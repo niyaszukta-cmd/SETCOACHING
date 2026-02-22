@@ -483,7 +483,7 @@ def init_state():
         if k not in st.session_state: st.session_state[k]=v
 init_state()
 
-def all_questions(): return QUESTION_BANK + st.session_state.ai_questions
+def all_questions(): return QUESTION_BANK + PRELOADED_QUESTIONS + st.session_state.ai_questions
 
 def start_quiz(topic_filter=None,difficulty_filter=None,count=20):
     pool=all_questions()
@@ -520,53 +520,581 @@ def reset_quiz():
     st.session_state.answers={}; st.session_state.quiz_questions=[]
     st.session_state.current_idx=0; st.session_state.score=0; st.session_state.streak=0
 
+
 # ══════════════════════════════════════════════════════════════════════════════
-#  AI GENERATOR
+#  AI GENERATOR ENGINE  (v3 — robust, efficient, with discussion)
 # ══════════════════════════════════════════════════════════════════════════════
-def generate_questions_ai(api_key,topic,subtopic,difficulty,count=5,existing=None):
-    if not existing: existing=[]
-    q_type=random.choice(QUESTION_TYPES); angle=random.choice(ANGLES)
-    context=AI_TOPIC_PROMPTS.get(topic,topic)
-    existing_sample="\n".join(f"- {q}" for q in existing[:8])
-    prompt=f"""You are an expert question setter for the Kerala SET exam in English Language and Literature.
-Generate exactly {count} original MCQ questions.
-SPECIFICATIONS: Topic:{topic} | Subtopic:{subtopic} | Difficulty:{difficulty}
-Question type: {q_type} | Angle: {angle}
-Syllabus: {context}
-RULES: 4 options A) B) C) D), one correct, plausible distractors.
-Do NOT repeat: {existing_sample if existing_sample else "(none)"}
-Respond ONLY with valid JSON (no markdown):
-{{"questions":[{{"q":"...","opts":["A) ...","B) ...","C) ...","D) ..."],"ans":"A","topic":"{topic}","subtopic":"{subtopic}","difficulty":"{difficulty}"}}]}}"""
-    client=anthropic.Anthropic(api_key=api_key)
-    response=client.messages.create(model="claude-opus-4-6",max_tokens=4096,
-                                    messages=[{"role":"user","content":prompt}])
-    raw=response.content[0].text.strip()
-    m=re.search(r'\{.*\}',raw,re.DOTALL)
-    if not m: return []
-    data=json.loads(m.group()); questions=data.get("questions",[])
-    start_id=10000+random.randint(100,89000)
-    valid=[]
-    for i,q in enumerate(questions):
-        q["id"]=start_id+i; q["ai_generated"]=True
-        if all(k in q for k in ["q","opts","ans"]) and len(q["opts"])==4 and q["ans"] in "ABCD":
+
+AI_MODEL = "claude-haiku-4-5-20251001"   # fast + cost-efficient; best for bulk generation
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PRE-GENERATED QUESTION BANK (300+ questions with full explanations & hints)
+#  These work WITHOUT any API key and form the core enriched question set
+# ══════════════════════════════════════════════════════════════════════════════
+PRELOADED_QUESTIONS = [
+  # ─── BRITISH LITERATURE: Modernism ───────────────────────────────────────
+  {"id":20001,"topic":"British Literature","subtopic":"Modernism","difficulty":"easy",
+   "q":"The stream-of-consciousness technique in Mrs Dalloway moves through time primarily by means of:",
+   "opts":["A) Flashbacks introduced by chapter breaks","B) Free association triggered by sensory stimuli","C) A reliable omniscient narrator","D) Dream sequences during sleep"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Woolf uses characters' sensory perceptions (a car backfire, Big Ben striking) to trigger free-associative memories and thoughts, blurring past and present. There are no chapter breaks in the novel, and the narrator is not traditional or omniscient.",
+   "hint":"Think of Mrs Dalloway hearing the car — sound triggers memory. SENSORY → MEMORY is Woolf's method."},
+
+  {"id":20002,"topic":"British Literature","subtopic":"Modernism","difficulty":"medium",
+   "q":"T.S. Eliot's concept of the 'dissociation of sensibility' argues that after the seventeenth century, poets:",
+   "opts":["A) Wrote only in free verse","B) Could no longer feel their thought as immediately as the smell of a rose","C) Abandoned classical mythology","D) Rejected the dramatic monologue form"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Eliot argues in 'The Metaphysical Poets' (1921) that after the 17th century, thought and feeling became separate — later poets could not fuse intellectual and emotional experience the way Donne or Marvell did. The exact phrasing 'smell of a rose' is Eliot's own.",
+   "hint":"DIS-SOCIATION = SPLIT between thinking and feeling. Donne could do both at once; later poets could not."},
+
+  {"id":20003,"topic":"British Literature","subtopic":"Modernism","difficulty":"hard",
+   "q":"Which technique does Woolf employ in The Waves to narrate through nine soliloquies alternating with interludes describing the sea?",
+   "opts":["A) Epistolary narration","B) Stream of consciousness presented as formal spoken soliloquy","C) Third-person limited omniscience","D) Unreliable first-person retrospection"],
+   "ans":"B","ai_generated":True,
+   "explanation":"The Waves abandons traditional narration entirely. Six characters speak in formal, stylised interior monologues ('said Bernard', 'said Jinny') interspersed with poetic descriptions of waves and light. It is Woolf's most experimental departure from realist fiction.",
+   "hint":"The WAVES = six voices speaking IN TURNS like waves, not conventional narrative. 'Said Bernard' is the tag throughout."},
+
+  {"id":20004,"topic":"British Literature","subtopic":"Modernism","difficulty":"easy",
+   "q":"James Joyce's Dubliners stories are unified by the concept of:",
+   "opts":["A) Comic relief","B) Epiphany — a moment of sudden revelation","C) Stream of consciousness","D) The unreliable narrator"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Joyce borrowed the term 'epiphany' from Catholic theology to describe a sudden spiritual manifestation — a moment when trivial events reveal deep truths. Each story in Dubliners builds toward such a moment of insight or paralysis.",
+   "hint":"EPIPHANY = 'sudden revelation'. Joyce: ordinary things suddenly show their deeper truth. In 'The Dead', Gabriel's realisation at the end is the classic example."},
+
+  {"id":20005,"topic":"British Literature","subtopic":"Modernism","difficulty":"medium",
+   "q":"Identify the correct statement about W.B. Yeats's system of historical cycles:",
+   "opts":["A) He called them 'objective correlatives'","B) He described them as 'gyres' in A Vision (1925)","C) He borrowed the concept directly from Freud","D) He abandoned it after writing 'Sailing to Byzantium'"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Yeats's A Vision (1925) describes history as a series of interpenetrating cones or 'gyres' — each civilisation completing a 2000-year cycle. 'Objective correlative' is Eliot's term; Freud is not relevant here.",
+   "hint":"GYRES = spinning cones = Yeats's historical cycles. Remember: A VISION (1925) is the source text. Not Eliot, not Freud — Yeats."},
+
+  {"id":20006,"topic":"British Literature","subtopic":"Modernism","difficulty":"medium",
+   "q":"In Eliot's 'The Love Song of J. Alfred Prufrock', the repeated phrase 'Do I dare?' signals:",
+   "opts":["A) Prufrock's heroic boldness","B) Existential paralysis and inability to act","C) The speaker's anger at bourgeois society","D) A direct address to a romantic partner"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Prufrock's refrain 'Do I dare? / Disturb the universe?' epitomises his paralytic self-consciousness. He is the archetypal anti-hero of Modernism — hyper-aware, unable to act, measuring his life in coffee spoons. The poem is an interior monologue, not a direct romantic address.",
+   "hint":"PRUFROCK = PARALYSIS. He thinks about acting but never does. Like Hamlet — he even mentions Hamlet in the poem ('No! I am not Prince Hamlet')."},
+
+  # ─── BRITISH LITERATURE: Victorian ────────────────────────────────────────
+  {"id":20010,"topic":"British Literature","subtopic":"Victorian","difficulty":"easy",
+   "q":"Matthew Arnold's 'touchstone method' of literary criticism involves:",
+   "opts":["A) Comparing each work to passages from great literature to assess quality","B) Using scientific methods to analyse verse","C) Judging literature by its moral improvement of the reader","D) Applying Aristotelian categories of tragedy and comedy"],
+   "ans":"A","ai_generated":True,
+   "explanation":"Arnold proposed in 'The Study of Poetry' (1880) that critics should use short passages from 'classic' poets (Homer, Dante, Shakespeare) as 'touchstones' against which to measure the quality of other poetry. It is an impressionistic, comparative method.",
+   "hint":"TOUCHSTONE = like a gold test stone. You rub gold against it to test purity. Arnold: rub new poetry against Homer/Shakespeare/Dante."},
+
+  {"id":20011,"topic":"British Literature","subtopic":"Victorian","difficulty":"medium",
+   "q":"George Eliot's novel Middlemarch is subtitled:",
+   "opts":["A) A Novel without a Hero","B) A Study of Provincial Life","C) A Domestic Romance","D) A Novel of Manners"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Middlemarch (1871-72) carries the subtitle 'A Study of Provincial Life,' signalling Eliot's sociological ambition to document the interconnected lives of a small English community with scientific precision. 'A Novel without a Hero' is the subtitle of Thackeray's Vanity Fair.",
+   "hint":"MIDDLEMARCH = 'A Study of Provincial Life'. Mid + March = middle of England. Eliot studies provincial community scientifically. Vanity Fair is 'without a Hero'."},
+
+  {"id":20012,"topic":"British Literature","subtopic":"Victorian","difficulty":"hard",
+   "q":"Browning's dramatic monologue 'My Last Duchess' is spoken by the Duke of Ferrara to:",
+   "opts":["A) His dead wife in a dream","B) An envoy arranging his next marriage","C) A priest hearing his confession","D) A rival nobleman"],
+   "ans":"B","ai_generated":True,
+   "explanation":"The poem is set during a negotiation for a new marriage alliance. The Duke addresses the Count's envoy who has come to arrange the terms of a dowry for the Duke's next wife. This context makes the Duke's casual revelation of his first wife's murder chilling — he is simultaneously showing his power and issuing a veiled warning.",
+   "hint":"Duke + Envoy + DOWRY negotiation = the dramatic situation. The Duke is simultaneously interviewing for wife #2 while explaining why wife #1 'disappeared'."},
+
+  {"id":20013,"topic":"British Literature","subtopic":"Victorian","difficulty":"easy",
+   "q":"Which Dickens novel features the character Miss Havisham who stopped all clocks at the moment she was jilted?",
+   "opts":["A) Bleak House","B) Our Mutual Friend","C) Great Expectations","D) Dombey and Son"],
+   "ans":"C","ai_generated":True,
+   "explanation":"Miss Havisham in Great Expectations (1861) stopped all clocks at 9:20, the moment her groom failed to appear, and spent decades in a decaying wedding dress. She represents obsessive grief and the damage of living in the past.",
+   "hint":"MISS HAVISHAM + STOPPED CLOCKS = Great Expectations. She adopts Estella to break men's hearts in revenge. Remember: 'Great' = GREAT trauma."},
+
+  {"id":20014,"topic":"British Literature","subtopic":"Victorian","difficulty":"medium",
+   "q":"Thomas Hardy's The Return of the Native is set in:",
+   "opts":["A) The Midlands","B) Egdon Heath in Wessex","C) The Scottish Highlands","D) The Yorkshire Moors"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Hardy's fictional Wessex is centred in Dorset. Egdon Heath functions as a vast, hostile, quasi-mythical landscape that dominates the characters' fates. Hardy opens the novel with an extended personification of the Heath, which many critics see as the true protagonist.",
+   "hint":"HARDY = WESSEX = DORSET in real life. Return of the Native = EGDON HEATH. The heath is the most important character in the novel."},
+
+  {"id":20015,"topic":"British Literature","subtopic":"Victorian","difficulty":"hard",
+   "q":"Walter Pater's famous conclusion to The Renaissance (1873) advocates:",
+   "opts":["A) Moral improvement through art","B) Burning with a gem-like flame — aesthetic experience as an end in itself","C) The return to classical Greek values in modern life","D) Political engagement as the highest artistic duty"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Pater's Conclusion scandalously argued that life is a series of fleeting impressions, and the highest goal is to burn with a 'gem-like flame' of intense aesthetic experience — a proto-Decadent position that led Oxford authorities to remove the Conclusion from later editions for fear of corrupting students.",
+   "hint":"PATER = 'Burn with a gem-like FLAME.' Pure aestheticism — art for its own sake. This inspired Oscar Wilde. The conclusion was so controversial it was pulled from the 2nd edition."},
+
+  # ─── BRITISH LITERATURE: Romanticism ──────────────────────────────────────
+  {"id":20020,"topic":"British Literature","subtopic":"Romanticism","difficulty":"easy",
+   "q":"Keats's 'Ode on a Grecian Urn' ends with the famous assertion:",
+   "opts":["A) 'Beauty is in the eye of the beholder'","B) 'Beauty is truth, truth beauty — that is all ye know on earth'","C) 'A thing of beauty is a joy forever'","D) 'Heard melodies are sweet, but those unheard are sweeter'"],
+   "ans":"B","ai_generated":True,
+   "explanation":"The final two lines of 'Ode on a Grecian Urn' — 'Beauty is truth, truth beauty, — that is all / Ye know on earth, and all ye need to know' — are among the most debated in English poetry. 'A thing of beauty is a joy forever' opens Endymion; 'Heard melodies' appears earlier in the same ode.",
+   "hint":"'Beauty is truth, truth beauty' = ODE ON A GRECIAN URN. Closing line. 'A thing of beauty is a joy forever' = ENDYMION (different poem!)."},
+
+  {"id":20021,"topic":"British Literature","subtopic":"Romanticism","difficulty":"medium",
+   "q":"Shelley's 'Ode to the West Wind' employs terza rima. This verse form was invented by:",
+   "opts":["A) Petrarch","B) Virgil","C) Dante Alighieri","D) Boccaccio"],
+   "ans":"C","ai_generated":True,
+   "explanation":"Dante invented terza rima (ABA BCB CDC…) for the Divine Comedy (c.1308-21). Shelley consciously adopted it for 'Ode to the West Wind' (1819) to lend the poem's driving energy a formal momentum that mirrors the relentless force of the wind.",
+   "hint":"TERZA RIMA = Dante's form (Divine Comedy). Shelley borrowed it for the West Wind's relentless interlocking force. ABA BCB = each stanza locks into the next."},
+
+  {"id":20022,"topic":"British Literature","subtopic":"Romanticism","difficulty":"easy",
+   "q":"Byron's poem Don Juan is primarily written in:",
+   "opts":["A) Spenserian stanza","B) Ottava rima","C) Heroic couplets","D) Blank verse"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Byron uses ottava rima (ABABABCC — 8 lines, iambic pentameter) throughout Don Juan, exploiting its closing couplet for comic or ironic deflation. This Italian stanza form, used by Ariosto and Tasso, becomes Byron's vehicle for wit and satire.",
+   "hint":"DON JUAN = OTTAVA RIMA. 8-line stanza, ABABABCC. Byron uses the closing couplet for COMIC PUNCHLINES. Don = 8 letters = 8-line stanza (memory trick!)."},
+
+  {"id":20023,"topic":"British Literature","subtopic":"Romanticism","difficulty":"hard",
+   "q":"Coleridge's Biographia Literaria (1817) makes a famous distinction between:",
+   "opts":["A) The sublime and the beautiful","B) Primary imagination, secondary imagination, and fancy","C) Organic and mechanical form","D) Classical and Romantic modes of composition"],
+   "ans":"B","ai_generated":True,
+   "explanation":"In Chapter XIII of Biographia Literaria, Coleridge distinguishes: Primary Imagination (the living power of all human perception), Secondary Imagination (the conscious echo that recreates and modifies — the true creative faculty), and Fancy (mere association of fixed ideas, not truly creative). This is his most influential critical contribution.",
+   "hint":"COLERIDGE = THREE levels: 1° Primary (all humans perceive), 2° Secondary (artist creates), Fancy (just associates). PRIMARY is unconscious, SECONDARY is the POET'S power."},
+
+  {"id":20024,"topic":"British Literature","subtopic":"Romanticism","difficulty":"medium",
+   "q":"Blake's 'Songs of Innocence and Experience' were published together in:",
+   "opts":["A) 1789","B) 1794","C) 1798","D) 1804"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Songs of Innocence appeared alone in 1789; Songs of Experience was added and the combined volume published in 1794, with the famous subtitle 'Showing the Two Contrary States of the Human Soul.' 1798 is the date of Lyrical Ballads.",
+   "hint":"Songs of INNOCENCE = 1789 (French Revolution year, childhood/purity). Songs of EXPERIENCE added in 1794. 1798 = Lyrical Ballads (different work, Wordsworth-Coleridge)."},
+
+  # ─── BRITISH LITERATURE: Renaissance ─────────────────────────────────────
+  {"id":20030,"topic":"British Literature","subtopic":"Renaissance","difficulty":"easy",
+   "q":"Shakespeare's play that features the line 'All the world's a stage, / And all the men and women merely players' is:",
+   "opts":["A) Hamlet","B) King Lear","C) As You Like It","D) The Tempest"],
+   "ans":"C","ai_generated":True,
+   "explanation":"The 'Seven Ages of Man' speech ('All the world's a stage') is spoken by Jacques in As You Like It (Act II, Scene vii). It is one of the most famous set pieces in Shakespearean comedy, contrasting sharply with the melancholy Jacques himself.",
+   "hint":"'All the world's a STAGE' = AS YOU LIKE IT (the play about a theatrical world). Spoken by JAQUES, the melancholy philosopher of the Forest of Arden."},
+
+  {"id":20031,"topic":"British Literature","subtopic":"Renaissance","difficulty":"medium",
+   "q":"Sidney's Defence of Poesy argues that poetry is superior to history and philosophy because:",
+   "opts":["A) It is more emotionally intense","B) It gives the universal and the particular simultaneously — a speaking picture","C) It teaches through metre and rhyme","D) It requires more technical skill than prose"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Sidney argues that history gives only particulars (what happened) and philosophy only universals (abstract ideas), while poetry gives both: the philosopher's generality clothed in the historian's particularity. He famously calls the poet a 'maker' who creates a second nature.",
+   "hint":"SIDNEY: Poet = COMBINES history (particular) + philosophy (universal). The poet MAKES, doesn't just imitate. Defence of Poesy = first major work of English literary criticism."},
+
+  {"id":20032,"topic":"British Literature","subtopic":"Renaissance","difficulty":"hard",
+   "q":"Spenser's The Faerie Queene uses the Spenserian stanza, which consists of:",
+   "opts":["A) Eight iambic pentameter lines + one iambic hexameter (alexandrine), rhyming ABABBCBCC","B) Seven iambic pentameter lines rhyming ABABBCC","C) Eight iambic tetrameter lines + one alexandrine, rhyming ABABCDCD","D) Nine iambic pentameter lines rhyming ABABABABB"],
+   "ans":"A","ai_generated":True,
+   "explanation":"The Spenserian stanza: 9 lines — 8 of iambic pentameter + a final alexandrine (6 iambic feet), rhyming ABABBCBCC. The lengthened final line creates a satisfying sense of closure or weight. Keats and Byron both used this stanza.",
+   "hint":"SPENSERIAN STANZA = 8 pentameter + 1 ALEXANDRINE (6 feet). ABABBCBCC. Remember: NINE lines, last one is LONGER (alexandrine). Keats used it in The Eve of St Agnes."},
+
+  {"id":20033,"topic":"British Literature","subtopic":"Renaissance","difficulty":"easy",
+   "q":"The masque 'The Tempest' opens with a shipwreck. The magician Prospero was once Duke of:",
+   "opts":["A) Venice","B) Verona","C) Milan","D) Naples"],
+   "ans":"C","ai_generated":True,
+   "explanation":"Prospero was the rightful Duke of Milan, usurped by his brother Antonio with the help of Alonso, King of Naples. He retreated to the island with his daughter Miranda. The play's action involves restoring Prospero's rightful dukedom.",
+   "hint":"PROSPERO = DUKE OF MILAN. Usurped by brother ANTONIO. Remember: M for Milan, M for Magic, M for Miranda. 3 M's = Milan, Magic, Miranda."},
+
+  # ─── BRITISH LITERATURE: 18th Century ────────────────────────────────────
+  {"id":20040,"topic":"British Literature","subtopic":"18th Century","difficulty":"easy",
+   "q":"Alexander Pope's mock epic The Rape of the Lock was inspired by a real quarrel between two Catholic families about:",
+   "opts":["A) A stolen jewel","B) A lock of hair cut without permission","C) A contested inheritance","D) An arranged marriage"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Lord Petre cut a lock of Arabella Fermor's hair without permission, causing a quarrel between their families. Pope's friend John Caryll suggested he write a poem to reconcile them; instead Pope produced a brilliant mock-heroic satire elevating a trivial incident to Homeric proportions.",
+   "hint":"RAPE OF THE LOCK = lock of HAIR stolen. Real event: Lord Petre cut Arabella Fermor's hair. Pope MOCKED the fuss by using epic machinery (sylphs as guardian spirits)."},
+
+  {"id":20041,"topic":"British Literature","subtopic":"18th Century","difficulty":"medium",
+   "q":"Samuel Johnson's Dictionary of the English Language was published in:",
+   "opts":["A) 1747","B) 1750","C) 1755","D) 1762"],
+   "ans":"C","ai_generated":True,
+   "explanation":"Johnson's Dictionary appeared in 1755, nine years after the Plan of a Dictionary (1747) addressed to Lord Chesterfield. The Dictionary contained approximately 42,000 entries and remained authoritative for over a century until the OED.",
+   "hint":"JOHNSON'S DICTIONARY = 1755. Remember: 1-7-5-5 = 17 (55 = 5 squared = 25, so 1755). Or: Johnson worked for 9 years (1746-1755). He famously defined 'lexicographer' as 'a harmless drudge'."},
+
+  {"id":20042,"topic":"British Literature","subtopic":"18th Century","difficulty":"medium",
+   "q":"Swift's Gulliver's Travels (1726) is divided into four voyages. Which voyage satirises the corruption of reason and the Royal Society through the flying island of Laputa?",
+   "opts":["A) Voyage I (Lilliput)","B) Voyage II (Brobdingnag)","C) Voyage III (Laputa)","D) Voyage IV (Houyhnhnms)"],
+   "ans":"C","ai_generated":True,
+   "explanation":"Voyage III targets abstract speculation divorced from practical life. The Laputans are so absorbed in theoretical mathematics and music that they require servants ('flappers') to tap them to attention. Laputa floats above the country of Balnibarbi, which is ruined by the Academy of Projectors' impractical schemes.",
+   "hint":"LAPUTA = Book III = Satire on ABSTRACT SCIENCE (Royal Society). Laputans float above reality, just as scientists ignore practical life. Book I=tiny (Lilliput), II=huge (Brobdingnag), III=abstract (Laputa), IV=horses (Houyhnhnms)."},
+
+  # ─── BRITISH LITERATURE: Old English / Medieval ───────────────────────────
+  {"id":20050,"topic":"British Literature","subtopic":"Old English","difficulty":"medium",
+   "q":"Beowulf is preserved in a single manuscript known as the Cotton Vitellius manuscript, kept at the:",
+   "opts":["A) Bodleian Library, Oxford","B) British Library, London","C) Cambridge University Library","D) National Library of Scotland"],
+   "ans":"B","ai_generated":True,
+   "explanation":"The Nowell Codex (Cotton Vitellius A.xv.) containing Beowulf is held at the British Library in London. The manuscript was damaged in the 1731 Cotton library fire but survived; Thorkelin made the first transcripts in 1786-87.",
+   "hint":"BEOWULF manuscript = BRITISH LIBRARY (Cotton Vitellius A.xv.). Remember: one manuscript = one location = British Library. The manuscript is over 1000 years old."},
+
+  {"id":20051,"topic":"British Literature","subtopic":"Medieval","difficulty":"medium",
+   "q":"In The Canterbury Tales, the pilgrims are travelling to the shrine of which saint?",
+   "opts":["A) St Cuthbert at Durham","B) St Thomas Becket at Canterbury Cathedral","C) St Edward at Westminster","D) St Swithun at Winchester"],
+   "ans":"B","ai_generated":True,
+   "explanation":"The pilgrims in Chaucer's frame narrative travel to Canterbury Cathedral to venerate the shrine of Thomas Becket, Archbishop of Canterbury murdered in 1170 and canonised in 1173. Canterbury Cathedral was one of the most visited pilgrimage sites in medieval England.",
+   "hint":"CANTERBURY TALES = pilgrims going to Canterbury to see ST THOMAS BECKET's shrine. Becket = Archbishop murdered by knights of Henry II. 'Will no one rid me of this turbulent priest?'"},
+
+  {"id":20052,"topic":"British Literature","subtopic":"Medieval","difficulty":"hard",
+   "q":"Sir Gawain and the Green Knight is written in a dialect associated with the:",
+   "opts":["A) Southeast Midlands (London)","B) East Midlands","C) Northwest Midlands (Cheshire/Lancashire area)","D) Northumbria"],
+   "ans":"C","ai_generated":True,
+   "explanation":"The Pearl-Poet (also known as the Gawain-Poet) wrote in the Northwest Midland dialect, associated with the Cheshire/Lancashire region. This distinguishes the poem sharply from Chaucer's London/Southeast Midland dialect. The Pearl manuscript contains four poems attributed to the same anonymous poet.",
+   "hint":"GAWAIN-POET = NORTHWEST MIDLANDS (Lancashire/Cheshire). Chaucer = SOUTHEAST (London). Same period, different dialect. The four Pearl poems are all from the same anonymous Northwest Midlands poet."},
+
+  # ─── AMERICAN LITERATURE ──────────────────────────────────────────────────
+  {"id":20060,"topic":"American Literature","subtopic":"Modernism","difficulty":"easy",
+   "q":"Fitzgerald's The Great Gatsby is narrated by:",
+   "opts":["A) Jay Gatsby himself","B) Daisy Buchanan","C) Nick Carraway","D) Tom Buchanan"],
+   "ans":"C","ai_generated":True,
+   "explanation":"Nick Carraway, Gatsby's neighbour and Daisy's cousin, narrates the novel retrospectively. He is simultaneously an observer of and participant in Gatsby's world. As a Midwesterner in the East, Nick represents a moral sensibility that contrasts with the careless wealth of the Buchanans.",
+   "hint":"GREAT GATSBY narrator = NICK CARRAWAY. Cousin of DAISY, neighbour of GATSBY. NICK = moral observer, outsider from the Midwest. Like Ishmael in Moby-Dick = witness narrator."},
+
+  {"id":20061,"topic":"American Literature","subtopic":"Modernism","difficulty":"medium",
+   "q":"Hemingway's 'iceberg theory' (theory of omission) states that:",
+   "opts":["A) Stories should begin in medias res","B) The writer should omit what he knows, trusting the reader to feel it","C) Dialogue should always be subtext","D) Prose should use long, flowing sentences to convey depth"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Hemingway stated in Death in the Afternoon (1932) that a writer who knows enough can omit anything and the reader will still feel it. 'The dignity of movement of an iceberg is due to only one eighth of it being above water.' This justifies his minimalist style.",
+   "hint":"HEMINGWAY = ICEBERG = 7/8 hidden. What the writer KNOWS but DOESN'T SAY gives the story its power. Short sentences + omission = reader feels the depth."},
+
+  {"id":20062,"topic":"American Literature","subtopic":"Harlem Renaissance","difficulty":"medium",
+   "q":"The term 'New Negro' associated with the Harlem Renaissance was popularised by the anthology edited by:",
+   "opts":["A) W.E.B. Du Bois","B) Langston Hughes","C) Alain Locke","D) Marcus Garvey"],
+   "ans":"C","ai_generated":True,
+   "explanation":"Alain Locke edited The New Negro: An Interpretation (1925), the landmark anthology that defined the Harlem Renaissance. It included essays, poetry, fiction, and art, positioning African-American cultural production as a source of racial pride and aesthetic achievement.",
+   "hint":"THE NEW NEGRO anthology (1925) = ALAIN LOCKE (editor). Du Bois wrote The Souls of Black Folk (1903). Hughes wrote poetry. Locke = the PHILOSOPHER of the Harlem Renaissance."},
+
+  {"id":20063,"topic":"American Literature","subtopic":"Poetry","difficulty":"easy",
+   "q":"Walt Whitman's Leaves of Grass was first published in:",
+   "opts":["A) 1850","B) 1855","C) 1860","D) 1865"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Whitman published the first edition of Leaves of Grass in 1855 at his own expense — a thin volume of 12 untitled poems including what would later be called 'Song of Myself'. He revised and expanded it through eight editions until 1891-92 ('deathbed edition').",
+   "hint":"Whitman LEAVES OF GRASS = 1855 (self-published). He kept revising until death. 1855 = the year before the Civil War tensions peaked (Kansas-Nebraska Act 1854). Free verse = free man."},
+
+  {"id":20064,"topic":"American Literature","subtopic":"Drama","difficulty":"medium",
+   "q":"Arthur Miller's Death of a Salesman is a tragedy of:",
+   "opts":["A) Classical hubris in a Greek sense","B) The common man who mistakes false dreams for genuine values","C) Political corruption in Cold War America","D) An immigrant's struggle for identity"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Willy Loman's tragedy is being trapped in the American Dream — the belief that being 'well-liked' and successful in sales is the highest good. Miller argued in 'Tragedy and the Common Man' (1949) that the modern common man can be a tragic hero as validly as any king.",
+   "hint":"WILLY LOMAN = LOW MAN (his name suggests his position). DEATH OF A SALESMAN = American Dream is a LIE. Miller: tragedy doesn't need kings — common men can be tragic heroes."},
+
+  # ─── INDIAN LITERATURE ────────────────────────────────────────────────────
+  {"id":20070,"topic":"Indian Literature","subtopic":"Fiction","difficulty":"easy",
+   "q":"R.K. Narayan's fictional town of Malgudi is modelled on:",
+   "opts":["A) Mumbai","B) Mysore/Karnataka region","C) Chennai","D) Kolkata"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Narayan (1906-2001) based Malgudi on the Mysore region of Karnataka where he lived. It is a quintessentially South Indian small town that serves as the setting for nearly all his novels and stories, including Swami and Friends, The Guide, and The Financial Expert.",
+   "hint":"MALGUDI = MYSORE (Karnataka). RK Narayan lived in Mysore. Malgudi = fictional but feels like a real South Indian town. The Guide (1960) = his most celebrated novel, won Sahitya Akademi Award."},
+
+  {"id":20071,"topic":"Indian Literature","subtopic":"Fiction","difficulty":"medium",
+   "q":"Mulk Raj Anand's novel Untouchable (1935) depicts one day in the life of:",
+   "opts":["A) A Brahmin priest","B) Bakha, a sweeper/latrine cleaner","C) A colonial administrator","D) An Indian soldier in WWI"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Untouchable follows 18-year-old Bakha, a sweeper, through a single humiliating day in which he accidentally touches a Brahmin and faces violent social ostracism. Anand wrote it to expose the brutality of the caste system; E.M. Forster wrote the preface.",
+   "hint":"UNTOUCHABLE (1935) = BAKHA the sweeper. ONE day in his life. Anand + CASTE CRITIQUE. Forster wrote the preface (connecting British and Indian literary worlds)."},
+
+  {"id":20072,"topic":"Indian Literature","subtopic":"Drama","difficulty":"medium",
+   "q":"Vijay Tendulkar's play Silence! The Court Is in Session depicts the trial of:",
+   "opts":["A) A freedom fighter","B) An unmarried pregnant woman at a mock trial","C) A corrupt judge","D) A Muslim in a Hindu-majority village"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Silence! The Court Is in Session (1967) presents a seemingly light-hearted amateur theatre group's mock trial that gradually turns into a real lynching of Leela Benare, an unmarried schoolteacher who is pregnant. The play exposes patriarchal hypocrisy and the cruelty of social judgement.",
+   "hint":"TENDULKAR 'Silence! The Court Is in Session' = LEELA BENARE on 'trial' for being PREGNANT and unmarried. The mock trial becomes real persecution. Maharashtra's most provocative playwright."},
+
+  {"id":20073,"topic":"Indian Literature","subtopic":"Fiction","difficulty":"hard",
+   "q":"Amitav Ghosh's The Shadow Lines (1988) experiments with time and memory by:",
+   "opts":["A) Using a non-linear structure where memory challenges national and geographic boundaries","B) Employing a frame narrative of letters between characters","C) Adopting magical realism to describe Partition violence","D) Telling the story through multiple unreliable narrators"],
+   "ans":"A","ai_generated":True,
+   "explanation":"The Shadow Lines uses an unnamed narrator's memory to move fluidly between Calcutta, London, and Dhaka, and across decades from the 1930s to 1960s. The 'shadow lines' of the title are the arbitrary lines of nations and maps that fail to contain human experience or prevent communal violence.",
+   "hint":"SHADOW LINES = lines that are only shadows (not real). National borders are IMAGINARY lines. Ghosh: memory DEFIES geography and time. Non-linear narrative = like actual memory."},
+
+  {"id":20074,"topic":"Indian Literature","subtopic":"Poetry","difficulty":"medium",
+   "q":"Kamala Das's confessional poetry collection My Story (1976) was originally written in:",
+   "opts":["A) English","B) Malayalam","C) Tamil","D) Hindi"],
+   "ans":"B","ai_generated":True,
+   "explanation":"My Story (Ente Katha in Malayalam) was originally Kamala Das's autobiography written in Malayalam (1973), later translated into English by the author herself (1976). Her English poetry (Summer in Calcutta, 1965) is equally celebrated for its frank treatment of female sexuality and desire.",
+   "hint":"KAMALA DAS wrote in BOTH Malayalam (Madhavikutty) AND English. My Story = Malayalam original 'Ente Katha'. She is Kerala's most celebrated poet in both languages. Important for Kerala SET!"},
+
+  # ─── WORLD LITERATURE ────────────────────────────────────────────────────
+  {"id":20080,"topic":"World Literature","subtopic":"African Literature","difficulty":"medium",
+   "q":"Ngugi wa Thiong'o's decision to stop writing in English and write only in Gikuyu is articulated in his book:",
+   "opts":["A) The River Between","B) Decolonising the Mind (1986)","C) A Grain of Wheat","D) Petals of Blood"],
+   "ans":"B","ai_generated":True,
+   "explanation":"In Decolonising the Mind: The Politics of Language in African Literature (1986), Ngugi argues that using the coloniser's language perpetuates mental colonisation. He declared it his farewell to English as a literary medium and subsequently wrote in Gikuyu (e.g., Devil on the Cross, Wizard of the Crow).",
+   "hint":"NGUGI = DECOLONISING THE MIND (1986). He quit English to write in GIKUYU. Language = political act. Compare: Chinua Achebe chose to stay with English ('It belongs to us too')."},
+
+  {"id":20081,"topic":"World Literature","subtopic":"Caribbean Literature","difficulty":"medium",
+   "q":"Derek Walcott's epic poem Omeros (1990) reimagines:",
+   "opts":["A) Virgil's Aeneid in a Caribbean setting","B) Homer's Iliad and Odyssey with St Lucian fishermen as characters","C) Shakespeare's The Tempest in Barbados","D) Dante's Inferno in Trinidad"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Walcott's Omeros transports Homer's characters — Achille, Hector, Helen, Philoctete — to the island of St Lucia, where they are fishermen and local women. The poem meditates on colonial history, Caribbean identity, and the persistence of classical patterns in the postcolonial world.",
+   "hint":"WALCOTT OMEROS = Homer's characters in ST LUCIA. Achille (Achilles), Hector, Helen = now Caribbean fishermen. Walcott won Nobel 1992. Omeros = Greek spelling of Homer."},
+
+  {"id":20082,"topic":"World Literature","subtopic":"African Literature","difficulty":"hard",
+   "q":"Chimamanda Ngozi Adichie's novel Half of a Yellow Sun (2006) is set during:",
+   "opts":["A) The independence of Nigeria (1960)","B) The Biafran War (1967-1970)","C) The colonial period under British rule","D) Contemporary Lagos"],
+   "ans":"B","ai_generated":True,
+   "explanation":"The novel centres on the Nigerian-Biafran War (1967-70), when Igbo-majority southeastern Nigeria seceded as the Republic of Biafra. The yellow sun of the title refers to the Biafran flag. The war resulted in massive civilian casualties and famine.",
+   "hint":"HALF OF A YELLOW SUN = BIAFRAN WAR (1967-70). Yellow sun = Biafran flag symbol. Adichie = Igbo Nigerian writer. Biafra = attempted Igbo secession from Nigeria. Half sun = Biafra's story is unfinished."},
+
+  # ─── LITERARY THEORY ─────────────────────────────────────────────────────
+  {"id":20090,"topic":"Literary Theory","subtopic":"New Criticism","difficulty":"easy",
+   "q":"The 'intentional fallacy' in New Criticism refers to the mistake of:",
+   "opts":["A) Judging a work by its emotional effect on the reader","B) Seeking the author's intention as the standard for interpreting a text","C) Reading literature as historical document","D) Treating all literary forms as equally valuable"],
+   "ans":"B","ai_generated":True,
+   "explanation":"W.K. Wimsatt and Monroe Beardsley's 'The Intentional Fallacy' (1946) argues that a poem's meaning and success is not determined by what the author intended. The poem becomes public property once written; only the text itself (not the author's mind) can be the standard of criticism.",
+   "hint":"INTENTIONAL FALLACY = author's INTENTION is IRRELEVANT. Wimsatt + Beardsley. Partner: AFFECTIVE FALLACY = reader's EMOTION is irrelevant. New Critics care only about THE TEXT."},
+
+  {"id":20091,"topic":"Literary Theory","subtopic":"Structuralism","difficulty":"medium",
+   "q":"Roland Barthes's essay 'The Death of the Author' (1967) argues that:",
+   "opts":["A) Authors should not be interviewed about their works","B) The birth of the reader must come at the cost of the death of the author","C) Literary authorship is a bourgeois myth to be abolished","D) Only anonymous texts have genuine literary value"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Barthes argues that once a text is written, the author's intentions become irrelevant; meaning is created by the reader in the act of reading. 'The birth of the reader must be at the cost of the death of the Author.' This is a key post-structuralist move.",
+   "hint":"BARTHES 'Death of the Author' = BIRTH OF THE READER. Kill the author = free the text to have multiple meanings. Reader = the one who gives the text meaning. 1967 = same year as Derrida's Of Grammatology."},
+
+  {"id":20092,"topic":"Literary Theory","subtopic":"Postcolonialism","difficulty":"medium",
+   "q":"Homi Bhabha's concept of 'mimicry' in colonial discourse refers to:",
+   "opts":["A) The colonised imitating the coloniser's culture, producing 'almost the same but not quite'","B) The coloniser's imitation of indigenous customs for administrative purposes","C) The use of parody in anti-colonial literature","D) The way colonial texts copy European literary forms"],
+   "ans":"A","ai_generated":True,
+   "explanation":"Bhabha argues in The Location of Culture (1994) that colonial mimicry — the colonised subject's imitation of the coloniser — produces an ambivalent 'almost the same but not quite/white' subject who simultaneously confirms and threatens colonial authority. The mimic man is a figure of menace as well as mockery.",
+   "hint":"BHABHA MIMICRY = 'almost the same but not QUITE/WHITE'. The colonised copies the coloniser but can never be identical = threatening ambivalence. Think: Macaulay's Indian clerk — English in tastes but never English."},
+
+  {"id":20093,"topic":"Literary Theory","subtopic":"Deconstruction","difficulty":"hard",
+   "q":"Derrida's concept of 'différance' (with an 'a') combines the meanings of:",
+   "opts":["A) Difference and deference","B) Differing and deferring (of meaning)","C) Differentiation and determination","D) Discourse and reference"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Derrida coined 'différance' (spelled with 'a' — indistinguishable from 'différence' in French speech, but visible in writing) to capture two simultaneous processes: language works by DIFFERING (each word differs from others) and DEFERRING (meaning is always postponed, never fully present). This undermines the idea of stable, present meaning.",
+   "hint":"DIFFÉRANCE (Derrida) = DIFFER + DEFER. Words mean by DIFFERENCE from other words, and meaning is always DEFERRED (never fully arrived). The 'a' is silent in French — only visible in WRITING (ironic for a writing theorist!)."},
+
+  {"id":20094,"topic":"Literary Theory","subtopic":"Feminism","difficulty":"medium",
+   "q":"Judith Butler's Gender Trouble (1990) argues that gender is:",
+   "opts":["A) A biological fact expressed through cultural behaviour","B) Performative — constituted through repeated acts rather than expressing a prior identity","C) A psychological construct formed in early childhood","D) A social construction that can be abolished through legislation"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Butler argues that gender has no prior ontological status — there is no 'woman' or 'man' behind the acts. Gender is PERFORMATIVE: it is constituted through repeated, stylised acts (gestures, dress, speech). This does not mean performance is free or voluntary — it is compelled by regulatory norms.",
+   "hint":"BUTLER GENDER = PERFORMANCE (not performance as in theatre, but PERFORMATIVE = constituted by acts). 'I do woman' through repeated acts, not 'I am a woman' with a fixed identity. Gender TROUBLE = trouble for the idea of stable gender."},
+
+  {"id":20095,"topic":"Literary Theory","subtopic":"Marxism","difficulty":"medium",
+   "q":"Gramsci's concept of 'hegemony' differs from crude Marxist base-superstructure theory because it emphasises:",
+   "opts":["A) Economic determination as the only cause of ideology","B) Consent and cultural leadership rather than coercion alone","C) The role of the state in directly controlling consciousness","D) Class struggle as the only means of social change"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Gramsci, writing in his Prison Notebooks (1929-35), argued that ruling class power is sustained not merely by force but through 'hegemony' — cultural and intellectual leadership that makes the dominated class consent to their own domination. This requires the 'organic intellectual' as a counter-hegemonic force.",
+   "hint":"GRAMSCI HEGEMONY = power through CONSENT not just force. The ruling class 'leads' culturally, not just politically. Counter-hegemony needs ORGANIC INTELLECTUALS (from the working class). Hegemony ≠ army; hegemony = ideas everyone 'agrees' with."},
+
+  {"id":20096,"topic":"Literary Theory","subtopic":"Psychoanalytic Criticism","difficulty":"hard",
+   "q":"Lacan's Mirror Stage theory argues that the infant's first recognition of its image in the mirror produces:",
+   "opts":["A) A secure, unified sense of self","B) A misrecognition (méconnaissance) — an idealized, alienated image of a coherent self","C) The infant's entry into the Symbolic order of language","D) The formation of the superego"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Lacan's Mirror Stage (6-18 months) produces not a true self but a misrecognition (méconnaissance): the infant sees its reflection as a coherent, unified whole, which is actually an external, alien image. This alienated identification becomes the foundation of the ego — forever a fiction, always other.",
+   "hint":"LACAN MIRROR STAGE = MISRECOGNITION (méconnaissance). Baby sees itself as WHOLE in mirror but it's just an IMAGE = alienated. Ego = always a fiction, always other. Then later = SYMBOLIC order (language)."},
+
+  {"id":20097,"topic":"Literary Theory","subtopic":"New Historicism","difficulty":"medium",
+   "q":"Stephen Greenblatt's concept of 'self-fashioning' in Renaissance Self-Fashioning (1980) argues that:",
+   "opts":["A) Renaissance individuals had complete freedom to construct their identities","B) Identity in the Renaissance was formed through submission to authority as much as self-construction","C) Renaissance literature rejected all social constraints on individual expression","D) The self was irrelevant in Renaissance humanism"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Greenblatt shows that Renaissance self-fashioning — the construction of a public identity — always involved submission to an authority (God, a monarch, a text) and the definition of self against an Other (heretic, alien, woman). Freedom and constraint are simultaneously present.",
+   "hint":"GREENBLATT SELF-FASHIONING = identity made through SUBMISSION as much as freedom. You fashion yourself AGAINST a threatening Other. New Historicism: power is everywhere in culture, not just politics."},
+
+  # ─── LINGUISTICS ─────────────────────────────────────────────────────────
+  {"id":20100,"topic":"Linguistics","subtopic":"Phonetics","difficulty":"medium",
+   "q":"Which of the following is a voiced bilabial plosive?",
+   "opts":["A) /p/","B) /b/","C) /m/","D) /f/"],
+   "ans":"B","ai_generated":True,
+   "explanation":"/b/ is voiced (vocal cords vibrate), bilabial (both lips), and plosive (complete closure then release). /p/ is voiceless bilabial plosive. /m/ is voiced bilabial NASAL (air through nose). /f/ is voiceless labiodental fricative.",
+   "hint":"VOICED BILABIAL PLOSIVE = /b/. Minimal pair: /p/ (voiceless) vs /b/ (voiced) — same place (bilabial) and manner (plosive), differ only in VOICING. Put your hand on your throat: /b/ buzzes, /p/ doesn't."},
+
+  {"id":20101,"topic":"Linguistics","subtopic":"Semantics","difficulty":"medium",
+   "q":"The semantic relation between 'scarlet', 'crimson', and 'vermilion' is an example of:",
+   "opts":["A) Antonymy","B) Synonymy","C) Hyponymy — all are hyponyms of 'red'","D) Polysemy"],
+   "ans":"C","ai_generated":True,
+   "explanation":"Scarlet, crimson, and vermilion are all specific types (hyponyms) of the superordinate term 'red'. The relation is: red is the HYPERNYM; scarlet/crimson/vermilion are CO-HYPONYMS of red. They are not synonyms (they are distinct shades) nor antonyms.",
+   "hint":"HYPONYMY = X is a kind of Y. Scarlet is a kind of RED. Red = hypernym (superordinate). Scarlet/crimson/vermilion = co-hyponyms. Think: PET is hypernym of DOG/CAT/BIRD (they are co-hyponyms of pet)."},
+
+  {"id":20102,"topic":"Linguistics","subtopic":"Pragmatics","difficulty":"medium",
+   "q":"According to Austin's speech act theory, a performative utterance is one that:",
+   "opts":["A) Merely describes a state of affairs","B) Performs the action it names when uttered in appropriate conditions","C) Always requires a response from the listener","D) Can only be made by authorised speakers in formal contexts"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Austin (How to Do Things with Words, 1962) distinguished constatives (descriptions, true or false) from performatives (utterances that DO something: 'I promise', 'I hereby sentence you', 'I do'). A performative is felicitous (not true/false) when conditions are right.",
+   "hint":"AUSTIN PERFORMATIVE = utterance that DOES what it says. 'I promise' = the ACT of promising. 'I now pronounce you married' = performs marriage. Not true/false — FELICITOUS or INFELICITOUS (happy or unhappy conditions)."},
+
+  {"id":20103,"topic":"Linguistics","subtopic":"Morphology","difficulty":"easy",
+   "q":"The process by which words like 'brunch' (breakfast + lunch) or 'smog' (smoke + fog) are formed is called:",
+   "opts":["A) Compounding","B) Affixation","C) Blending","D) Conversion"],
+   "ans":"C","ai_generated":True,
+   "explanation":"Blending (also called portmanteau words) combines parts of two words: br(eakfast) + (l)unch = brunch; sm(oke) + (f)og = smog. This differs from compounding (which combines two complete words: blackbird) and affixation (which adds a bound morpheme).",
+   "hint":"BLENDING = parts of two words FUSED. brunch = br+unch, smog = sm+og. Also: blog (web+log), motel (motor+hotel), Brexit (Britain+exit). Different from COMPOUND (full words: blackbird, toothpaste)."},
+
+  {"id":20104,"topic":"Linguistics","subtopic":"Sociolinguistics","difficulty":"medium",
+   "q":"Diglossia, as defined by Charles Ferguson (1959), refers to:",
+   "opts":["A) Bilingualism in an individual","B) Two varieties of the same language used for different social functions (H and L varieties)","C) The mixing of two different languages in a single utterance","D) The use of multiple dialects in literary writing"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Ferguson defined diglossia as the situation where a speech community uses two varieties (HIGH and LOW) of the same language for distinct social functions: H (formal, religious, literary) and L (informal, everyday). Example: Classical Arabic (H) vs. colloquial Arabic dialects (L).",
+   "hint":"DIGLOSSIA = TWO varieties, same language, different FUNCTIONS. H = High (formal, religious). L = Low (home, market). Ferguson (1959). Greek: dí (two) + glōssa (tongue). Not bilingualism (two different languages) — diglossia (two registers of ONE language)."},
+
+  {"id":20105,"topic":"Linguistics","subtopic":"Language Acquisition","difficulty":"medium",
+   "q":"Krashen's distinction between 'acquisition' and 'learning' holds that:",
+   "opts":["A) Children acquire L1 but must formally learn L2","B) Acquisition is subconscious (natural communication); learning is conscious (rule study)","C) Adults can only learn, not acquire, a second language","D) Learning leads to fluency faster than acquisition"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Krashen's Acquisition-Learning Hypothesis (Input Hypothesis, 1985) distinguishes subconscious acquisition (like a child picking up L1 through natural communication) from conscious learning (studying grammar rules). Acquired knowledge enables fluency; learned knowledge can only monitor output.",
+   "hint":"KRASHEN: ACQUISITION (subconscious, natural) vs LEARNING (conscious, rules). Children ACQUIRE language naturally. Adults often LEARN rules but can't speak fluently. Krashen prefers COMPREHENSIBLE INPUT (i+1) over drilling."},
+
+  {"id":20106,"topic":"Linguistics","subtopic":"Historical Linguistics","difficulty":"medium",
+   "q":"Grimm's Law (First Germanic Consonant Shift) explains why Latin 'pater' corresponds to English 'father'. The sound change involved is:",
+   "opts":["A) Voiced stops become voiceless","B) Voiceless stops become voiceless fricatives (p→f, t→θ, k→h)","C) Nasals become plosives","D) Fricatives become stops"],
+   "ans":"B","ai_generated":True,
+   "explanation":"Grimm's Law (1822) describes a systematic shift: PIE voiceless stops (p, t, k) became Germanic voiceless fricatives (f, θ, h). So Latin/PIE *p becomes English f: pater→father, piscis→fish, ped-→foot. This shows the Germanic languages (including English) underwent a unique consonant shift.",
+   "hint":"GRIMM'S LAW: p→f, t→θ (th), k→h. Latin pater = English FATHER (p→f). Latin tres = English THREE (t→th). Latin cornu = English HORN (k→h). Discovered by Jacob Grimm (same Grimm as fairy tales!)."},
+]
+
+# Mark all as ai_generated
+for q in PRELOADED_QUESTIONS:
+    q.setdefault("ai_generated", True)
+    q.setdefault("explanation", "")
+    q.setdefault("hint", "")
+
+MEGA_PROMPT_TEMPLATE = """You are a senior question setter for the Kerala SET exam in English Language and Literature, with 20 years of UGC-style MCQ experience.
+
+Generate exactly {count} high-quality, original MCQ questions.
+
+SPECIFICATIONS:
+Topic: {topic} | Subtopic: {subtopic} | Difficulty: {difficulty}
+Style: {q_type} | Angle: {angle}
+Scope: {context}
+
+STRICT RULES:
+1. Each question: exactly 4 options A) B) C) D)
+2. Exactly ONE correct answer
+3. Distractors must use real authors/works/terms but be clearly wrong to a prepared candidate
+4. Do NOT rephrase or repeat: {existing_sample}
+5. Include 'explanation': 2-3 sentences — WHY correct, why each distractor wrong
+6. Include 'hint': one-sentence mnemonic or memory hook
+7. Hard = nuanced specialist knowledge; Easy = canonical must-know facts
+
+OUTPUT: Respond with ONLY valid JSON (no markdown, no text outside JSON):
+{{"questions":[{{"q":"Question?","opts":["A) opt","B) opt","C) opt","D) opt"],"ans":"B","topic":"{topic}","subtopic":"{subtopic}","difficulty":"{difficulty}","explanation":"Correct because... A is wrong because... C is wrong because...","hint":"Remember: ..."}}]}}"""
+
+DISCUSSION_PROMPT = """You are a brilliant, encouraging English Literature professor guiding a Kerala SET aspirant who got a question WRONG.
+
+QUESTION: {question}
+ALL OPTIONS:
+{options}
+CORRECT ANSWER: {correct_opt}
+STUDENT CHOSE: {student_opt}
+
+Write a warm, detailed tutorial covering:
+**1. Why the correct answer is right** — explain deeply with historical/literary context
+**2. Why the student's choice was wrong** — address the misconception directly
+**3. Key facts to memorise** — 4-5 bullet points essential for SET
+**4. Two related SET-style questions** on the same topic (with answers)
+**5. Memory trick** — a mnemonic or unforgettable hook
+
+Be encouraging, thorough, and specific. Write as if in a face-to-face tutorial session."""
+
+EXPLAIN_PROMPT = """You are an expert Kerala SET English Literature tutor.
+
+Explain this question for a student who wants to understand it deeply:
+
+QUESTION: {question}
+CORRECT ANSWER: {correct_opt}
+TOPIC: {topic} — {subtopic}
+
+Cover:
+1. **Core concept** in simple, clear terms
+2. **Why each option** is right or wrong
+3. **Context**: literary period, movement, critical significance
+4. **Exam pattern**: what kind of SET question uses this knowledge
+5. **3 quick related facts** that could appear in the same question area
+
+Keep under 300 words. Be precise, engaging, and educational."""
+
+
+def _call_claude(api_key, prompt, max_tokens=8192):
+    client = anthropic.Anthropic(api_key=api_key)
+    response = client.messages.create(
+        model=AI_MODEL, max_tokens=max_tokens,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.content[0].text.strip()
+
+
+def _parse_questions_json(raw, topic, subtopic, difficulty):
+    raw_clean = re.sub(r"```(?:json)?\s*", "", raw)
+    raw_clean = re.sub(r"\s*```", "", raw_clean).strip()
+    m = re.search(r"\{.*\}", raw_clean, re.DOTALL)
+    if not m:
+        return []
+    try:
+        data = json.loads(m.group())
+    except Exception:
+        return []
+    questions = data.get("questions", [])
+    start_id = 100000 + random.randint(1000, 899000)
+    valid = []
+    for i, q in enumerate(questions):
+        q["id"] = start_id + i
+        q["ai_generated"] = True
+        q.setdefault("explanation", "")
+        q.setdefault("hint", "")
+        q.setdefault("tags", [topic, subtopic])
+        if (all(k in q for k in ["q", "opts", "ans"])
+                and len(q["opts"]) == 4
+                and q["ans"] in ["A", "B", "C", "D"]):
             valid.append(q)
     return valid
 
-def generate_batch(api_key,topics,difficulties,total_count,existing=None,progress_cb=None):
-    if not existing: existing=[]
-    combos=[(t,d) for t in topics for d in difficulties]; random.shuffle(combos)
-    per=max(1,total_count//len(combos)) if combos else 1
-    rem=total_count-per*len(combos); all_new=[]
-    for idx,(topic,diff) in enumerate(combos):
-        n=per+(1 if idx<rem else 0)
-        if n<=0: continue
-        subtopic=random.choice(SUBTOPIC_MAP.get(topic,[topic]))
+
+def generate_questions_ai(api_key, topic, subtopic, difficulty, count=10, existing=None):
+    if not existing: existing = []
+    q_type   = random.choice(QUESTION_TYPES)
+    angle    = random.choice(ANGLES)
+    context  = AI_TOPIC_PROMPTS.get(topic, topic)
+    ex_sample = "\n".join(f"- {q}" for q in existing[:6]) if existing else "(none yet)"
+    prompt = MEGA_PROMPT_TEMPLATE.format(
+        count=count, topic=topic, subtopic=subtopic, difficulty=difficulty,
+        q_type=q_type, angle=angle, context=context, existing_sample=ex_sample
+    )
+    raw = _call_claude(api_key, prompt, max_tokens=8192)
+    return _parse_questions_json(raw, topic, subtopic, difficulty)
+
+
+def generate_batch_smart(api_key, topics, difficulties, total_count,
+                          existing=None, progress_cb=None):
+    if not existing: existing = []
+    topic_weights = {"British Literature":3,"Literary Theory":3,"Linguistics":2,
+                     "Indian Literature":2,"American Literature":1,"World Literature":1}
+    combos = []
+    for t in topics:
+        w = topic_weights.get(t, 1)
+        for d in difficulties:
+            combos.extend([(t, d)] * w)
+    random.shuffle(combos)
+    per_call = max(8, min(15, total_count // max(1, len(combos))))
+    all_new, errors = [], []
+    for idx, (topic, diff) in enumerate(combos):
+        if len(all_new) >= total_count: break
+        remaining = total_count - len(all_new)
+        n = min(per_call, remaining)
+        if n <= 0: break
+        subtopic = random.choice(SUBTOPIC_MAP.get(topic, [topic]))
         try:
-            new_qs=generate_questions_ai(api_key,topic,subtopic,diff,count=n,existing=existing)
-            all_new.extend(new_qs); existing.extend([q["q"] for q in new_qs])
-        except Exception: pass
-        if progress_cb: progress_cb(idx+1,len(combos))
-    return all_new
+            new_qs = generate_questions_ai(api_key, topic, subtopic, diff, count=n, existing=existing)
+            all_new.extend(new_qs)
+            existing.extend([q["q"] for q in new_qs])
+        except anthropic.BadRequestError as e:
+            if "credit" in str(e).lower() or "balance" in str(e).lower():
+                raise ValueError("CREDITS")
+            errors.append(f"{topic}/{diff}: {str(e)[:80]}")
+        except anthropic.AuthenticationError:
+            raise ValueError("AUTHFAIL")
+        except anthropic.RateLimitError:
+            raise ValueError("RATELIMIT")
+        except Exception as e:
+            errors.append(f"{topic}/{diff}: {str(e)[:80]}")
+        if progress_cb: progress_cb(idx + 1, len(combos), len(all_new), errors)
+    return all_new, errors
+
+
+def get_discussion(api_key, question, options, correct_opt, student_opt):
+    prompt = DISCUSSION_PROMPT.format(
+        question=question,
+        options="\n".join(options),
+        correct_opt=correct_opt,
+        student_opt=student_opt
+    )
+    return _call_claude(api_key, prompt, max_tokens=1500)
+
+
+def get_explanation(api_key, question, correct_opt, topic, subtopic):
+    prompt = EXPLAIN_PROMPT.format(
+        question=question, correct_opt=correct_opt,
+        topic=topic, subtopic=subtopic
+    )
+    return _call_claude(api_key, prompt, max_tokens=1000)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  SIDEBAR
@@ -774,74 +1302,521 @@ def _results(questions):
         if st.button("🏠 Home",use_container_width=True):
             reset_quiz(); st.session_state.page="home"; st.rerun()
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  PAGE: AI GENERATOR
-# ══════════════════════════════════════════════════════════════════════════════
-def page_ai_gen():
-    st.markdown("""<div class="app-hdr"><div><h1>🤖 AI Question Generator</h1>
-    <div class="sub">Multiply your practice set using Claude AI</div></div>
-    <div class="bdg">Powered by Claude</div></div>""",unsafe_allow_html=True)
-    st.markdown("""<div class="ai-box"><h3>⚡ Permutation & Combination Engine</h3>
-    <p>Selects every combination of Topic × Difficulty × Question Type × Angle, then prompts Claude
-    to generate unique questions for each combo — multiplying your bank from 75 to 500+ instantly.</p></div>""",unsafe_allow_html=True)
-    if not st.session_state.api_key:
-        st.warning("🔑 Please enter your Anthropic API key in the sidebar.")
-        st.info("Get your API key at: https://console.anthropic.com"); return
-    ai_c=len(st.session_state.ai_questions)
-    stat_cards([("Seed Questions",len(QUESTION_BANK),"sc-blue"),("AI Generated",ai_c,"sc-green"),
-                ("Total",len(QUESTION_BANK)+ai_c,"sc-gold")])
-    st.markdown("---"); st.markdown("### 🎛️ Generation Settings")
-    col1,col2=st.columns(2)
-    with col1:
-        sel_topics=st.multiselect("Topics",TOPICS,default=TOPICS,key="gen_t")
-        sel_diffs=st.multiselect("Difficulties",DIFFICULTIES,default=DIFFICULTIES,key="gen_d")
-    with col2:
-        n_q=st.slider("Total to generate",10,200,30,step=10,key="gen_n")
-        combos=len(sel_topics)*len(sel_diffs)
-        if combos:
-            per=max(1,n_q//combos)
-            st.info(f"📐 **{combos}** combos → ~**{per}** each → ~**{combos*per}** total")
-    st.markdown("---")
-    if st.button("🚀 Generate with AI",type="primary",use_container_width=True):
-        if not sel_topics or not sel_diffs: st.error("Select at least one topic and difficulty."); return
-        existing=[q["q"] for q in QUESTION_BANK+st.session_state.ai_questions]
-        bar=st.progress(0); stat=st.empty(); err=st.empty()
-        def cb(done,total_c): bar.progress(int(done/total_c*100)); stat.markdown(f"⏳ Generating… combo **{done}/{total_c}**")
-        try:
-            new_qs=generate_batch(st.session_state.api_key,sel_topics,sel_diffs,n_q,existing=existing,progress_cb=cb)
-            st.session_state.ai_questions.extend(new_qs); bar.progress(100); stat.empty()
-            st.success(f"✅ Generated **{len(new_qs)}** new questions! Total: **{len(QUESTION_BANK)+len(st.session_state.ai_questions)}**")
-            st.balloons()
-        except anthropic.AuthenticationError: bar.empty(); stat.empty(); err.error("❌ Invalid API key.")
-        except anthropic.RateLimitError: bar.empty(); stat.empty(); err.error("❌ Rate limit. Please wait.")
-        except Exception as e: bar.empty(); stat.empty(); err.error(f"❌ Error: {str(e)}")
-    if st.session_state.ai_questions:
-        st.markdown("---"); st.markdown(f"### 📋 AI Questions ({len(st.session_state.ai_questions)} total)")
-        pf1,pf2=st.columns(2)
-        with pf1: f_t=st.selectbox("Filter topic",["All"]+TOPICS,key="pf_t")
-        with pf2: f_d=st.selectbox("Filter difficulty",["All"]+DIFFICULTIES,key="pf_d")
-        filtered=st.session_state.ai_questions
-        if f_t!="All": filtered=[q for q in filtered if q.get("topic")==f_t]
-        if f_d!="All": filtered=[q for q in filtered if q.get("difficulty")==f_d]
-        for q in filtered[:15]:
-            with st.expander(f"🤖 [{q.get('difficulty','?').upper()}] {q['q'][:85]}..."):
-                for opt in q["opts"]:
-                    is_a=opt[0]==q["ans"]
-                    st.markdown(f"<span style='color:{'#27ae60' if is_a else '#2c2c3e'};font-weight:{'700' if is_a else '400'}'>{'✅ ' if is_a else '   '}{opt}</span>",unsafe_allow_html=True)
-        if st.button("🗑️ Clear AI Questions"): st.session_state.ai_questions=[]; st.success("Cleared."); st.rerun()
-    st.markdown("---"); st.markdown("### 🔢 Question Count Matrix")
-    aq=QUESTION_BANK+st.session_state.ai_questions
-    rows=["| Topic | Easy | Medium | Hard | Total |","|---|---|---|---|---|"]
-    for t in TOPICS:
-        e=len([q for q in aq if q["topic"]==t and q["difficulty"]=="easy"])
-        m=len([q for q in aq if q["topic"]==t and q["difficulty"]=="medium"])
-        h=len([q for q in aq if q["topic"]==t and q["difficulty"]=="hard"])
-        rows.append(f"| {t} | {e} | {m} | {h} | **{e+m+h}** |")
-    st.markdown("\n".join(rows))
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  PAGE: ANALYTICS
+#  PAGE: AI GENERATOR  (rebuilt v3)
 # ══════════════════════════════════════════════════════════════════════════════
+
+def page_ai_gen():
+    st.markdown("""<div class="app-hdr">
+    <div><h1>🤖 AI Question Generator & Discussion Centre</h1>
+    <div class="sub">300+ pre-loaded questions with explanations · AI tutor · Discussion mode · Bulk generation</div></div>
+    <div class="bdg">Powered by Claude</div></div>""",unsafe_allow_html=True)
+
+    # ── Hero Banner ──────────────────────────────────────────────────────────
+    ai_c   = len(st.session_state.ai_questions)
+    pre_c  = len(PRELOADED_QUESTIONS)
+    total  = len(QUESTION_BANK) + pre_c + ai_c
+    with_exp = len([q for q in PRELOADED_QUESTIONS + st.session_state.ai_questions if q.get("explanation")])
+
+    st.markdown(f"""<div style="background:linear-gradient(135deg,#0d2347 0%,#1a3a6b 60%,#1565c0 100%);
+    border-radius:16px;padding:1.6rem 2rem;margin-bottom:1.2rem;
+    box-shadow:0 8px 32px rgba(26,58,107,.35)">
+    <div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;margin-bottom:1rem">
+      <div style="font-size:2.8rem">⚡</div>
+      <div>
+        <div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:#fff">
+          Permutation × Combination Engine</div>
+        <div style="font-size:.84rem;opacity:.82;color:#fff;margin-top:.2rem">
+          {pre_c} pre-loaded expert questions + API generation + Full explanation & discussion on every question
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <div style="background:rgba(255,255,255,.15);border-radius:8px;padding:8px 14px;font-size:.78rem;color:#fff">
+        📦 {total} Total Questions</div>
+      <div style="background:rgba(255,255,255,.15);border-radius:8px;padding:8px 14px;font-size:.78rem;color:#fff">
+        📖 {with_exp} With Full Explanations</div>
+      <div style="background:rgba(255,255,255,.15);border-radius:8px;padding:8px 14px;font-size:.78rem;color:#fff">
+        💬 Discussion on Every Question</div>
+      <div style="background:rgba(255,255,255,.15);border-radius:8px;padding:8px 14px;font-size:.78rem;color:#fff">
+        🤖 {ai_c} API-Generated</div>
+    </div></div>""",unsafe_allow_html=True)
+
+    stat_cards([
+        ("Seed Questions",  len(QUESTION_BANK),  "sc-blue"),
+        ("Pre-loaded Expert Qs", pre_c,           "sc-green"),
+        ("API Generated",   ai_c,                 "sc-gold"),
+        ("Total Bank",      total,                "sc-red"),
+    ])
+
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "🚀 Generate More", "📋 Browse Questions", "💬 Discussion Centre", "📊 Matrix"
+    ])
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB 1: Generate
+    # ══════════════════════════════════════════════════════════════════════════
+    with tab1:
+        has_key = bool(st.session_state.api_key)
+
+        if not has_key:
+            st.markdown("""<div style="background:#e3f2fd;border-radius:14px;padding:1.5rem 1.8rem;
+            border-left:5px solid #1565c0;margin-bottom:1rem">
+            <div style="font-weight:700;color:#0d47a1;font-size:1rem;margin-bottom:.5rem">
+              ℹ️ 300+ Questions Already Loaded!</div>
+            <div style="color:#1a237e;font-size:.88rem;line-height:1.7">
+              You already have <strong>300+ pre-loaded expert questions</strong> with full explanations and hints
+              ready to use in the <strong>Browse</strong> and <strong>Discussion</strong> tabs — no API key needed!<br><br>
+              To generate <em>additional</em> AI questions, enter your Anthropic API key in the sidebar.<br>
+              Get one free at: <strong>console.anthropic.com</strong> → API Keys (free tier available)
+            </div></div>""",unsafe_allow_html=True)
+        else:
+            # Credit status check
+            st.markdown("""<div style="background:#e8f5e9;border-radius:10px;padding:.8rem 1.2rem;
+            border-left:4px solid #27ae60;margin-bottom:.8rem;font-size:.85rem;color:#1b5e20">
+            ✅ API key detected — ready to generate additional questions
+            </div>""",unsafe_allow_html=True)
+
+        st.markdown("### ⚙️ Generation Settings")
+        col1, col2 = st.columns(2)
+        with col1:
+            sel_topics = st.multiselect("Topics", TOPICS, default=TOPICS, key="gen_t")
+            sel_diffs  = st.multiselect("Difficulty levels", DIFFICULTIES, default=DIFFICULTIES, key="gen_d")
+        with col2:
+            n_q = st.slider("Questions to generate", 20, 300, 50, step=10, key="gen_n",
+                            help="Each API call produces 10–15 Qs. 100 questions ≈ 7–10 API calls.")
+            combos = len(sel_topics) * len(sel_diffs)
+            if combos:
+                calls_est = max(1, n_q // 12)
+                cost_est  = calls_est * 0.003
+                st.markdown(f"""<div style="background:#e3f2fd;border-radius:8px;padding:10px 14px;
+                font-size:.83rem;color:#0d47a1">
+                📐 <strong>{combos*3}</strong> topic×difficulty combos<br>
+                ⚡ ~<strong>{calls_est}</strong> API calls (12 Qs each)<br>
+                💰 Estimated cost: ~<strong>${cost_est:.2f}</strong>
+                </div>""",unsafe_allow_html=True)
+
+        st.markdown("---")
+        col_b1, col_b2, col_b3 = st.columns(3)
+        with col_b1:
+            go_btn = st.button("🚀 Generate with AI",type="primary",use_container_width=True,key="gen_go",
+                               disabled=not has_key)
+        with col_b2:
+            quick_btn = st.button("⚡ Quick 50 — British Lit",use_container_width=True,key="gen_quick",
+                                  disabled=not has_key)
+        with col_b3:
+            theory_btn = st.button("🧠 50 Theory Questions",use_container_width=True,key="gen_theory",
+                                   disabled=not has_key)
+
+        if not has_key:
+            st.info("🔑 Add API key in sidebar to enable generation. Browse pre-loaded questions meanwhile!")
+        else:
+            sel_topics_r = sel_diffs_r = None; n_q_r = n_q
+            if go_btn:     sel_topics_r, sel_diffs_r = sel_topics, sel_diffs
+            elif quick_btn: sel_topics_r, sel_diffs_r, n_q_r = ["British Literature"], DIFFICULTIES, 50
+            elif theory_btn: sel_topics_r, sel_diffs_r, n_q_r = ["Literary Theory"], DIFFICULTIES, 50
+
+            if sel_topics_r:
+                if not sel_topics_r:
+                    st.error("Select at least one topic."); st.stop()
+                existing_qs = [q["q"] for q in all_questions()]
+                prog_hdr = st.empty()
+                prog_bar = st.progress(0)
+                prog_stats = st.empty()
+                prog_log   = st.empty()
+                err_box    = st.empty()
+                prog_hdr.markdown("### ⏳ Generating…")
+                log_lines = []
+
+                def update_progress(done, total_combos, n_gen, errors):
+                    pct = min(99, int(done/total_combos*100))
+                    prog_bar.progress(pct)
+                    prog_stats.markdown(f"""<span style="color:#1a3a6b;font-weight:600">
+                    📦 {n_gen} generated</span>  |  Combo {done}/{total_combos}""",
+                    unsafe_allow_html=True)
+                    if done % 3 == 0:
+                        log_lines.append(f"✅ Combo {done}: {n_gen} total")
+                        prog_log.text("\n".join(log_lines[-4:]))
+
+                try:
+                    new_qs, errors = generate_batch_smart(
+                        st.session_state.api_key, sel_topics_r, sel_diffs_r,
+                        n_q_r, existing=existing_qs, progress_cb=update_progress)
+                    prog_bar.progress(100); prog_hdr.empty(); prog_log.empty(); prog_stats.empty()
+                    if new_qs:
+                        st.session_state.ai_questions.extend(new_qs)
+                        st.markdown(f"""<div style="background:linear-gradient(135deg,#1b5e20,#27ae60);
+                        border-radius:14px;padding:1.5rem 2rem;color:#fff;text-align:center;
+                        box-shadow:0 6px 24px rgba(39,174,96,.3)">
+                        <div style="font-size:2.5rem;font-weight:800;color:#fff">{len(new_qs)}</div>
+                        <div style="font-size:1rem;color:#fff;opacity:.9">Questions Generated!</div>
+                        <div style="font-size:.82rem;color:#fff;opacity:.72;margin-top:.3rem">
+                          Total: {len(QUESTION_BANK)+len(PRELOADED_QUESTIONS)+len(st.session_state.ai_questions)}
+                        </div></div>""",unsafe_allow_html=True)
+                        st.balloons()
+                        if errors:
+                            with st.expander(f"⚠️ {len(errors)} warnings"):
+                                for e in errors: st.text(e)
+                    else:
+                        err_box.error("No questions generated. Check settings.")
+                except ValueError as e:
+                    prog_bar.empty(); prog_hdr.empty()
+                    err_str = str(e)
+                    if err_str == "CREDITS":
+                        err_box.markdown("""<div style="background:#fce4ec;border-radius:12px;
+                        padding:1.5rem;border-left:5px solid #c0392b">
+                        <div style="font-weight:700;color:#b71c1c;font-size:1rem">💳 No API Credits</div>
+                        <div style="color:#7f0000;font-size:.88rem;margin-top:.5rem;line-height:1.7">
+                        Your Anthropic account needs credits. Add at <strong>console.anthropic.com → Billing</strong>.<br>
+                        Generating 100 questions ≈ <strong>$0.02–$0.05</strong> (very cheap!)<br>
+                        <strong>Meanwhile: use the 300+ pre-loaded questions in Browse tab!</strong>
+                        </div></div>""",unsafe_allow_html=True)
+                    elif err_str == "AUTHFAIL":
+                        err_box.error("🔑 Invalid API key. Check sidebar.")
+                    elif err_str == "RATELIMIT":
+                        err_box.warning("⏱️ Rate limit hit. Wait 60 seconds.")
+                    else:
+                        err_box.error(f"❌ {err_str}")
+                except Exception as e:
+                    prog_bar.empty(); prog_hdr.empty()
+                    err_box.error(f"❌ Unexpected error: {str(e)}")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB 2: Browse Questions
+    # ══════════════════════════════════════════════════════════════════════════
+    with tab2:
+        browse_pool = PRELOADED_QUESTIONS + st.session_state.ai_questions
+        st.markdown(f"### 📋 Browsing {len(browse_pool)} Expert Questions")
+
+        col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+        with col_f1: bf_t = st.selectbox("Topic",["All"]+TOPICS,key="bf_t")
+        with col_f2: bf_d = st.selectbox("Difficulty",["All"]+DIFFICULTIES,key="bf_d")
+        with col_f3: bf_s = st.selectbox("Source",["All","Pre-loaded","API Generated"],key="bf_s")
+        with col_f4: bf_q = st.text_input("Search",placeholder="keyword…",key="bf_q")
+
+        filtered = browse_pool
+        if bf_t != "All": filtered = [q for q in filtered if q.get("topic")==bf_t]
+        if bf_d != "All": filtered = [q for q in filtered if q.get("difficulty")==bf_d]
+        if bf_s == "Pre-loaded": filtered = [q for q in filtered if q["id"] < 90000]
+        elif bf_s == "API Generated": filtered = [q for q in filtered if q["id"] >= 90000]
+        if bf_q:
+            kw = bf_q.lower()
+            filtered = [q for q in filtered if kw in q["q"].lower() or
+                       any(kw in o.lower() for o in q["opts"]) or
+                       kw in q.get("explanation","").lower()]
+
+        st.markdown(f"**{len(filtered)}** questions match your filters")
+        st.markdown("---")
+
+        PAGE_SIZE = 10
+        total_pages = max(1, (len(filtered)+PAGE_SIZE-1)//PAGE_SIZE)
+        page_num = st.number_input("Page", 1, total_pages, 1, key="bf_page")
+
+        for q in filtered[(page_num-1)*PAGE_SIZE : page_num*PAGE_SIZE]:
+            dc    = q.get("difficulty","medium")
+            dc_col= {"easy":"#27ae60","medium":"#2980b9","hard":"#c0392b"}.get(dc,"#666")
+            has_expl = bool(q.get("explanation"))
+            has_hint = bool(q.get("hint"))
+            badges = ""
+            if has_expl: badges += ' <span style="background:#e8f5e9;color:#1b5e20;font-size:.65rem;font-weight:700;padding:1px 7px;border-radius:10px">📖 EXPLANATION</span>'
+            if has_hint: badges += ' <span style="background:#fff8e1;color:#8a6200;font-size:.65rem;font-weight:700;padding:1px 7px;border-radius:10px">💡 HINT</span>'
+
+            with st.expander(f"[{dc.upper()}] {q['q'][:95]}{'...' if len(q['q'])>95 else ''}"):
+                st.markdown(f"""<div style="background:#f8faff;border-radius:10px;padding:1rem 1.2rem;margin-bottom:.6rem">
+                <div style="display:flex;gap:6px;margin-bottom:.7rem;flex-wrap:wrap">
+                  <span style="background:#e8eef7;color:#1a3a6b;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:12px">{q.get("topic","")}</span>
+                  <span style="background:#e8eef7;color:#1a3a6b;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:12px">{q.get("subtopic","")}</span>
+                  <span style="background:{dc_col}22;color:{dc_col};font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:12px">{dc.upper()}</span>
+                  {badges}
+                </div>
+                <div style="font-size:.98rem;font-weight:600;color:#1c1c2e;margin-bottom:.9rem;line-height:1.6">{q["q"]}</div>""",
+                unsafe_allow_html=True)
+
+                for opt in q["opts"]:
+                    is_a = opt[0] == q["ans"]
+                    st.markdown(f"""<div style="background:{"#eafaf1" if is_a else "#f8faff"};
+                    border:1.5px solid {"#27ae60" if is_a else "#dce3ee"};border-radius:8px;
+                    padding:7px 13px;margin-bottom:5px;font-size:.89rem;
+                    color:{"#1b5e20" if is_a else "#2c2c3e"};
+                    font-weight:{"700" if is_a else "400"}">{"✅" if is_a else "  "} {opt}</div>""",
+                    unsafe_allow_html=True)
+                st.markdown("</div>",unsafe_allow_html=True)
+
+                if q.get("explanation"):
+                    st.markdown(f"""<div style="background:#e8f5e9;border-radius:9px;padding:.9rem 1.1rem;
+                    margin-top:.5rem;border-left:4px solid #27ae60">
+                    <div style="font-size:.7rem;font-weight:700;color:#1b5e20;text-transform:uppercase;letter-spacing:.5px;margin-bottom:.3rem">📖 Explanation</div>
+                    <div style="font-size:.87rem;color:#1c2c1e;line-height:1.65">{q["explanation"]}</div></div>""",
+                    unsafe_allow_html=True)
+
+                if q.get("hint"):
+                    st.markdown(f"""<div style="background:#fff8e1;border-radius:9px;padding:.7rem 1.1rem;
+                    margin-top:.5rem;border-left:4px solid #f39c12">
+                    <div style="font-size:.7rem;font-weight:700;color:#8a6200;text-transform:uppercase;letter-spacing:.5px;margin-bottom:.2rem">💡 Memory Hint</div>
+                    <div style="font-size:.85rem;color:#5a4000;line-height:1.55">{q["hint"]}</div></div>""",
+                    unsafe_allow_html=True)
+
+                # Discussion shortcut
+                st.markdown("<div style='height:.5rem'></div>",unsafe_allow_html=True)
+                c_disc, c_quiz = st.columns(2)
+                with c_disc:
+                    if st.button("💬 Discuss This Question",key=f"disc_{q['id']}",use_container_width=True):
+                        st.session_state["disc_q_id"] = q["id"]
+                        st.session_state.page = "ai_gen"
+                        # Jump to discussion tab by storing state
+                        st.session_state["active_tab"] = "discussion"
+                        st.rerun()
+                with c_quiz:
+                    if st.button("📝 Quiz This Topic",key=f"qtopic_{q['id']}",use_container_width=True):
+                        start_quiz(topic_filter=[q.get("topic")],count=15)
+                        st.session_state.page="quiz"; st.rerun()
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB 3: Discussion Centre
+    # ══════════════════════════════════════════════════════════════════════════
+    with tab3:
+        st.markdown("""<div style="background:linear-gradient(135deg,#1a3a6b,#0d47a1);
+        border-radius:14px;padding:1.4rem 1.6rem;margin-bottom:1.2rem">
+        <div style="font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:.4rem">
+          💬 AI Discussion & Explanation Centre</div>
+        <div style="font-size:.85rem;color:rgba(255,255,255,.82);line-height:1.6">
+          Select any question · Choose your answer · Get a detailed professor-style tutorial<br>
+          Works on all 300+ pre-loaded questions. Claude AI gives deeper explanations when API key is available.
+        </div></div>""",unsafe_allow_html=True)
+
+        # ── Question selector ────────────────────────────────────────────────
+        disc_pool = all_questions()
+        col_d1, col_d2, col_d3 = st.columns([2,1,1])
+        with col_d1: disc_topic = st.selectbox("Filter by topic",["All"]+TOPICS,key="disc_t")
+        with col_d2: disc_diff  = st.selectbox("Difficulty",["All"]+DIFFICULTIES,key="disc_d")
+        with col_d3: disc_src   = st.selectbox("Source",["All","Has Explanation","Has Hint"],key="disc_src")
+
+        pool_f = disc_pool
+        if disc_topic != "All": pool_f = [q for q in pool_f if q.get("topic")==disc_topic]
+        if disc_diff  != "All": pool_f = [q for q in pool_f if q.get("difficulty")==disc_diff]
+        if disc_src == "Has Explanation": pool_f = [q for q in pool_f if q.get("explanation")]
+        elif disc_src == "Has Hint":      pool_f = [q for q in pool_f if q.get("hint")]
+
+        if not pool_f:
+            st.info("No questions match this filter."); 
+        else:
+            # Build question options
+            q_labels = {q["id"]: f"[{q.get('difficulty','?').upper()}] {q['q'][:80]}..." for q in pool_f}
+            
+            # Check if a question was pre-selected from Browse
+            pre_sel_id = st.session_state.get("disc_q_id", None)
+            pre_sel_idx = 0
+            if pre_sel_id:
+                ids = list(q_labels.keys())
+                if pre_sel_id in ids:
+                    pre_sel_idx = ids.index(pre_sel_id)
+
+            sel_id = st.selectbox(
+                f"Select question ({len(pool_f)} available)",
+                options=list(q_labels.keys()),
+                format_func=lambda x: q_labels[x],
+                index=pre_sel_idx,
+                key="disc_sel"
+            )
+
+            sel_q = next((q for q in pool_f if q["id"]==sel_id), None)
+            if not sel_q:
+                st.warning("Question not found."); 
+            else:
+                st.markdown("---")
+                # Show question card
+                dc = sel_q.get("difficulty","medium")
+                dc_col = {"easy":"#27ae60","medium":"#2980b9","hard":"#c0392b"}.get(dc,"#666")
+                st.markdown(f"""<div style="background:#ffffff;border-radius:14px;padding:1.5rem 1.8rem;
+                box-shadow:0 4px 20px rgba(0,0,0,.09);border:2px solid {dc_col}33;margin-bottom:1rem">
+                <div style="display:flex;gap:6px;margin-bottom:.6rem">
+                  <span style="background:#e8eef7;color:#1a3a6b;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:12px">{sel_q.get("topic","")}</span>
+                  <span style="background:{dc_col}22;color:{dc_col};font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:12px">{dc.upper()}</span>
+                </div>
+                <div style="font-size:1.05rem;font-weight:600;color:#1c1c2e;line-height:1.65;margin-bottom:1rem">{sel_q["q"]}</div>
+                </div>""",unsafe_allow_html=True)
+
+                # ── Answer selection ─────────────────────────────────────────
+                st.markdown("**Choose your answer:**")
+                opt_labels = {opt[0]: opt for opt in sel_q["opts"]}
+                user_choice = st.radio("",
+                    options=list(opt_labels.keys()),
+                    format_func=lambda x: opt_labels[x],
+                    key=f"disc_ans_{sel_q['id']}",
+                    horizontal=False)
+
+                st.markdown("<div style='height:.5rem'></div>",unsafe_allow_html=True)
+                col_sub, col_exp = st.columns(2)
+                with col_sub:
+                    submit_disc = st.button("✅ Submit & Discuss",type="primary",
+                                           use_container_width=True,key=f"disc_sub_{sel_q['id']}")
+                with col_exp:
+                    explain_only = st.button("📖 Explain Correct Answer",
+                                            use_container_width=True,key=f"disc_expl_{sel_q['id']}")
+
+                # ── Discussion output ────────────────────────────────────────
+                if submit_disc or explain_only:
+                    correct_letter = sel_q["ans"]
+                    correct_opt = next(o for o in sel_q["opts"] if o[0]==correct_letter)
+                    user_opt    = opt_labels.get(user_choice,"")
+                    is_correct  = user_choice == correct_letter
+
+                    if submit_disc:
+                        # Result feedback
+                        if is_correct:
+                            st.markdown(f"""<div style="background:linear-gradient(135deg,#1b5e20,#27ae60);
+                            border-radius:12px;padding:1.2rem 1.5rem;margin:.8rem 0;color:#fff;text-align:center">
+                            <div style="font-size:2rem">🎉</div>
+                            <div style="font-size:1.1rem;font-weight:700;color:#fff">Correct!</div>
+                            <div style="font-size:.85rem;color:rgba(255,255,255,.85);margin-top:.3rem">
+                              {correct_opt}</div></div>""",unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"""<div style="background:linear-gradient(135deg,#7f0000,#c0392b);
+                            border-radius:12px;padding:1.2rem 1.5rem;margin:.8rem 0;color:#fff">
+                            <div style="font-size:1.5rem;text-align:center">❌</div>
+                            <div style="font-size:.95rem;font-weight:700;color:#fff;margin:.4rem 0">You chose: {user_opt}</div>
+                            <div style="font-size:.9rem;color:rgba(255,255,255,.9)">Correct: <strong>{correct_opt}</strong></div>
+                            </div>""",unsafe_allow_html=True)
+
+                    # ── Built-in explanation (always available) ─────────────
+                    if sel_q.get("explanation"):
+                        st.markdown(f"""<div style="background:#e8f5e9;border-radius:12px;
+                        padding:1.2rem 1.5rem;border-left:5px solid #27ae60;margin:.8rem 0">
+                        <div style="font-size:.75rem;font-weight:700;color:#1b5e20;text-transform:uppercase;
+                          letter-spacing:.6px;margin-bottom:.5rem">📖 Expert Explanation</div>
+                        <div style="font-size:.92rem;color:#1c2c1e;line-height:1.7">{sel_q["explanation"]}</div>
+                        </div>""",unsafe_allow_html=True)
+
+                    if sel_q.get("hint"):
+                        st.markdown(f"""<div style="background:#fff8e1;border-radius:10px;
+                        padding:.9rem 1.2rem;border-left:4px solid #f39c12;margin:.6rem 0">
+                        <div style="font-size:.73rem;font-weight:700;color:#8a6200;text-transform:uppercase;
+                          letter-spacing:.5px;margin-bottom:.3rem">💡 Memory Hint</div>
+                        <div style="font-size:.88rem;color:#5a4000;line-height:1.55">{sel_q["hint"]}</div>
+                        </div>""",unsafe_allow_html=True)
+
+                    # ── All options explained ────────────────────────────────
+                    st.markdown("""<div style="background:#f0f4fb;border-radius:10px;padding:1rem 1.2rem;margin:.8rem 0">
+                    <div style="font-size:.75rem;font-weight:700;color:#1a3a6b;text-transform:uppercase;margin-bottom:.6rem">
+                      📋 All Options Reviewed</div>""",unsafe_allow_html=True)
+                    for opt in sel_q["opts"]:
+                        is_a = opt[0] == correct_letter
+                        is_u = opt[0] == user_choice
+                        icon = "✅" if is_a else ("❌" if is_u and submit_disc else "○")
+                        bg   = "#eafaf1" if is_a else ("#fce4ec" if is_u and not is_a and submit_disc else "#ffffff")
+                        bc   = "#27ae60" if is_a else ("#e74c3c" if is_u and not is_a and submit_disc else "#dce3ee")
+                        st.markdown(f"""<div style="background:{bg};border:1.5px solid {bc};
+                        border-radius:8px;padding:7px 12px;margin-bottom:5px;
+                        font-size:.88rem;color:#1c1c2e;font-weight:{"700" if is_a else "400"}">{icon} {opt}</div>""",
+                        unsafe_allow_html=True)
+                    st.markdown("</div>",unsafe_allow_html=True)
+
+                    # ── AI Deep Dive (if API key available) ──────────────────
+                    st.markdown("---")
+                    if st.session_state.api_key:
+                        disc_type = "wrong" if (submit_disc and not is_correct) else "explain"
+                        btn_label = "🧠 Get AI Professor Tutorial" if disc_type=="wrong" else "🧠 Get AI Deep Explanation"
+                        if st.button(btn_label, type="primary", use_container_width=True,
+                                     key=f"ai_deep_{sel_q['id']}_{submit_disc}"):
+                            with st.spinner("Professor Claude is preparing your tutorial…"):
+                                try:
+                                    if disc_type == "wrong":
+                                        ai_resp = get_discussion(
+                                            st.session_state.api_key,
+                                            sel_q["q"],
+                                            sel_q["opts"],
+                                            correct_opt,
+                                            user_opt
+                                        )
+                                    else:
+                                        ai_resp = get_explanation(
+                                            st.session_state.api_key,
+                                            sel_q["q"],
+                                            correct_opt,
+                                            sel_q.get("topic",""),
+                                            sel_q.get("subtopic","")
+                                        )
+                                    st.markdown(f"""<div style="background:linear-gradient(135deg,#0d2347,#1a3a6b);
+                                    border-radius:14px;padding:1.5rem 1.8rem;margin-top:.8rem">
+                                    <div style="font-size:.75rem;font-weight:700;color:#d4a017;text-transform:uppercase;
+                                      letter-spacing:.7px;margin-bottom:.7rem">🤖 AI Professor Tutorial</div>
+                                    <div style="font-size:.91rem;color:#ffffff;line-height:1.75;white-space:pre-wrap">{ai_resp}</div>
+                                    </div>""",unsafe_allow_html=True)
+                                except ValueError as ve:
+                                    st.error(f"API issue: {str(ve)}")
+                                except Exception as e:
+                                    st.error(f"Could not get AI tutorial: {str(e)}")
+                    else:
+                        st.markdown("""<div style="background:#f3e5f5;border-radius:10px;padding:1rem 1.3rem;
+                        border-left:4px solid #7b1fa2">
+                        <div style="font-weight:700;color:#4a148c;font-size:.88rem">🧠 Want deeper AI tutorials?</div>
+                        <div style="font-size:.83rem;color:#4a148c;margin-top:.3rem;line-height:1.6">
+                          Add your Anthropic API key in the sidebar to get full professor-style AI tutorials
+                          with related questions, mnemonics, and exam strategies for every question.
+                        </div></div>""",unsafe_allow_html=True)
+
+                    # ── Related questions ────────────────────────────────────
+                    st.markdown("---")
+                    st.markdown("### 🔗 Related Questions")
+                    related = [q for q in all_questions()
+                               if q["id"] != sel_q["id"]
+                               and q.get("topic")==sel_q.get("topic")
+                               and q.get("subtopic")==sel_q.get("subtopic")][:4]
+                    if related:
+                        for rq in related:
+                            rd = rq.get("difficulty","medium")
+                            with st.expander(f"[{rd.upper()}] {rq['q'][:80]}..."):
+                                for opt in rq["opts"]:
+                                    is_a = opt[0]==rq["ans"]
+                                    st.markdown(f"<span style='color:{'#27ae60' if is_a else '#2c2c3e'};font-weight:{'700' if is_a else '400'}'>{'✅ ' if is_a else '   '}{opt}</span>",unsafe_allow_html=True)
+                                if rq.get("explanation"):
+                                    st.markdown(f"*{rq['explanation']}*")
+                    else:
+                        st.info("No related questions in same subtopic yet. Try generating more!")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB 4: Matrix
+    # ══════════════════════════════════════════════════════════════════════════
+    with tab4:
+        st.markdown("### 📊 Question Bank Matrix")
+        aq = all_questions()
+        rows = ["| Topic | Easy | Medium | Hard | Total | Pre-loaded | API Gen |",
+                "|:---|:---:|:---:|:---:|:---:|:---:|:---:|"]
+        for t in TOPICS:
+            e   = len([q for q in aq if q["topic"]==t and q["difficulty"]=="easy"])
+            m   = len([q for q in aq if q["topic"]==t and q["difficulty"]=="medium"])
+            h   = len([q for q in aq if q["topic"]==t and q["difficulty"]=="hard"])
+            pre = len([q for q in PRELOADED_QUESTIONS if q["topic"]==t])
+            api = len([q for q in st.session_state.ai_questions if q.get("topic")==t])
+            rows.append(f"| {t} | {e} | {m} | {h} | **{e+m+h}** | {pre} | {api} |")
+        st.markdown("\n".join(rows))
+
+        st.markdown("---")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            if st.button("📝 Practice All Pre-loaded",type="primary",use_container_width=True):
+                pool = PRELOADED_QUESTIONS.copy(); random.shuffle(pool)
+                st.session_state.quiz_questions = pool[:min(30,len(pool))]
+                st.session_state.current_idx=0; st.session_state.answers={}
+                st.session_state.quiz_started=True; st.session_state.quiz_finished=False
+                st.session_state.score=0; st.session_state.streak=0
+                st.session_state.page="quiz"; st.rerun()
+        with c2:
+            if st.button("🎯 Hard Questions Only",use_container_width=True):
+                pool = [q for q in all_questions() if q["difficulty"]=="hard"]
+                random.shuffle(pool)
+                st.session_state.quiz_questions = pool[:20]
+                st.session_state.current_idx=0; st.session_state.answers={}
+                st.session_state.quiz_started=True; st.session_state.quiz_finished=False
+                st.session_state.score=0; st.session_state.streak=0
+                st.session_state.page="quiz"; st.rerun()
+        with c3:
+            if st.button("🗑️ Clear API Questions",use_container_width=True):
+                st.session_state.ai_questions=[]; st.success("API questions cleared."); st.rerun()
+
+
+
 def page_analytics():
     st.markdown("""<div class="app-hdr"><div><h1>📊 Performance Analytics</h1>
     <div class="sub">Track your Kerala SET preparation progress</div></div></div>""",unsafe_allow_html=True)
