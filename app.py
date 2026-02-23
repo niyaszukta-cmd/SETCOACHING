@@ -2,7 +2,7 @@
 # ║          NET QUIZ MASTER — UGC NET Paper 1                      ║
 # ║          Single-file Streamlit App                               ║
 # ║          Includes: Question Bank · AI Generator · PDF Extractor  ║
-# ╚══════════════════════════════════════════════════════════════════╝
+# ╚══════════════════════════════════════════════════════════════════╝.
 #
 # USAGE:
 #   pip install streamlit pandas PyMuPDF pdfplumber PyPDF2 anthropic
