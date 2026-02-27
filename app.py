@@ -1387,7 +1387,7 @@ def render_pdf_upload():
         }
         selected_preload = st.selectbox("Select a pre-loaded book", ["None"] + list(preloaded.keys()))
         st.markdown("<br>", unsafe_allow_html=True)
-        pdf_num_q = st.slider("Max questions to load", 10, 100, 30, key="pdf_num_q")
+        pdf_num_q = st.slider("Max questions to load", 10, 1000, 30, key="pdf_num_q")
         pdf_topic = st.text_input("Assign topic label", placeholder="e.g., Research Aptitude (optional)")
         pdf_difficulty = st.select_slider("Assign difficulty", ["Easy", "Medium", "Hard"], value="Medium")
         extract_btn = st.button("🔍 Extract Questions from PDF", use_container_width=True, type="primary")
