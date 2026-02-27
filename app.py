@@ -512,7 +512,23 @@ class QuestionBank:
     def get_topics(self):
         return sorted(set(q.get("topic", "General") for q in self._load()))
 
-    def get_questions(self, topics=None, n=20, difficulty="Mixed"):
+    def get_years(self):
+        """Return sorted list of all distinct years present in bank (excluding None)."""
+        years = sorted(set(
+            q.get("year") for q in self._load()
+            if q.get("year") and str(q.get("year")).strip()
+        ), reverse=True)
+        return years
+
+    def get_seasons(self):
+        """Return distinct seasons (June / December / etc.)."""
+        return sorted(set(
+            q.get("season") for q in self._load()
+            if q.get("season") and str(q.get("season")).strip()
+        ))
+
+    def get_questions(self, topics=None, n=20, difficulty="Mixed",
+                      years=None, seasons=None):
         questions = self._load()
         if topics:
             questions = [q for q in questions if q.get("topic") in topics]
@@ -520,8 +536,33 @@ class QuestionBank:
             filtered = [q for q in questions if q.get("difficulty") == difficulty]
             if filtered:
                 questions = filtered
+        if years:
+            filtered = [q for q in questions if str(q.get("year","")) in [str(y) for y in years]]
+            if filtered:
+                questions = filtered
+        if seasons:
+            filtered = [q for q in questions if q.get("season","") in seasons]
+            if filtered:
+                questions = filtered
         random.shuffle(questions)
         return questions[:n]
+
+    def get_questions_for_mock(self, mock_config):
+        """
+        Build a question set for a mock test.
+        mock_config = {topic: count, ...} or just a total count with mixed topics.
+        """
+        all_q = self._load()
+        random.shuffle(all_q)
+        result = []
+        seen = set()
+        for q in all_q:
+            if q.get("id") not in seen:
+                result.append(q)
+                seen.add(q.get("id"))
+            if len(result) >= mock_config.get("total", 50):
+                break
+        return result
 
     def add_questions(self, new_questions):
         existing = self._load()
@@ -864,9 +905,12 @@ def init_session_state():
         "wrong_questions": [], "timed": True, "time_per_q": 90, "q_start_time": None,
         # Full-bank shuffle mode
         "full_bank_mode": False,
-        "full_bank_queue": [],      # remaining question IDs not yet shown
-        "full_bank_done": set(),    # IDs already attempted in full-bank sessions
-        "full_bank_session": 0,     # which shuffle session we're on
+        "full_bank_queue": [],
+        "full_bank_done": set(),
+        "full_bank_session": 0,
+        # Mock test
+        "mock_test_active": False,
+        "mock_test_name": "",
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -997,6 +1041,7 @@ def render_sidebar():
         nav_items = [
             ("🏠", "Home",          "home"),
             ("📝", "Practice Quiz", "quiz"),
+            ("🧪", "Mock Tests",    "mock"),
             ("📊", "Analytics",     "analytics"),
             ("🔖", "Bookmarks",     "bookmarks"),
             ("⚙️", "Settings",      "settings"),
@@ -1074,7 +1119,7 @@ def render_home():
     st.markdown("""
     <div class="hero-section">
         <div class="hero-badge">UGC NET · Paper 1</div>
-        <h1 class="hero-title">NET Master by <span class="gradient-text">ZYRO Learning</span></h1>
+        <h1 class="hero-title">Master Your <span class="gradient-text">NET Exam</span></h1>
         <p class="hero-subtitle">1500+ questions · 10 core topics · Real exam simulation</p>
     </div>""", unsafe_allow_html=True)
 
@@ -1100,7 +1145,7 @@ def render_home():
     st.markdown("""
     <div class="feature-grid">
         <div class="feature-card"><div class="feature-icon">⚡</div><div class="feature-title">Quick Practice</div><div class="feature-desc">Jump into a 20-question session immediately. Mixed topics, timed mode.</div></div>
-        <div class="feature-card"><div class="feature-icon">📄</div><div class="feature-title">PDF Quiz Generator (Developer Feature, contact Zyro for Developer feature) </div><div class="feature-desc">Upload any study material PDF and auto-extract quiz questions using OCR + text analysis.</div></div>
+        <div class="feature-card"><div class="feature-icon">📄</div><div class="feature-title">PDF Quiz Generator</div><div class="feature-desc">Upload any study material PDF and auto-extract quiz questions using OCR + text analysis.</div></div>
         <div class="feature-card"><div class="feature-icon">🔖</div><div class="feature-title">Bookmarks & Review</div><div class="feature-desc">Save tricky questions, review wrong answers, and target weak topics precisely.</div></div>
     </div>""", unsafe_allow_html=True)
 
@@ -1238,6 +1283,55 @@ def render_quiz_config():
                     selected.append(topic)
         st.markdown('</div>', unsafe_allow_html=True)
 
+        # ── Year & Season Filter ──
+        available_years   = qb.get_years()
+        available_seasons = qb.get_seasons()
+
+        st.markdown('<div class="config-card">', unsafe_allow_html=True)
+        st.markdown("#### 📅 Filter by Year & Season")
+        st.markdown('<div style="font-size:0.82rem;color:#64748b;margin-bottom:0.75rem;">Leave blank to include all years/seasons</div>', unsafe_allow_html=True)
+
+        fc1, fc2 = st.columns(2)
+        with fc1:
+            if available_years:
+                sel_years = st.multiselect(
+                    "📆 Exam Year(s)",
+                    options=available_years,
+                    default=[],
+                    placeholder="All years",
+                    key="filter_years"
+                )
+            else:
+                st.markdown('<div style="color:#64748b;font-size:0.85rem;">No year data yet.<br>Tag questions with year when uploading PDFs.</div>', unsafe_allow_html=True)
+                sel_years = []
+        with fc2:
+            if available_seasons:
+                sel_seasons = st.multiselect(
+                    "🌤️ Season(s)",
+                    options=available_seasons,
+                    default=[],
+                    placeholder="All seasons",
+                    key="filter_seasons"
+                )
+            else:
+                st.markdown('<div style="color:#64748b;font-size:0.85rem;">No season data yet.<br>(June / December tags appear after upload)</div>', unsafe_allow_html=True)
+                sel_seasons = []
+
+        # Show count of matching questions
+        preview = qb.get_questions(
+            topics=selected if selected else None,
+            n=9999,
+            difficulty="Mixed",
+            years=sel_years if sel_years else None,
+            seasons=sel_seasons if sel_seasons else None
+        )
+        st.markdown(
+            f'<div style="margin-top:0.5rem;font-size:0.85rem;color:#a855f7;font-weight:700;">'
+            f'✅ {len(preview)} questions match your filters</div>',
+            unsafe_allow_html=True
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+
         st.markdown('<div class="config-card">', unsafe_allow_html=True)
         st.markdown("#### ⚙️ Settings")
         num_q = st.select_slider("Number of Questions", options=[10, 15, 20, 25, 30, 40, 50], value=20)
@@ -1252,7 +1346,11 @@ def render_quiz_config():
             if not selected:
                 st.error("Please select at least one topic!")
                 return
-            questions = qb.get_questions(topics=selected, n=num_q, difficulty=difficulty)
+            questions = qb.get_questions(
+                topics=selected, n=num_q, difficulty=difficulty,
+                years=sel_years if sel_years else None,
+                seasons=sel_seasons if sel_seasons else None
+            )
             if quiz_mode.lower() == "review" and st.session_state.wrong_questions:
                 questions = st.session_state.wrong_questions[:num_q]
             random.shuffle(questions)
@@ -1262,6 +1360,7 @@ def render_quiz_config():
                 "quiz_mode": quiz_mode.lower(), "start_time": time.time(),
                 "num_questions": num_q, "timed": timed, "time_per_q": time_per_q,
                 "q_start_time": time.time(), "full_bank_mode": False,
+                "mock_test_active": False,
             })
             st.rerun()
 
@@ -1451,33 +1550,57 @@ def render_results():
     mins, secs = divmod(elapsed, 60)
     grade, grade_color, grade_msg = get_grade(pct)
 
-    st.markdown(f'<div class="results-hero"><div class="results-grade" style="color:{grade_color}">{grade}</div><div class="results-score">{score} / {total}</div><div class="results-pct">{pct}% Accuracy</div><div class="results-msg">{grade_msg}</div></div>', unsafe_allow_html=True)
+    # Mock test badge
+    mock_badge = ""
+    if st.session_state.get("mock_test_active"):
+        mname = st.session_state.get("mock_test_name", "Mock Test")
+        mock_badge = f'<div style="display:inline-block;background:rgba(124,58,237,0.2);border:1px solid #7c3aed;color:#c084fc;padding:0.3rem 1rem;border-radius:20px;font-size:0.78rem;font-weight:700;margin-bottom:0.75rem;">🧪 {mname}</div>'
+
+    st.markdown(
+        f'<div class="results-hero">'
+        f'{mock_badge}'
+        f'<div class="results-grade" style="color:{grade_color}">{grade}</div>'
+        f'<div class="results-score">{score} / {total}</div>'
+        f'<div class="results-pct">{pct}% Accuracy</div>'
+        f'<div class="results-msg">{grade_msg}</div>'
+        f'</div>',
+        unsafe_allow_html=True
+    )
 
     wrong = sum(1 for a in st.session_state.answers.values() if not a.get("correct") and not a.get("skipped"))
     skipped = sum(1 for a in st.session_state.answers.values() if a.get("skipped"))
     avg_time = round(sum(st.session_state.question_times.values()) / len(st.session_state.question_times)) if st.session_state.question_times else 0
 
     c1, c2, c3, c4, c5 = st.columns(5)
-    for col, val, lbl, color in [(c1,score,"Correct","#22c55e"),(c2,wrong,"Wrong","#ef4444"),(c3,skipped,"Skipped","#f59e0b"),(c4,f"{mins}m {secs}s","Total Time","#6366f1"),(c5,f"{avg_time}s","Avg/Q","#06b6d4")]:
+    for col, val, lbl, color in [
+        (c1, score, "Correct", "#22c55e"),
+        (c2, wrong, "Wrong", "#ef4444"),
+        (c3, skipped, "Skipped", "#f59e0b"),
+        (c4, f"{mins}m {secs}s", "Total Time", "#6366f1"),
+        (c5, f"{avg_time}s", "Avg/Q", "#06b6d4"),
+    ]:
         with col:
             st.markdown(f'<div class="result-stat-card" style="border-top:3px solid {color}"><div class="rs-val" style="color:{color}">{val}</div><div class="rs-lbl">{lbl}</div></div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
     with col1:
-        if st.button("🔄 Retake Quiz", use_container_width=True, type="primary"):
+        if st.button("🔄 Retake", use_container_width=True, type="primary"):
             st.session_state.quiz_started = False
             st.session_state.quiz_completed = False
             st.rerun()
     with col2:
-        if st.button("📊 View Analytics", use_container_width=True):
+        if st.button("📊 Analytics", use_container_width=True):
             st.session_state.page = "analytics"
             st.rerun()
     with col3:
-        if st.button("🏠 Home", use_container_width=True):
-            st.session_state.page = "home"
+        back_label = "🧪 Mock Tests" if st.session_state.get("mock_test_active") else "🏠 Home"
+        back_page  = "mock"          if st.session_state.get("mock_test_active") else "home"
+        if st.button(back_label, use_container_width=True):
+            st.session_state.page = back_page
             st.session_state.quiz_started = False
             st.session_state.quiz_completed = False
+            st.session_state.mock_test_active = False
             st.rerun()
 
     st.markdown("---")
@@ -1525,7 +1648,7 @@ def render_analytics():
 # 13. PDF UPLOAD PAGE  (pure extraction — no external API needed)
 # ════════════════════════════════════════════════════════════════
 def render_pdf_upload():
-    st.markdown('<h2 class="page-title">📄 PDF Quiz Generator-Developer Feature, contact Zyro for Developer feature </h2>', unsafe_allow_html=True)
+    st.markdown('<h2 class="page-title">📄 PDF Quiz Generator</h2>', unsafe_allow_html=True)
     st.markdown('<div class="pdf-intro">Upload any NET Paper 1 study material or question bank PDF. The app will extract existing MCQ questions directly from the text — no external API required.</div>', unsafe_allow_html=True)
 
     col1, col2 = st.columns([3, 2])
@@ -1766,6 +1889,357 @@ def render_bookmarks():
                 st.rerun()
 
 
+
+# ════════════════════════════════════════════════════════════════
+# 16b. MOCK TESTS PAGE
+# ════════════════════════════════════════════════════════════════
+
+# Official UGC NET Paper 1 mock blueprints
+# Each mock mirrors the real exam: 50 Qs, 100 marks, 3-hour window
+MOCK_TESTS = [
+    {
+        "id": "mock_full_1",
+        "name": "Full Mock Test — Set 1",
+        "description": "Complete 50-question exam simulation. All 10 topics, mixed difficulty. Timed at 180 min.",
+        "icon": "🎯",
+        "tag": "Full Exam",
+        "tag_color": "#7c3aed",
+        "total": 50,
+        "time_minutes": 180,
+        "difficulty": "Mixed",
+        "topics": None,          # None = all topics
+        "years": None,
+        "seasons": None,
+    },
+    {
+        "id": "mock_full_2",
+        "name": "Full Mock Test — Set 2",
+        "description": "Second full-length paper with fresh question shuffle. Exam mode only.",
+        "icon": "🎯",
+        "tag": "Full Exam",
+        "tag_color": "#7c3aed",
+        "total": 50,
+        "time_minutes": 180,
+        "difficulty": "Mixed",
+        "topics": None,
+        "years": None,
+        "seasons": None,
+    },
+    {
+        "id": "mock_teaching",
+        "name": "Teaching Aptitude Sprint",
+        "description": "25 focused questions from Teaching Aptitude. Great for targeted revision.",
+        "icon": "🧠",
+        "tag": "Topic Sprint",
+        "tag_color": "#0891b2",
+        "total": 25,
+        "time_minutes": 45,
+        "difficulty": "Mixed",
+        "topics": ["Teaching Aptitude"],
+        "years": None,
+        "seasons": None,
+    },
+    {
+        "id": "mock_research",
+        "name": "Research Aptitude Sprint",
+        "description": "25 questions covering Research Methods, Ethics, and Types of Research.",
+        "icon": "🔬",
+        "tag": "Topic Sprint",
+        "tag_color": "#0891b2",
+        "total": 25,
+        "time_minutes": 45,
+        "difficulty": "Mixed",
+        "topics": ["Research Aptitude"],
+        "years": None,
+        "seasons": None,
+    },
+    {
+        "id": "mock_ict_env",
+        "name": "ICT + Environment Sprint",
+        "description": "20 questions combining ICT basics and Environmental Studies.",
+        "icon": "💻",
+        "tag": "Topic Sprint",
+        "tag_color": "#0891b2",
+        "total": 20,
+        "time_minutes": 30,
+        "difficulty": "Mixed",
+        "topics": ["ICT", "Environment"],
+        "years": None,
+        "seasons": None,
+    },
+    {
+        "id": "mock_reasoning_di",
+        "name": "Reasoning + Data Interpretation",
+        "description": "25 questions on Logical Reasoning and Data Interpretation — the toughest scorers.",
+        "icon": "🔢",
+        "tag": "Topic Sprint",
+        "tag_color": "#0891b2",
+        "total": 25,
+        "time_minutes": 45,
+        "difficulty": "Mixed",
+        "topics": ["Reasoning", "Data Interpretation"],
+        "years": None,
+        "seasons": None,
+    },
+    {
+        "id": "mock_hard_only",
+        "name": "Hard Level Challenge",
+        "description": "30 hard-level questions from all topics. Push your limits.",
+        "icon": "🔥",
+        "tag": "Challenge",
+        "tag_color": "#dc2626",
+        "total": 30,
+        "time_minutes": 60,
+        "difficulty": "Hard",
+        "topics": None,
+        "years": None,
+        "seasons": None,
+    },
+    {
+        "id": "mock_easy_warm",
+        "name": "Warm-Up (Easy Only)",
+        "description": "20 easy questions — perfect for building confidence before a big session.",
+        "icon": "☀️",
+        "tag": "Warm-Up",
+        "tag_color": "#16a34a",
+        "total": 20,
+        "time_minutes": 30,
+        "difficulty": "Easy",
+        "topics": None,
+        "years": None,
+        "seasons": None,
+    },
+    {
+        "id": "mock_june_series",
+        "name": "June Exam Series",
+        "description": "Questions tagged from June exam sessions. Requires year-tagged questions in your bank.",
+        "icon": "☀️",
+        "tag": "By Season",
+        "tag_color": "#ca8a04",
+        "total": 50,
+        "time_minutes": 180,
+        "difficulty": "Mixed",
+        "topics": None,
+        "years": None,
+        "seasons": ["June"],
+    },
+    {
+        "id": "mock_dec_series",
+        "name": "December Exam Series",
+        "description": "Questions tagged from December exam sessions. Requires year-tagged questions in your bank.",
+        "icon": "❄️",
+        "tag": "By Season",
+        "tag_color": "#0284c7",
+        "total": 50,
+        "time_minutes": 180,
+        "difficulty": "Mixed",
+        "topics": None,
+        "years": None,
+        "seasons": ["December"],
+    },
+]
+
+
+def render_mock_tests():
+    st.markdown('<h2 class="page-title">🧪 Mock Tests</h2>', unsafe_allow_html=True)
+    st.markdown(
+        '<div style="color:#94a3b8;font-size:0.9rem;margin-bottom:1.5rem;">'
+        'Structured exam-pattern tests. Each mock follows the UGC NET Paper 1 format. '
+        'Results are saved to your analytics.'
+        '</div>',
+        unsafe_allow_html=True
+    )
+
+    qb = QuestionBank()
+    all_q = qb.get_all_questions()
+    total_bank = len(all_q)
+
+    # ── Custom Mock Builder ──
+    st.markdown('<div class="config-card" style="border-color:#7c3aed;">', unsafe_allow_html=True)
+    st.markdown("#### 🛠️ Custom Mock Builder")
+
+    cm1, cm2, cm3 = st.columns(3)
+    with cm1:
+        available_years = qb.get_years()
+        sel_years = st.multiselect(
+            "📆 Year(s)", options=available_years, default=[],
+            placeholder="All years", key="mock_years"
+        ) if available_years else []
+        if not available_years:
+            st.caption("No year-tagged questions yet")
+
+    with cm2:
+        available_seasons = qb.get_seasons()
+        sel_seasons = st.multiselect(
+            "🌤️ Season(s)", options=available_seasons, default=[],
+            placeholder="All seasons", key="mock_seasons"
+        ) if available_seasons else []
+        if not available_seasons:
+            st.caption("No season-tagged questions yet")
+
+    with cm3:
+        custom_topics = qb.get_topics()
+        sel_topics = st.multiselect(
+            "📚 Topics", options=custom_topics, default=[],
+            placeholder="All topics", key="mock_topics"
+        )
+
+    cm4, cm5, cm6 = st.columns(3)
+    with cm4:
+        custom_n = st.select_slider("Questions", options=[10, 20, 25, 30, 50], value=50, key="mock_n")
+    with cm5:
+        custom_diff = st.selectbox("Difficulty", ["Mixed", "Easy", "Medium", "Hard"], key="mock_diff")
+    with cm6:
+        custom_time = st.select_slider("Time (min)", options=[15, 30, 45, 60, 90, 120, 180], value=180, key="mock_time")
+
+    # Live count
+    preview_q = qb.get_questions(
+        topics=sel_topics if sel_topics else None,
+        n=9999, difficulty=custom_diff,
+        years=sel_years if sel_years else None,
+        seasons=sel_seasons if sel_seasons else None
+    )
+    st.markdown(
+        f'<div style="font-size:0.85rem;color:#a855f7;font-weight:700;margin:0.5rem 0;">'
+        f'✅ {len(preview_q)} questions match · {min(custom_n, len(preview_q))} will be used</div>',
+        unsafe_allow_html=True
+    )
+
+    if st.button("🚀 Start Custom Mock", use_container_width=True, type="primary", key="start_custom_mock"):
+        questions = qb.get_questions(
+            topics=sel_topics if sel_topics else None,
+            n=custom_n, difficulty=custom_diff,
+            years=sel_years if sel_years else None,
+            seasons=sel_seasons if sel_seasons else None
+        )
+        if not questions:
+            st.error("No questions match your filters. Try removing some filters.")
+        else:
+            random.shuffle(questions)
+            st.session_state.update({
+                "questions": questions, "current_q_idx": 0, "answers": {},
+                "quiz_started": True, "quiz_completed": False,
+                "quiz_mode": "exam", "start_time": time.time(),
+                "num_questions": len(questions),
+                "timed": True, "time_per_q": int(custom_time * 60 / len(questions)),
+                "q_start_time": time.time(),
+                "full_bank_mode": False, "mock_test_active": True,
+                "mock_test_name": "Custom Mock",
+                "page": "quiz",
+            })
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="section-title" style="margin-top:1.5rem;">📋 Pre-built Mock Tests</div>', unsafe_allow_html=True)
+
+    # Group mocks by tag
+    tag_groups = {}
+    for m in MOCK_TESTS:
+        tag_groups.setdefault(m["tag"], []).append(m)
+
+    for tag, mocks in tag_groups.items():
+        tag_color = mocks[0]["tag_color"]
+        st.markdown(
+            f'<div style="display:inline-block;background:{tag_color}22;border:1px solid {tag_color}88;'
+            f'color:{tag_color};border-radius:20px;padding:0.2rem 0.85rem;font-size:0.78rem;'
+            f'font-weight:700;margin:1rem 0 0.6rem;">▸ {tag}</div>',
+            unsafe_allow_html=True
+        )
+
+        cols = st.columns(min(len(mocks), 2))
+        for i, mock in enumerate(mocks):
+            with cols[i % 2]:
+                # Count available questions for this mock
+                avail = qb.get_questions(
+                    topics=mock["topics"],
+                    n=9999,
+                    difficulty=mock["difficulty"],
+                    years=mock["years"],
+                    seasons=mock["seasons"]
+                )
+                avail_count = len(avail)
+                can_run = avail_count >= max(1, mock["total"] // 2)
+                used = min(mock["total"], avail_count)
+
+                status_color = "#10b981" if can_run else "#f43f5e"
+                status_text  = f"{avail_count} available" if can_run else "Not enough questions"
+
+                st.markdown(f"""
+                <div class="config-card" style="border-color:{mock['tag_color']}55;margin-bottom:0.5rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;">
+                        <div style="font-size:1.5rem;">{mock['icon']}</div>
+                        <div style="font-size:0.72rem;color:{status_color};font-weight:700;">{status_text}</div>
+                    </div>
+                    <div style="font-weight:800;color:#fff;font-size:0.95rem;margin-bottom:0.3rem;">{mock['name']}</div>
+                    <div style="font-size:0.8rem;color:#94a3b8;margin-bottom:0.75rem;line-height:1.5;">{mock['description']}</div>
+                    <div style="display:flex;gap:0.75rem;font-size:0.75rem;color:#64748b;flex-wrap:wrap;">
+                        <span>📝 {used} Qs</span>
+                        <span>⏱️ {mock['time_minutes']} min</span>
+                        <span>📊 {mock['difficulty']}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                btn_label = f"Start → {mock['name'][:22]}" if can_run else "⚠️ Upload More Questions"
+                if st.button(btn_label, key=f"mock_{mock['id']}", use_container_width=True,
+                             type="primary" if can_run else "secondary", disabled=not can_run):
+                    questions = qb.get_questions(
+                        topics=mock["topics"],
+                        n=mock["total"],
+                        difficulty=mock["difficulty"],
+                        years=mock["years"],
+                        seasons=mock["seasons"]
+                    )
+                    random.shuffle(questions)
+                    time_per_q = int(mock["time_minutes"] * 60 / max(len(questions), 1))
+                    st.session_state.update({
+                        "questions": questions, "current_q_idx": 0, "answers": {},
+                        "quiz_started": True, "quiz_completed": False,
+                        "quiz_mode": "exam", "start_time": time.time(),
+                        "num_questions": len(questions),
+                        "timed": True, "time_per_q": time_per_q,
+                        "q_start_time": time.time(),
+                        "full_bank_mode": False, "mock_test_active": True,
+                        "mock_test_name": mock["name"],
+                        "page": "quiz",
+                    })
+                    st.rerun()
+
+    # ── Year-based mocks (dynamic — one card per year found in bank) ──
+    years_in_bank = qb.get_years()
+    if years_in_bank:
+        st.markdown(
+            '<div style="display:inline-block;background:#ca8a0422;border:1px solid #ca8a0488;'
+            'color:#ca8a04;border-radius:20px;padding:0.2rem 0.85rem;font-size:0.78rem;'
+            'font-weight:700;margin:1rem 0 0.6rem;">▸ By Year</div>',
+            unsafe_allow_html=True
+        )
+        ycols = st.columns(min(len(years_in_bank), 3))
+        for i, yr in enumerate(years_in_bank):
+            with ycols[i % 3]:
+                yr_q = [q for q in all_q if str(q.get("year", "")) == str(yr)]
+                st.markdown(f"""
+                <div class="config-card" style="border-color:#ca8a0455;text-align:center;">
+                    <div style="font-size:1.8rem;font-weight:800;color:#fbbf24;">{yr}</div>
+                    <div style="font-size:0.8rem;color:#94a3b8;margin:0.3rem 0 0.75rem;">{len(yr_q)} questions</div>
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button(f"Take {yr} Mock", key=f"yr_mock_{yr}", use_container_width=True, type="primary"):
+                    questions = random.sample(yr_q, min(50, len(yr_q)))
+                    st.session_state.update({
+                        "questions": questions, "current_q_idx": 0, "answers": {},
+                        "quiz_started": True, "quiz_completed": False,
+                        "quiz_mode": "exam", "start_time": time.time(),
+                        "num_questions": len(questions),
+                        "timed": True, "time_per_q": int(180 * 60 / max(len(questions), 1)),
+                        "q_start_time": time.time(),
+                        "full_bank_mode": False, "mock_test_active": True,
+                        "mock_test_name": f"{yr} Mock",
+                        "page": "quiz",
+                    })
+                    st.rerun()
+
+
 # ════════════════════════════════════════════════════════════════
 # 16. SETTINGS PAGE
 # ════════════════════════════════════════════════════════════════
@@ -1794,7 +2268,7 @@ Bookmarks saved: **{len(st.session_state.bookmarks)}**
 Wrong questions for review: **{len(st.session_state.wrong_questions)}**
 
 Built for UGC NET Paper 1 aspirants.
-
+Supports PDF extraction from any text-based question bank.
         """)
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1817,6 +2291,8 @@ def main():
         render_home()
     elif page == "quiz":
         render_quiz_config() if not st.session_state.quiz_started else render_quiz()
+    elif page == "mock":
+        render_mock_tests()
     elif page == "analytics":
         render_analytics()
     elif page == "pdf_upload":
