@@ -1794,7 +1794,7 @@ Bookmarks saved: **{len(st.session_state.bookmarks)}**
 Wrong questions for review: **{len(st.session_state.wrong_questions)}**
 
 Built for UGC NET Paper 1 aspirants.
-Supports PDF extraction from any text-based question bank.
+
         """)
         st.markdown('</div>', unsafe_allow_html=True)
 
