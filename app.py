@@ -1100,7 +1100,7 @@ def render_home():
     st.markdown("""
     <div class="feature-grid">
         <div class="feature-card"><div class="feature-icon">⚡</div><div class="feature-title">Quick Practice</div><div class="feature-desc">Jump into a 20-question session immediately. Mixed topics, timed mode.</div></div>
-        <div class="feature-card"><div class="feature-icon">📄</div><div class="feature-title">PDF Quiz Generator</div><div class="feature-desc">Upload any study material PDF and auto-extract quiz questions using OCR + text analysis.</div></div>
+        <div class="feature-card"><div class="feature-icon">📄</div><div class="feature-title">PDF Quiz Generator (Developer Feature, contact Zyro for Developer feature) </div><div class="feature-desc">Upload any study material PDF and auto-extract quiz questions using OCR + text analysis.</div></div>
         <div class="feature-card"><div class="feature-icon">🔖</div><div class="feature-title">Bookmarks & Review</div><div class="feature-desc">Save tricky questions, review wrong answers, and target weak topics precisely.</div></div>
     </div>""", unsafe_allow_html=True)
 
