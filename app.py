@@ -304,11 +304,79 @@ div[data-testid="stMarkdownContainer"] p {
 .wrong-opt  { background: rgba(244,63,94,0.12);  border-color:#f43f5e; color:#fb7185; }
 .neutral-opt { background: rgba(30,45,69,0.6);   border-color:#2d3f5e; color:#94a3b8; }
 
-/* ── FORM STYLING — hide borders, style option submit buttons ── */
+/* ── OPTION SELECTED DIV ── */
+.opt-selected {
+    background: linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.18));
+    border: 2px solid #a855f7;
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    margin: 0.4rem 0;
+    color: #f0e6ff !important;
+    font-size: 1rem;
+    font-weight: 700;
+    box-shadow: 0 0 16px rgba(168,85,247,0.25);
+    line-height: 1.5;
+}
+.opt-dot-sel { color: #c084fc; margin-right: 0.4rem; }
+
+/* ── FORM STYLING — hide borders ── */
 div[data-testid="stForm"] {
     border: none !important;
     padding: 0 !important;
     background: transparent !important;
+    margin: 0 !important;
+}
+
+/* ── FORCE ALL BUTTON TEXT VISIBLE — override Streamlit internals ── */
+/* Streamlit wraps button text in a <p> inside <div> inside <button> */
+.stButton button,
+.stButton button *,
+.stButton > button,
+.stButton > button > div,
+.stButton > button > div > p,
+[data-testid="baseButton-secondary"],
+[data-testid="baseButton-secondary"] *,
+[data-testid="baseButton-primary"],
+[data-testid="baseButton-primary"] * {
+    color: #e2e8f0 !important;
+}
+[data-testid="baseButton-primary"],
+[data-testid="baseButton-primary"] * {
+    color: #ffffff !important;
+}
+[data-testid="baseButton-secondary"] {
+    background: #131929 !important;
+    border: 2px solid #3b4f6e !important;
+}
+[data-testid="baseButton-primary"] {
+    background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
+    border: none !important;
+    box-shadow: 0 4px 20px rgba(124,58,237,0.4) !important;
+}
+
+/* Form submit buttons */
+div[data-testid="stForm"] button,
+div[data-testid="stForm"] button *,
+[data-testid="baseButton-secondaryFormSubmit"],
+[data-testid="baseButton-secondaryFormSubmit"] *,
+[data-testid="baseButton-primaryFormSubmit"],
+[data-testid="baseButton-primaryFormSubmit"] * {
+    color: #e2e8f0 !important;
+}
+[data-testid="baseButton-primaryFormSubmit"],
+[data-testid="baseButton-primaryFormSubmit"] * {
+    color: #ffffff !important;
+    background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
+}
+
+/* Sidebar buttons text */
+[data-testid="stSidebar"] button,
+[data-testid="stSidebar"] button * {
+    color: #94a3b8 !important;
+}
+[data-testid="stSidebar"] button[kind="primary"],
+[data-testid="stSidebar"] button[kind="primary"] * {
+    color: #ffffff !important;
 }
 
 /* ── ALL BUTTONS — universal text color fix ── */
@@ -507,23 +575,36 @@ div[data-testid="metric-container"] label { color:#94a3b8 !important; }
 div[data-testid="metric-container"] [data-testid="stMetricValue"] { color:#ffffff !important; }
 select option { background:#131929 !important; color:#ffffff !important; }
 
-/* ── NUCLEAR NONE-TEXT HIDE ── */
-/* Streamlit prints "None" as green badge text in element-container > stMarkdownContainer */
-div[data-testid="stMarkdownContainer"] p:only-child { 
-    display: none !important; 
-}
-/* Also target the specific green badge Streamlit uses */
-.stMarkdown small, 
-div.element-container div[data-testid="stMarkdownContainer"] > p { 
-    color: transparent !important;
-    font-size: 0 !important;
-    height: 0 !important;
-    overflow: hidden !important;
-    display: none !important;
-}
-/* Hide stText elements that render None */
+/* ── Hide stText None artifacts ── */
 [data-testid="stText"] { display: none !important; }
 </style>
+<script>
+/* Force all button text to be visible — runs after DOM is ready */
+(function fixButtonColors() {
+    function applyColors() {
+        document.querySelectorAll('button').forEach(function(btn) {
+            var allChildren = btn.querySelectorAll('*');
+            allChildren.forEach(function(el) {
+                if (window.getComputedStyle(el).color === 'rgb(255, 255, 255)' ||
+                    window.getComputedStyle(el).color === 'rgba(0, 0, 0, 0)' ||
+                    el.tagName === 'P') {
+                    el.style.setProperty('color', 'inherit', 'important');
+                }
+            });
+            if (!btn.style.color || btn.style.color === 'transparent') {
+                btn.style.setProperty('color', '#e2e8f0', 'important');
+            }
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyColors);
+    } else {
+        applyColors();
+    }
+    var observer = new MutationObserver(applyColors);
+    observer.observe(document.body, { childList: true, subtree: true });
+})();
+</script>
 """, unsafe_allow_html=True)
 
 
@@ -1153,26 +1234,25 @@ def render_quiz():
     elapsed = int(time.time() - st.session_state.start_time)
     mins, secs = divmod(elapsed, 60)
 
-    # ── Header row: progress + timer + skip (all inside ONE form to avoid None) ──
-    with st.form(key=f"hdr_{idx}", clear_on_submit=False):
-        hc1, hc2, hc3 = st.columns([4, 1, 1])
-        with hc1:
-            st.markdown(
-                f'<div class="quiz-header">'
-                f'<span class="q-counter">Question <b>{idx+1}</b> / {total}</span>'
-                f'<span class="q-topic-badge">{q.get("topic","General")}</span>'
-                f'<span class="q-diff-badge diff-{q.get("difficulty","medium").lower()}">'
-                f'{q.get("difficulty","Medium")}</span></div>',
-                unsafe_allow_html=True
-            )
-        with hc2:
-            st.markdown(f'<div class="timer-box">⏱️ {mins:02d}:{secs:02d}</div>', unsafe_allow_html=True)
-        with hc3:
-            skip_btn = st.form_submit_button("Skip →", use_container_width=True)
+    # ── Header row ──
+    hc1, hc2, hc3 = st.columns([4, 1, 1])
+    with hc1:
+        st.markdown(
+            f'<div class="quiz-header">'
+            f'<span class="q-counter">Question <b>{idx+1}</b> / {total}</span>'
+            f'<span class="q-topic-badge">{q.get("topic","General")}</span>'
+            f'<span class="q-diff-badge diff-{q.get("difficulty","medium").lower()}">'
+            f'{q.get("difficulty","Medium")}</span></div>',
+            unsafe_allow_html=True
+        )
+    with hc2:
+        st.markdown(f'<div class="timer-box">⏱️ {mins:02d}:{secs:02d}</div>', unsafe_allow_html=True)
+    with hc3:
+        skip_clicked = st.button("Skip →", key=f"skip_{idx}", use_container_width=True)
 
     st.progress(idx / total)
 
-    if skip_btn:
+    if skip_clicked:
         st.session_state.answers[idx] = {"answer": None, "correct": False, "skipped": True}
         st.session_state.current_q_idx += 1
         st.session_state.q_start_time = time.time()
@@ -1212,70 +1292,68 @@ def render_quiz():
                 unsafe_allow_html=True
             )
         # Navigation form
-        with st.form(key=f"nav_{idx}", clear_on_submit=False):
-            nc1, nc2 = st.columns(2)
-            with nc1:
-                prev_btn = st.form_submit_button("← Previous", use_container_width=True) if idx > 0 else None
-            with nc2:
-                if idx < total - 1:
-                    next_btn = st.form_submit_button("Next Question →", use_container_width=True, type="primary")
-                    finish_btn = False
-                else:
-                    next_btn = False
-                    finish_btn = st.form_submit_button("🏁 Finish Quiz", use_container_width=True, type="primary")
+        nc1, nc2 = st.columns(2)
+        with nc1:
+            prev_clicked = st.button("← Previous", key=f"prev_{idx}", use_container_width=True) if idx > 0 else False
+        with nc2:
+            if idx < total - 1:
+                next_clicked = st.button("Next Question →", key=f"next_{idx}", use_container_width=True, type="primary")
+                finish_clicked = False
+            else:
+                next_clicked = False
+                finish_clicked = st.button("🏁 Finish Quiz", key=f"finish_{idx}", use_container_width=True, type="primary")
 
-        if prev_btn:
+        if prev_clicked:
             st.session_state.current_q_idx -= 1
             st.rerun()
-        if next_btn:
+        if next_clicked:
             st.session_state.current_q_idx += 1
             st.session_state.q_start_time = time.time()
             st.rerun()
-        if finish_btn:
+        if finish_clicked:
             st.session_state.quiz_completed = True
             st.session_state.score = sum(1 for a in st.session_state.answers.values() if a.get("correct"))
             st.rerun()
 
-    # ── PRE-ANSWER: show options + submit form ──
+    # ── PRE-ANSWER: show options + submit ──
     else:
         sel_key = f"sel_q_{idx}"
         if sel_key not in st.session_state:
             st.session_state[sel_key] = options[0] if options else ""
 
-        # Option buttons — each a tiny form so no st.button inside columns
-        for i, opt in enumerate(options):
-            clean_opt = html.unescape(re.sub(r'<[^>]+>', '', opt)).strip()
+        clean_opts = [html.unescape(re.sub(r'<[^>]+>', '', o)).strip() for o in options]
+
+        # Render each option as a pure st.button — use label with explicit text
+        # This is the only 100% reliable way: native st.button with colored label
+        for i, (opt, clean_opt) in enumerate(zip(options, clean_opts)):
             is_sel = st.session_state[sel_key] == opt
+            prefix = "●" if is_sel else "○"
+            label = f"{prefix}  {clean_opt}"
             if is_sel:
+                # Show selected as styled HTML (always visible)
                 st.markdown(
-                    f'<div style="background:linear-gradient(135deg,rgba(124,58,237,0.25),rgba(168,85,247,0.15));'
-                    f'border:2px solid #a855f7;border-radius:12px;padding:0.9rem 1.4rem;margin:0.4rem 0;'
-                    f'color:#e9d5ff;font-size:0.97rem;font-weight:700;cursor:pointer;">'
-                    f'● &nbsp; {clean_opt}</div>',
+                    f'<div class="opt-selected">'
+                    f'<span class="opt-dot-sel">●</span>&nbsp;&nbsp;{clean_opt}'
+                    f'</div>',
                     unsafe_allow_html=True
                 )
             else:
-                with st.form(key=f"opt_{idx}_{i}", clear_on_submit=False):
-                    clicked = st.form_submit_button(
-                        f"○  {clean_opt}",
-                        use_container_width=True
-                    )
-                if clicked:
+                # Unselected: pure st.button, no columns, no forms
+                if st.button(label, key=f"opt_{idx}_{i}", use_container_width=True):
                     st.session_state[sel_key] = opt
                     st.rerun()
 
-        st.markdown("<div style='margin-top:0.8rem'></div>", unsafe_allow_html=True)
-
-        # Submit + Bookmark form
+        st.markdown("<div style='height:0.8rem'></div>", unsafe_allow_html=True)
         choice = st.session_state[sel_key]
-        with st.form(key=f"ans_{idx}", clear_on_submit=False):
-            ac1, ac2 = st.columns([3, 1])
-            with ac1:
-                do_submit = st.form_submit_button("✅  Submit Answer", use_container_width=True, type="primary")
-            with ac2:
-                do_bookmark = st.form_submit_button("🔖  Bookmark", use_container_width=True)
 
-        if do_submit:
+        # Submit row — capture OUTSIDE with-blocks to avoid None rendering
+        sub_col, bm_col = st.columns([3, 1])
+        with sub_col:
+            sub_clicked = st.button("✅  Submit Answer", key=f"sub_{idx}", use_container_width=True, type="primary")
+        with bm_col:
+            bm_clicked = st.button("🔖  Bookmark", key=f"bm_{idx}", use_container_width=True)
+
+        if sub_clicked:
             is_correct = (choice == correct_ans)
             time_taken = int(time.time() - st.session_state.q_start_time)
             st.session_state.answers[idx] = {"answer": choice, "correct": is_correct, "time_taken": time_taken}
@@ -1293,7 +1371,7 @@ def render_quiz():
                 st.session_state.q_start_time = time.time()
             st.rerun()
 
-        if do_bookmark:
+        if bm_clicked:
             if q_id in st.session_state.bookmarks:
                 st.session_state.bookmarks.discard(q_id)
             else:
