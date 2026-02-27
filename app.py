@@ -310,41 +310,69 @@ div[data-testid="stForm"] {
     padding: 0 !important;
     background: transparent !important;
 }
-/* Unselected option buttons (form_submit_button secondary look) */
-div[data-testid="stForm"] button[kind="secondaryFormSubmit"],
-div[data-testid="stForm"] button[kind="formSubmit"] {
-    background: #131929 !important;
-    border: 2px solid #2d3f5e !important;
+
+/* ── ALL BUTTONS — universal text color fix ── */
+/* Target every button p/span inside Streamlit regardless of kind */
+button p, button span, button div,
+.stButton button p, .stButton button span,
+div[data-testid="stForm"] button p,
+div[data-testid="stForm"] button span {
+    color: inherit !important;
+}
+
+/* All form submit buttons — make text visible */
+div[data-testid="stForm"] button {
     color: #e2e8f0 !important;
-    text-align: left !important;
-    padding: 0.9rem 1.4rem !important;
+    background: #131929 !important;
+    border: 2px solid #3b4f6e !important;
     border-radius: 12px !important;
     font-size: 0.97rem !important;
     font-weight: 600 !important;
-    margin: 0.35rem 0 !important;
+    padding: 0.9rem 1.4rem !important;
     width: 100% !important;
+    text-align: left !important;
     transition: all 0.15s ease !important;
+    margin: 0.3rem 0 !important;
 }
-div[data-testid="stForm"] button[kind="secondaryFormSubmit"]:hover,
-div[data-testid="stForm"] button[kind="formSubmit"]:hover {
+div[data-testid="stForm"] button:hover {
     border-color: #a855f7 !important;
-    background: rgba(124,58,237,0.15) !important;
+    background: rgba(124,58,237,0.18) !important;
     color: #ffffff !important;
 }
-/* Primary submit buttons inside forms */
-div[data-testid="stForm"] button[kind="primaryFormSubmit"] {
+/* Primary form buttons (Submit Answer, Skip, Next etc) */
+div[data-testid="stForm"] button[data-testid="baseButton-primaryFormSubmit"],
+div[data-testid="stForm"] button[kind="primaryFormSubmit"],
+div[data-testid="stForm"] button[data-testid*="primary"] {
     background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
-    color: white !important;
+    color: #ffffff !important;
+    border: none !important;
+    text-align: center !important;
     box-shadow: 0 4px 20px rgba(124,58,237,0.4) !important;
-    border-radius: 12px !important;
-    font-size: 1rem !important;
-    font-weight: 700 !important;
-    padding: 0.85rem 1.4rem !important;
 }
+div[data-testid="stForm"] button[data-testid="baseButton-primaryFormSubmit"]:hover,
 div[data-testid="stForm"] button[kind="primaryFormSubmit"]:hover {
-    transform: translateY(-2px) !important;
     box-shadow: 0 6px 28px rgba(124,58,237,0.55) !important;
+    transform: translateY(-2px) !important;
 }
+
+/* Sidebar buttons */
+[data-testid="stSidebar"] button {
+    color: #94a3b8 !important;
+}
+[data-testid="stSidebar"] button p,
+[data-testid="stSidebar"] button span {
+    color: inherit !important;
+}
+[data-testid="stSidebar"] button[kind="primary"] {
+    color: #ffffff !important;
+}
+
+/* ── ALL BUTTONS EVERYWHERE — nuclear text visibility fix ── */
+button { color: #e2e8f0 !important; }
+button p { color: inherit !important; }
+.stButton > button { color: #e2e8f0 !important; }
+.stButton > button[kind="primary"] { color: #ffffff !important; }
+.stButton > button[kind="secondary"] { color: #e2e8f0 !important; }
 
 /* ── EXPLANATION ── */
 .explanation-box {
@@ -404,20 +432,25 @@ div[data-testid="stForm"] button[kind="primaryFormSubmit"]:hover {
 }
 .stButton button {
     font-family:'DM Sans',sans-serif !important; font-weight:600 !important;
-    border-radius:10px !important; transition:all 0.2s ease !important; border:none !important;
+    border-radius:10px !important; transition:all 0.2s ease !important;
+    color: #e2e8f0 !important;
 }
+.stButton button p, .stButton button span, .stButton button div { color: inherit !important; }
 .stButton button[kind="primary"] {
     background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
-    color:white !important; box-shadow:0 4px 20px rgba(124,58,237,0.4) !important;
+    color: #ffffff !important; box-shadow:0 4px 20px rgba(124,58,237,0.4) !important;
+    border: none !important;
 }
+.stButton button[kind="primary"] p, .stButton button[kind="primary"] span { color: #ffffff !important; }
 .stButton button[kind="primary"]:hover {
     transform:translateY(-2px) !important;
     box-shadow:0 6px 28px rgba(124,58,237,0.55) !important;
 }
 .stButton button[kind="secondary"] {
     background: #131929 !important; color:#e2e8f0 !important;
-    border: 1px solid #2d3f5e !important;
+    border: 2px solid #3b4f6e !important;
 }
+.stButton button[kind="secondary"] p, .stButton button[kind="secondary"] span { color: #e2e8f0 !important; }
 .stButton button[kind="secondary"]:hover {
     border-color: #7c3aed !important; color:#ffffff !important;
     background: rgba(124,58,237,0.12) !important;
