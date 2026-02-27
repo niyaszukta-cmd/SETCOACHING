@@ -1525,7 +1525,7 @@ def render_analytics():
 # 13. PDF UPLOAD PAGE  (pure extraction — no external API needed)
 # ════════════════════════════════════════════════════════════════
 def render_pdf_upload():
-    st.markdown('<h2 class="page-title">📄 PDF Quiz Generator</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 class="page-title">📄 PDF Quiz Generator (Developer Feature, contact Zyro for Developer feature)</h2>', unsafe_allow_html=True)
     st.markdown('<div class="pdf-intro">Upload any NET Paper 1 study material or question bank PDF. The app will extract existing MCQ questions directly from the text — no external API required.</div>', unsafe_allow_html=True)
 
     col1, col2 = st.columns([3, 2])
