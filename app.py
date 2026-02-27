@@ -878,7 +878,110 @@ init_session_state()
 # ════════════════════════════════════════════════════════════════
 # 7. SIDEBAR
 # ════════════════════════════════════════════════════════════════
+DEVELOPER_PIN = "NYZ2025"   # ← change this to your own PIN
+
 def render_sidebar():
+    # ── Custom always-visible sidebar toggle button ──
+    # Streamlit's native toggle disappears when sidebar is collapsed.
+    # We inject our own floating button that clicks the native one programmatically.
+    st.markdown("""
+    <style>
+    /* ── Hide Streamlit's default collapse button (we replace it) ── */
+    [data-testid="stSidebarCollapseButton"] {
+        display: none !important;
+    }
+
+    /* ── Our custom floating toggle — always visible ── */
+    #custom-sidebar-toggle {
+        position: fixed;
+        top: 0.7rem;
+        left: 0.7rem;
+        z-index: 99999;
+        width: 2.5rem;
+        height: 2.5rem;
+        background: linear-gradient(135deg, #7c3aed, #a855f7);
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 18px rgba(124,58,237,0.55);
+        transition: box-shadow 0.2s, transform 0.15s;
+        outline: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+    #custom-sidebar-toggle:hover {
+        box-shadow: 0 6px 24px rgba(124,58,237,0.75);
+        transform: scale(1.08);
+    }
+    #custom-sidebar-toggle svg {
+        width: 1.1rem;
+        height: 1.1rem;
+        fill: #ffffff;
+        pointer-events: none;
+    }
+
+    /* Push main content so it never hides behind our button */
+    .main .block-container {
+        padding-top: 3.5rem !important;
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+    @media (min-width: 768px) {
+        .main .block-container {
+            padding-top: 1.5rem !important;
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
+        }
+    }
+    </style>
+
+    <!-- Our permanent floating hamburger button -->
+    <button id="custom-sidebar-toggle" aria-label="Toggle sidebar" title="Open / Close Menu">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="5"  width="18" height="2" rx="1"/>
+            <rect x="3" y="11" width="18" height="2" rx="1"/>
+            <rect x="3" y="17" width="18" height="2" rx="1"/>
+        </svg>
+    </button>
+
+    <script>
+    (function () {
+        var btn = document.getElementById('custom-sidebar-toggle');
+        if (!btn) return;
+
+        function clickNativeToggle() {
+            // Streamlit's sidebar open button (when sidebar is collapsed)
+            var collapsed = document.querySelector('[data-testid="collapsedControl"]');
+            if (collapsed) { collapsed.click(); return; }
+
+            // Streamlit's sidebar close button (when sidebar is open)
+            var closeBtn = document.querySelector('[data-testid="stSidebarCollapseButton"] button');
+            if (closeBtn) { closeBtn.click(); return; }
+
+            // Fallback: find any button inside the sidebar header area
+            var sidebarBtns = document.querySelectorAll('[data-testid="stSidebar"] button');
+            if (sidebarBtns.length > 0) { sidebarBtns[0].click(); }
+        }
+
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            clickNativeToggle();
+        });
+
+        // Make sure the button always stays on top even after Streamlit rerenders
+        function ensureButton() {
+            var b = document.getElementById('custom-sidebar-toggle');
+            if (!b) {
+                document.body.appendChild(btn);
+            }
+        }
+        new MutationObserver(ensureButton).observe(document.body, {childList: true, subtree: false});
+    })();
+    </script>
+    """, unsafe_allow_html=True)
+
     with st.sidebar:
         st.markdown("""
         <div class="sidebar-brand">
@@ -890,30 +993,78 @@ def render_sidebar():
         </div>""", unsafe_allow_html=True)
         st.markdown("---")
 
+        # ── Regular nav (PDF Upload & AI hidden from users) ──
         nav_items = [
-            ("🏠", "Home", "home"), ("📝", "Practice Quiz", "quiz"),
-            ("📊", "Analytics", "analytics"),
-            ("📄", "PDF Upload", "pdf_upload"), ("🔖", "Bookmarks", "bookmarks"),
-            ("⚙️", "Settings", "settings"),
+            ("🏠", "Home",          "home"),
+            ("📝", "Practice Quiz", "quiz"),
+            ("📊", "Analytics",     "analytics"),
+            ("🔖", "Bookmarks",     "bookmarks"),
+            ("⚙️", "Settings",      "settings"),
         ]
         for icon, label, page_key in nav_items:
+            active = st.session_state.page == page_key
             if st.button(f"{icon}  {label}", key=f"nav_{page_key}",
                          use_container_width=True,
-                         type="primary" if st.session_state.page == page_key else "secondary"):
+                         type="primary" if active else "secondary"):
                 st.session_state.page = page_key
                 st.session_state.quiz_started = False
                 st.rerun()
 
         st.markdown("---")
-        accuracy = round(st.session_state.total_correct / st.session_state.total_attempted * 100) if st.session_state.total_attempted > 0 else 0
+
+        # ── Developer Mode (PIN-gated) ──
+        if "dev_mode" not in st.session_state:
+            st.session_state.dev_mode = False
+
+        if st.session_state.dev_mode:
+            st.markdown(
+                '<div style="background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.4);'
+                'border-radius:10px;padding:0.5rem 0.75rem;margin-bottom:0.6rem;font-size:0.78rem;'
+                'color:#fbbf24;font-weight:700;text-align:center;">🔧 DEVELOPER MODE ON</div>',
+                unsafe_allow_html=True
+            )
+            dev_nav = [
+                ("📄", "PDF Upload", "pdf_upload"),
+            ]
+            for icon, label, page_key in dev_nav:
+                active = st.session_state.page == page_key
+                if st.button(f"{icon}  {label}", key=f"devnav_{page_key}",
+                             use_container_width=True,
+                             type="primary" if active else "secondary"):
+                    st.session_state.page = page_key
+                    st.session_state.quiz_started = False
+                    st.rerun()
+            if st.button("🔒 Exit Dev Mode", use_container_width=True):
+                st.session_state.dev_mode = False
+                if st.session_state.page == "pdf_upload":
+                    st.session_state.page = "home"
+                st.rerun()
+        else:
+            with st.expander("🔧 Developer", expanded=False):
+                pin = st.text_input("PIN", type="password", key="dev_pin_input", placeholder="Enter PIN")
+                if st.button("Unlock", key="dev_unlock", use_container_width=True, type="primary"):
+                    if pin == DEVELOPER_PIN:
+                        st.session_state.dev_mode = True
+                        st.rerun()
+                    else:
+                        st.error("❌ Incorrect PIN")
+
+        st.markdown("---")
+        attempted = st.session_state.total_attempted
+        accuracy  = round(st.session_state.total_correct / attempted * 100) if attempted > 0 else 0
         st.markdown(f"""
         <div class="sidebar-stats">
-            <div class="stat-mini"><span class="stat-mini-val">{st.session_state.total_attempted}</span><span class="stat-mini-lbl">Attempted</span></div>
+            <div class="stat-mini"><span class="stat-mini-val">{attempted}</span><span class="stat-mini-lbl">Attempted</span></div>
             <div class="stat-mini"><span class="stat-mini-val">{accuracy}%</span><span class="stat-mini-lbl">Accuracy</span></div>
             <div class="stat-mini"><span class="stat-mini-val">{st.session_state.streak}</span><span class="stat-mini-lbl">Streak 🔥</span></div>
         </div>""", unsafe_allow_html=True)
         st.markdown("---")
-        st.markdown('<div style="text-align:center;opacity:0.5;font-size:0.75rem;padding:0.5rem;">Built for NET Paper 1 Aspirants<br><span style="color:#6366f1;">NYZTrade Education</span></div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div style="text-align:center;opacity:0.5;font-size:0.75rem;padding:0.5rem;">'
+            'Built for NET Paper 1 Aspirants<br>'
+            '<span style="color:#a855f7;">NYZTrade Education</span></div>',
+            unsafe_allow_html=True
+        )
 
 
 # ════════════════════════════════════════════════════════════════
@@ -1387,7 +1538,7 @@ def render_pdf_upload():
         }
         selected_preload = st.selectbox("Select a pre-loaded book", ["None"] + list(preloaded.keys()))
         st.markdown("<br>", unsafe_allow_html=True)
-        pdf_num_q = st.slider("Max questions to load", 10, 1000, 30, key="pdf_num_q")
+        pdf_num_q = st.slider("Max questions to load", 10, 100, 30, key="pdf_num_q")
         pdf_topic = st.text_input("Assign topic label", placeholder="e.g., Research Aptitude (optional)")
         pdf_difficulty = st.select_slider("Assign difficulty", ["Easy", "Medium", "Hard"], value="Medium")
         extract_btn = st.button("🔍 Extract Questions from PDF", use_container_width=True, type="primary")
@@ -1656,6 +1807,12 @@ def main():
     render_sidebar()
 
     page = st.session_state.page
+
+    # Guard developer-only pages
+    if page == "pdf_upload" and not st.session_state.get("dev_mode", False):
+        page = "home"
+        st.session_state.page = "home"
+
     if page == "home":
         render_home()
     elif page == "quiz":
