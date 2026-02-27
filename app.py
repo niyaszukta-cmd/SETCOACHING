@@ -1074,7 +1074,7 @@ def render_home():
     st.markdown("""
     <div class="hero-section">
         <div class="hero-badge">UGC NET · Paper 1</div>
-        <h1 class="hero-title">Master Your <span class="gradient-text">NET Exam</span></h1>
+        <h1 class="hero-title">NET Master by <span class="gradient-text">ZYRO Learning</span></h1>
         <p class="hero-subtitle">1500+ questions · 10 core topics · Real exam simulation</p>
     </div>""", unsafe_allow_html=True)
 
