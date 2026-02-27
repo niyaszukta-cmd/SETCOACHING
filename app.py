@@ -24,7 +24,10 @@
 ╚══════════════════════════════════════════════════════════════╝
 
 Usage:
-    pip install streamlit pandas PyMuPDF pdfplumber PyPDF2 anthropic
+    pip install streamlit pandas PyMuPDF pdfplumber PyPDF2
+    pip install pdf2image pytesseract Pillow   # for scanned PDF OCR
+    # macOS:  brew install tesseract
+    # Ubuntu: sudo apt install tesseract-ocr
     streamlit run net_quiz_master.py
 """
 
@@ -132,10 +135,29 @@ def inject_styles():
 .bookmark-indicator { color:var(--accent-gold); font-size:1.1rem; }
 .question-text { font-family:'Playfair Display',serif; font-size:1.35rem; font-weight:700; color:var(--text-primary); line-height:1.75; letter-spacing:0.01em; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
 
-.option-btn { padding:1rem 1.4rem; border-radius:12px; margin:0.45rem 0; font-size:0.97rem; font-weight:500; cursor:default; border:2px solid; line-height:1.5; transition: all 0.15s ease; }
+.option-btn { padding:1rem 1.4rem; border-radius:12px; margin:0.45rem 0; font-size:0.97rem; font-weight:500; cursor:default; border:2px solid; line-height:1.5; }
 .correct-opt { background:rgba(34,197,94,0.12); border-color:#22c55e; color:#22c55e; box-shadow: 0 0 12px rgba(34,197,94,0.15); }
 .wrong-opt { background:rgba(239,68,68,0.1); border-color:#ef4444; color:#ef4444; }
 .neutral-opt { background:var(--bg-secondary); border-color:var(--border-color); color:var(--text-secondary); }
+
+/* Custom option selector buttons */
+div[data-testid="stVerticalBlock"] button[kind="secondary"]:has(span) {
+    background: #1a2235 !important;
+    border: 1px solid #1e293b !important;
+    color: #94a3b8 !important;
+    text-align: left !important;
+    padding: 0.9rem 1.2rem !important;
+    border-radius: 12px !important;
+    font-size: 0.96rem !important;
+    font-weight: 500 !important;
+    margin: 0.3rem 0 !important;
+    transition: all 0.15s ease !important;
+}
+div[data-testid="stVerticalBlock"] button[kind="secondary"]:has(span):hover {
+    border-color: #6366f1 !important;
+    background: rgba(99,102,241,0.08) !important;
+    color: #f1f5f9 !important;
+}
 .explanation-box { background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(6,182,212,0.05)); border:1px solid rgba(99,102,241,0.25); border-radius:var(--radius); padding:1.2rem; margin-top:1.2rem; }
 .exp-title { font-weight:700; color:var(--accent-primary); margin-bottom:0.5rem; font-size:0.9rem; }
 .exp-text { color:var(--text-secondary); font-size:0.9rem; line-height:1.7; }
@@ -327,31 +349,83 @@ class QuestionBank:
 
 
 # ════════════════════════════════════════════════════════════════
-# 4. PDF EXTRACTOR
+# 4. PDF EXTRACTOR  (text-based + OCR for scanned PDFs)
 # ════════════════════════════════════════════════════════════════
 class PDFExtractor:
+    """
+    Extracts text from PDFs using a 4-method cascade:
+      1. PyMuPDF  (fast, best for text-based PDFs)
+      2. pdfplumber  (fallback text extraction)
+      3. PyPDF2  (second fallback)
+      4. OCR via pytesseract + pdf2image  (for scanned / image-only PDFs)
+    """
+
     def extract_chunks(self, pdf_path: str, chunk_size: int = 1500) -> list:
-        text = self._extract_text(pdf_path)
+        text, method_used = self._extract_text_with_method(pdf_path)
         if not text:
             return []
+        # Store which method succeeded so caller can inform user
+        self.last_method = method_used
         text = self._clean_text(text)
         chunks = self._split_into_chunks(text, chunk_size)
-        return [c for c in chunks if len(c.strip()) > 200]
+        return [c for c in chunks if len(c.strip()) > 150]
+
+    def get_page_count(self, pdf_path: str) -> int:
+        try:
+            import fitz
+            doc = fitz.open(pdf_path)
+            n = len(doc); doc.close(); return n
+        except Exception:
+            pass
+        try:
+            import PyPDF2
+            with open(pdf_path, "rb") as f:
+                return len(PyPDF2.PdfReader(f).pages)
+        except Exception:
+            return 0
+
+    def is_scanned(self, pdf_path: str) -> bool:
+        """Heuristic: if text extraction yields very little text, it's likely scanned."""
+        text = self._pymupdf(pdf_path) or self._pdfplumber(pdf_path)
+        if not text:
+            return True
+        # Less than 100 chars per page → likely image-based
+        pages = max(self.get_page_count(pdf_path), 1)
+        return (len(text.strip()) / pages) < 100
+
+    # ── Extraction cascade ────────────────────────────────────────
+    def _extract_text_with_method(self, pdf_path: str):
+        """Returns (text, method_name). Falls back to OCR if needed."""
+        # Step 1-3: try native text extraction
+        for fn, name in [(self._pymupdf, "PyMuPDF"),
+                         (self._pdfplumber, "pdfplumber"),
+                         (self._pypdf2, "PyPDF2")]:
+            result = fn(pdf_path)
+            if result and len(result.strip()) > 200:
+                return result, name
+
+        # Step 4: OCR fallback for scanned PDFs
+        ocr_text = self._ocr(pdf_path)
+        if ocr_text:
+            return ocr_text, "OCR (pytesseract)"
+
+        return "", "none"
 
     def _extract_text(self, pdf_path: str) -> str:
-        for method in [self._pymupdf, self._pdfplumber, self._pypdf2]:
-            result = method(pdf_path)
-            if result:
-                return result
-        return ""
+        text, _ = self._extract_text_with_method(pdf_path)
+        return text
 
     def _pymupdf(self, path: str) -> str:
         try:
             import fitz
             doc = fitz.open(path)
-            text = "".join(page.get_text() + "\n\n" for page in doc)
+            pages_text = []
+            for page in doc:
+                t = page.get_text("text")
+                if t.strip():
+                    pages_text.append(t)
             doc.close()
-            return text
+            return "\n\n".join(pages_text)
         except Exception:
             return ""
 
@@ -374,16 +448,65 @@ class PDFExtractor:
             text = ""
             with open(path, "rb") as f:
                 for page in PyPDF2.PdfReader(f).pages:
-                    text += page.extract_text() + "\n\n"
+                    t = page.extract_text()
+                    if t:
+                        text += t + "\n\n"
             return text
         except Exception:
             return ""
 
+    def _ocr(self, path: str) -> str:
+        """
+        OCR pipeline for scanned PDFs:
+          pdf2image → PIL Images → pytesseract → text
+        Processes up to 30 pages to keep it fast.
+        """
+        try:
+            from pdf2image import convert_from_path
+            import pytesseract
+            from PIL import Image
+
+            pages = convert_from_path(
+                path,
+                dpi=300,          # high DPI for better OCR accuracy
+                fmt="jpeg",
+                thread_count=2,
+            )
+
+            texts = []
+            for i, page_img in enumerate(pages[:30]):   # cap at 30 pages
+                # Pre-process: convert to greyscale for better OCR
+                grey = page_img.convert("L")
+                # pytesseract with NET-friendly config
+                config = "--oem 3 --psm 6 -l eng"
+                page_text = pytesseract.image_to_string(grey, config=config)
+                if page_text.strip():
+                    texts.append(page_text)
+
+            return "\n\n".join(texts)
+
+        except ImportError as e:
+            # Return empty string; caller will surface install instructions
+            return ""
+        except Exception:
+            return ""
+
+    # ── Text cleaning ─────────────────────────────────────────────
     def _clean_text(self, text: str) -> str:
+        # Normalize line endings
+        text = re.sub(r'\r\n|\r', '\n', text)
+        # Collapse 3+ blank lines → 2
         text = re.sub(r'\n{3,}', '\n\n', text)
+        # Collapse multiple spaces
         text = re.sub(r' {2,}', ' ', text)
-        text = re.sub(r'\n\s*\d+\s*\n', '\n', text)
-        text = re.sub(r'www\.\S+', '', text)
+        # Remove standalone page numbers
+        text = re.sub(r'(?m)^\s*\d{1,4}\s*$', '', text)
+        # Remove URLs / watermarks
+        text = re.sub(r'https?://\S+|www\.\S+', '', text)
+        # Remove common OCR artefacts: long runs of punctuation
+        text = re.sub(r'[_\-\.]{5,}', ' ', text)
+        # Remove non-printable chars except newline/tab
+        text = re.sub(r'[^\x09\x0A\x20-\x7E\u0900-\u097F]', ' ', text)
         return text.strip()
 
     def _split_into_chunks(self, text: str, chunk_size: int) -> list:
@@ -398,9 +521,11 @@ class PDFExtractor:
                 current = para + "\n\n"
         if current:
             chunks.append(current.strip())
+        # Fallback: split by character count if paragraph splitting didn't work
         if len(chunks) <= 1 and len(text) > chunk_size:
-            chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size - 200)
-                      if len(text[i:i+chunk_size]) > 200]
+            chunks = [text[i:i + chunk_size]
+                      for i in range(0, len(text), chunk_size - 200)
+                      if len(text[i:i + chunk_size].strip()) > 150]
         return chunks
 
 
@@ -734,11 +859,12 @@ def render_quiz():
     with col_timer:
         st.markdown(f'<div class="timer-box">⏱️ {mins:02d}:{secs:02d}</div>', unsafe_allow_html=True)
     with col_skip:
-        if st.button("Skip →"):
-            st.session_state.answers[idx] = {"answer": None, "correct": False, "skipped": True}
-            st.session_state.current_q_idx += 1
-            st.session_state.q_start_time = time.time()
-            st.rerun()
+        skip_clicked = st.button("Skip →", key=f"skip_{idx}")
+    if skip_clicked:
+        st.session_state.answers[idx] = {"answer": None, "correct": False, "skipped": True}
+        st.session_state.current_q_idx += 1
+        st.session_state.q_start_time = time.time()
+        st.rerun()
 
     q_id = q.get("id", idx)
     bm_html = '<span class="bookmark-indicator">🔖</span>' if q_id in st.session_state.bookmarks else ''
@@ -765,33 +891,62 @@ def render_quiz():
             clean_exp = html.unescape(re.sub(r'<[^>]+>', '', q["explanation"])).strip()
             st.markdown(f'<div class="explanation-box"><div class="exp-title">💡 Explanation</div><div class="exp-text">{clean_exp}</div></div>', unsafe_allow_html=True)
     else:
-        choice = st.radio("Select your answer:", options, key=f"q_{idx}", label_visibility="collapsed")
+        # ── Custom option selector (replaces st.radio to avoid None rendering) ──
+        sel_key = f"sel_q_{idx}"
+        if sel_key not in st.session_state:
+            st.session_state[sel_key] = options[0] if options else ""
+
+        st.markdown("""
+        <style>
+        div[data-testid="stHorizontalBlock"] .opt-row { margin:0 !important; }
+        </style>""", unsafe_allow_html=True)
+
+        for i, opt in enumerate(options):
+            clean_opt = html.unescape(re.sub(r'<[^>]+>', '', opt)).strip()
+            is_sel = st.session_state[sel_key] == opt
+            border = "2px solid #6366f1" if is_sel else "1px solid #1e293b"
+            bg     = "rgba(99,102,241,0.12)" if is_sel else "#1a2235"
+            dot    = "🔵" if is_sel else "⚪"
+            if st.button(
+                f"{dot}  {clean_opt}",
+                key=f"opt_{idx}_{i}",
+                use_container_width=True,
+            ):
+                st.session_state[sel_key] = opt
+                st.rerun()
+
+        choice = st.session_state[sel_key]
+
+        st.markdown("<br>", unsafe_allow_html=True)
         col_ans, col_bk = st.columns([3, 1])
         with col_ans:
-            if st.button("✅ Submit Answer", use_container_width=True, type="primary"):
-                is_correct = (choice == correct_ans)
-                time_taken = int(time.time() - st.session_state.q_start_time)
-                st.session_state.answers[idx] = {"answer": choice, "correct": is_correct, "time_taken": time_taken}
-                st.session_state.question_times[idx] = time_taken
-                st.session_state.total_attempted += 1
-                if is_correct:
-                    st.session_state.total_correct += 1
-                    st.session_state.streak += 1
-                else:
-                    st.session_state.streak = 0
-                    if q not in st.session_state.wrong_questions:
-                        st.session_state.wrong_questions.append(q)
-                if st.session_state.quiz_mode != "practice":
-                    st.session_state.current_q_idx += 1
-                    st.session_state.q_start_time = time.time()
-                st.rerun()
+            submit_clicked = st.button("✅ Submit Answer", use_container_width=True, type="primary", key=f"sub_{idx}")
         with col_bk:
-            if st.button("🔖 Bookmark", use_container_width=True):
-                if q_id in st.session_state.bookmarks:
-                    st.session_state.bookmarks.discard(q_id)
-                else:
-                    st.session_state.bookmarks.add(q_id)
-                st.rerun()
+            bm_clicked = st.button("🔖 Bookmark", use_container_width=True, key=f"bm_{idx}")
+
+        if submit_clicked:
+            is_correct = (choice == correct_ans)
+            time_taken = int(time.time() - st.session_state.q_start_time)
+            st.session_state.answers[idx] = {"answer": choice, "correct": is_correct, "time_taken": time_taken}
+            st.session_state.question_times[idx] = time_taken
+            st.session_state.total_attempted += 1
+            if is_correct:
+                st.session_state.total_correct += 1
+                st.session_state.streak += 1
+            else:
+                st.session_state.streak = 0
+                if q not in st.session_state.wrong_questions:
+                    st.session_state.wrong_questions.append(q)
+            if st.session_state.quiz_mode != "practice":
+                st.session_state.current_q_idx += 1
+                st.session_state.q_start_time = time.time()
+            st.rerun()
+        if bm_clicked:
+            if q_id in st.session_state.bookmarks:
+                st.session_state.bookmarks.discard(q_id)
+            else:
+                st.session_state.bookmarks.add(q_id)
+            st.rerun()
 
     if already_answered:
         col_prev, col_next = st.columns(2)
@@ -927,19 +1082,20 @@ def render_pdf_upload():
         <div class="config-card">
             <div style="font-weight:700;margin-bottom:1rem;">📋 How Extraction Works</div>
             <div class="step-list">
-                <div class="step-item"><span class="step-num">1</span><span>PDF text is extracted page by page</span></div>
-                <div class="step-item"><span class="step-num">2</span><span>MCQ patterns (A/B/C/D options) are detected</span></div>
-                <div class="step-item"><span class="step-num">3</span><span>Questions are cleaned and structured</span></div>
-                <div class="step-item"><span class="step-num">4</span><span>Answer keys are matched if present</span></div>
-                <div class="step-item"><span class="step-num">5</span><span>Questions are added to your quiz bank</span></div>
+                <div class="step-item"><span class="step-num">1</span><span>PDF text extracted (PyMuPDF → pdfplumber → PyPDF2)</span></div>
+                <div class="step-item"><span class="step-num">2</span><span>If text is sparse → OCR engine activated for scanned pages</span></div>
+                <div class="step-item"><span class="step-num">3</span><span>MCQ patterns (A/B/C/D options) are detected by regex</span></div>
+                <div class="step-item"><span class="step-num">4</span><span>Questions are cleaned, de-tagged, and structured</span></div>
+                <div class="step-item"><span class="step-num">5</span><span>Questions are saved to your quiz bank instantly</span></div>
             </div>
         </div>
         <div class="config-card" style="margin-top:1rem;">
             <div style="font-weight:700;margin-bottom:0.5rem;">💡 Tips for Best Results</div>
             <ul style="color:#94a3b8;font-size:0.85rem;line-height:1.8;">
-                <li>Use text-based PDFs (not scanned images)</li>
-                <li>NET Paper 1 question banks work best</li>
+                <li>Text-based PDFs extract fastest &amp; most accurately</li>
+                <li><b style="color:#06b6d4;">Scanned PDFs</b> supported via OCR (pytesseract)</li>
                 <li>Options labelled (A) (B) (C) (D) detected automatically</li>
+                <li>300 DPI scans give best OCR quality</li>
                 <li>Both pre-loaded books are fully supported</li>
             </ul>
         </div>""", unsafe_allow_html=True)
@@ -959,13 +1115,36 @@ def render_pdf_upload():
             return
 
         with st.spinner("📖 Extracting text from PDF..."):
-            text_chunks = PDFExtractor().extract_chunks(pdf_path, chunk_size=3000)
+            extractor = PDFExtractor()
+            text_chunks = extractor.extract_chunks(pdf_path, chunk_size=3000)
+            method_used = getattr(extractor, 'last_method', 'unknown')
 
         if not text_chunks:
-            st.error("❌ Could not extract text. Ensure it is a text-based (not scanned) PDF.")
+            st.error("❌ Could not extract text from this PDF.")
+            # Check if it's likely scanned
+            try:
+                scanned = extractor.is_scanned(pdf_path)
+            except Exception:
+                scanned = True
+            if scanned:
+                st.warning("""
+**📷 This appears to be a scanned / image-based PDF.**
+
+To enable OCR support, install these packages and restart the app:
+```bash
+pip install pdf2image pytesseract Pillow
+# Also install Tesseract OCR engine:
+# macOS:   brew install tesseract
+# Ubuntu:  sudo apt install tesseract-ocr
+# Windows: https://github.com/UB-Mannheim/tesseract/wiki
+```
+                """)
             return
 
-        st.info(f"📄 Extracted {len(text_chunks)} sections from PDF. Scanning for MCQ questions...")
+        method_badge = f'<span style="background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);padding:0.2rem 0.7rem;border-radius:20px;font-size:0.75rem;font-weight:600;">📡 {method_used}</span>'
+        st.markdown(f'Extracted <b>{len(text_chunks)}</b> sections from PDF &nbsp; {method_badge}', unsafe_allow_html=True)
+        if "OCR" in method_used:
+            st.info("🔍 OCR mode active — scanned PDF detected. Results depend on scan quality.")
         progress_bar = st.progress(0)
         extracted_questions = []
 
