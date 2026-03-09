@@ -1,7 +1,7 @@
 """
 ╔══════════════════════════════════════════════════════════════════════╗
 ║    NET QUIZ MASTER v3.0  ·  Complete Platform Redesign              ║
-║   Zodha Research  ·  UGC NET Paper 1                           ║
+║    NYZTrade Education  ·  UGC NET Paper 1                           ║
 ╚══════════════════════════════════════════════════════════════════════╝
 """
 
@@ -39,6 +39,8 @@ SEASONS   = ["June", "December"]
 # CSS
 # ═══════════════════════════════════════════════
 def inject_styles():
+    # Inject viewport meta for proper mobile scaling
+    st.markdown('<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">', unsafe_allow_html=True)
     st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
@@ -590,7 +592,111 @@ hr { border: none !important; border-top: 1px solid var(--border) !important; ma
 .text-muted { color: var(--t2); font-size: 0.85rem; }
 .text-tiny  { color: var(--t3); font-size: 0.72rem; }
 
-@media (max-width: 600px) { .stat-strip .stat-cell:nth-child(n+4) { display: none; } .page-header h1 { font-size: 1.4rem; } }
+
+/* ══════════════════════════════════════════════════════
+   MOBILE-NATIVE RESPONSIVE OVERRIDES  (≤ 600px)
+══════════════════════════════════════════════════════ */
+
+/* ── Base layout ── */
+@media (max-width: 600px) {
+  /* Full-bleed content, no wasted margin */
+  .main .block-container { padding: 0.5rem 0.5rem 5rem !important; }
+
+  /* Streamlit column stacking */
+  [data-testid="column"] { min-width: 100% !important; }
+
+  /* Sidebar: auto-collapse on mobile */
+  [data-testid="stSidebar"] { min-width: 200px !important; max-width: 78vw !important; }
+
+  /* ── Hero ── */
+  .hero, .hero-section { padding: 2rem 0.75rem 1.5rem !important; }
+  .hero-title { font-size: clamp(1.7rem, 8vw, 2.6rem) !important; }
+  .hero-badge { font-size: 0.65rem !important; padding: 0.3rem 0.75rem !important; }
+  .hero-features { gap: 0.4rem !important; }
+  .hero-pill { font-size: 0.7rem !important; padding: 0.28rem 0.65rem !important; }
+
+  /* ── Stat strip: 3 columns, hide last 3 less-critical cells ── */
+  .stat-strip { grid-template-columns: repeat(3, 1fr) !important; max-width: 100% !important; }
+  .stat-strip .stat-cell:nth-child(n+4) { display: none !important; }
+  .stat-val { font-size: 1.4rem !important; }
+  .stat-icon { font-size: 1rem !important; }
+
+  /* ── Section labels ── */
+  .section-label { font-size: 0.8rem !important; }
+
+  /* ── Cards: single column ── */
+  .card { padding: 1rem !important; }
+  .card-title { font-size: 0.95rem !important; }
+  .card-desc  { font-size: 0.75rem !important; }
+
+  /* ── Year cards ── */
+  .year-num { font-size: 1.1rem !important; }
+  .year-count { font-size: 0.6rem !important; }
+
+  /* ── Quiz / question card ── */
+  .question-wrap, .question-card { padding: 1rem 0.85rem !important; }
+  .q-num { font-size: 0.6rem !important; }
+  .q-text, .question-text { font-size: clamp(0.9rem, 4vw, 1.1rem) !important; line-height: 1.65 !important; }
+  .q-tags { gap: 0.3rem !important; }
+  .meta-chip { font-size: 0.6rem !important; padding: 0.15rem 0.5rem !important; }
+
+  /* ── Options ── */
+  .opt-selected, .option-btn, .correct-opt, .wrong-opt, .neutral-opt {
+    font-size: 0.85rem !important; padding: 0.75rem 0.9rem !important;
+    border-radius: 10px !important;
+  }
+
+  /* ── Timer ── */
+  .timer-display { font-size: 0.9rem !important; padding: 0.3rem 0.7rem !important; min-width: 4rem !important; }
+
+  /* ── Explanation box ── */
+  .explanation-box { padding: 0.85rem !important; font-size: 0.8rem !important; }
+  .exp-title { font-size: 0.75rem !important; }
+
+  /* ── Page headers ── */
+  .page-header h1 { font-size: 1.3rem !important; }
+  .page-header p  { font-size: 0.8rem !important; }
+
+  /* ── Leaderboard ── */
+  .lb-row { padding: 0.65rem 0.75rem !important; gap: 0.5rem !important; }
+  .lb-name { font-size: 0.8rem !important; }
+  .lb-detail { font-size: 0.65rem !important; }
+  .lb-score { font-size: 0.95rem !important; }
+  .lb-avatar { width: 1.8rem !important; height: 1.8rem !important; font-size: 0.65rem !important; }
+
+  /* ── Login card ── */
+  .login-wrap { margin: 1rem auto !important; padding: 1.5rem 1.25rem !important; }
+
+  /* ── Results card ── */
+  .result-hero, .results-hero { padding: 1.5rem 1rem !important; }
+  .result-score { font-size: clamp(2rem, 12vw, 3.5rem) !important; }
+
+  /* ── PYQ year row buttons (3-col → flex wrap) ── */
+  .pyq-launch-row { flex-direction: column !important; gap: 0.35rem !important; }
+
+  /* ── Exam navigator panel: hide on very small screens ── */
+  .exam-panel { display: none !important; }
+
+  /* ── Buttons: better tap targets ── */
+  .stButton button { min-height: 44px !important; font-size: 0.88rem !important; }
+
+  /* ── Bottom nav spacing for thumb reachability ── */
+  .stButton:last-child { margin-bottom: 1rem !important; }
+
+  /* ── Scrollable tab overflow ── */
+  .stTabs [data-baseweb="tab-list"] { overflow-x: auto !important; flex-wrap: nowrap !important; }
+}
+
+/* ── Tablet tweaks (601px – 900px) ── */
+@media (min-width: 601px) and (max-width: 900px) {
+  .main .block-container { padding: 1rem 1.25rem 3rem !important; }
+  .hero-title { font-size: clamp(2rem, 5vw, 3rem) !important; }
+  .stat-strip { grid-template-columns: repeat(4, 1fr) !important; }
+  .stat-strip .stat-cell:nth-child(n+5) { display: none !important; }
+  .card-title { font-size: 1rem !important; }
+  .stButton button { min-height: 42px !important; }
+}
+
 </style>
 
 <script>
@@ -828,7 +934,9 @@ def render_sidebar():
     <style>
     [data-testid="stSidebarCollapseButton"] { display: none !important; }
     #custom-sidebar-toggle {
-        position: fixed; top: 0.7rem; left: 0.7rem; z-index: 99999;
+        position: fixed; z-index: 99999;
+        /* Desktop: top-left */
+        top: 0.7rem; left: 0.7rem;
         width: 2.5rem; height: 2.5rem;
         background: linear-gradient(135deg, #7c3aed, #a855f7);
         border: none; border-radius: 50%; cursor: pointer;
@@ -836,11 +944,28 @@ def render_sidebar():
         box-shadow: 0 4px 18px rgba(124,58,237,0.55);
         transition: box-shadow 0.2s, transform 0.15s; outline: none;
         -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
     }
     #custom-sidebar-toggle:hover { box-shadow: 0 6px 24px rgba(124,58,237,0.75); transform: scale(1.08); }
+    #custom-sidebar-toggle:active { transform: scale(0.94); }
     #custom-sidebar-toggle svg { width: 1.1rem; height: 1.1rem; fill: #ffffff; pointer-events: none; }
     .main .block-container { padding-top: 3.5rem !important; }
     @media (min-width: 768px) { .main .block-container { padding-top: 1.5rem !important; } }
+
+    /* Mobile: move button to bottom-right for thumb reach */
+    @media (max-width: 600px) {
+        #custom-sidebar-toggle {
+            top: auto !important;
+            left: auto !important;
+            bottom: 1.2rem !important;
+            right: 1.2rem !important;
+            width: 3rem !important;
+            height: 3rem !important;
+            box-shadow: 0 6px 24px rgba(124,58,237,0.7) !important;
+        }
+        #custom-sidebar-toggle svg { width: 1.3rem !important; height: 1.3rem !important; }
+        .main .block-container { padding-top: 0.75rem !important; padding-bottom: 5.5rem !important; }
+    }
     </style>
     <button id="custom-sidebar-toggle" aria-label="Toggle sidebar">
         <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="2" rx="1"/><rect x="3" y="11" width="18" height="2" rx="1"/><rect x="3" y="17" width="18" height="2" rx="1"/></svg>
@@ -957,7 +1082,7 @@ def render_sidebar():
 
         st.markdown(
             '<div style="text-align:center;opacity:0.4;font-size:0.72rem;padding:0.75rem 0.5rem 0;">'
-            'Zodha Research<br><span style="color:#a855f7;">Built for NET Aspirants</span></div>',
+            'NYZTrade Education<br><span style="color:#a855f7;">Built for NET Aspirants</span></div>',
             unsafe_allow_html=True
         )
 
@@ -976,8 +1101,8 @@ def page_home():
     # ── Hero ──────────────────────────────────────
     st.markdown(f"""
     <div class="hero">
-      <div class="hero-badge">🏛️ UGC NET &nbsp;·&nbsp; Paper 1 &nbsp;·&nbsp; Zodha Research</div>
-      <h1 class="hero-title">Master NET with<br><em>Zodha Research</em></h1>
+      <div class="hero-badge">🏛️ UGC NET &nbsp;·&nbsp; Paper 1 &nbsp;·&nbsp; NYZTrade Education</div>
+      <h1 class="hero-title">Master NET with<br><em>Intelligent Practice</em></h1>
       <div class="hero-features">
         <span class="hero-pill"><span class="pill-icon">📅</span> PYQ Year-wise Tests</span>
         <span class="hero-pill"><span class="pill-icon">🧪</span> Mock &amp; Exam Simulation</span>
@@ -1032,10 +1157,14 @@ def page_home():
     cards = [
         ("📅", "PYQ Yearwise",   "15-Q tests by year, season & topic",  "pyq",   "var(--amber)",   "amber",   "2023 · 2022 · 15 Qs each"),
         ("🧪", "Mock Tests",     "15-Q sprints, full mocks & exam sim", "mock",  "var(--indigo)",  "indigo",  "⚡ 15-Q · 🎓 Exam Sim"),
-        ("🤖", "AI Predicted",   "Smart questions for upcoming exams",  "ai",    "var(--teal)",    "teal",    "June 2026 focus"),
+        ("🤖", "AI Predicted",   "Smart questions for upcoming exams",  "ai",    "var(--teal)",    "teal",    "June 2025 focus"),
         ("⚡", "Quick Drill",    "15 questions, 15 min sprint",         "quick", "var(--emerald)", "emerald", "All topics mixed"),
     ]
-    c1, c2, c3, c4 = st.columns(4)
+    # On mobile Streamlit columns stack naturally — use 2 cols for better mobile layout
+    import streamlit as _st
+    _is_mobile_hint = False  # Streamlit doesn't expose screen width; CSS handles stacking
+    c1, c2 = st.columns(2)
+    c3, c4 = st.columns(2)
     for col, (icon, title, desc, dest, accent, chip_cls, meta) in zip([c1,c2,c3,c4], cards):
         with col:
             st.markdown(f"""<div class="card">
@@ -1760,41 +1889,43 @@ def page_quiz():
                         st.rerun()
 
             st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
-            sc1, sc2, sc3 = st.columns([3, 1, 1])
-            with sc1:
-                if st.button("✅  Submit Answer", key=f"sub_{idx}", use_container_width=True, type="primary"):
-                    choice       = st.session_state[sel_key]
-                    correct_flag = (choice == correct)
-                    t_taken      = int(time.time() - (st.session_state.q_start or time.time()))
-                    st.session_state.answers[idx] = {"answer": choice, "correct": correct_flag, "time": t_taken}
-                    st.session_state.q_times[idx]  = t_taken
-                    st.session_state.total_attempted += 1
-                    if correct_flag:
-                        st.session_state.total_correct += 1
-                        st.session_state.streak += 1
-                        st.session_state["_show_correct_fx"] = idx
-                    else:
-                        st.session_state.streak = 0
-                        st.session_state["_show_wrong_fx"] = idx
-                        if q not in st.session_state.wrong_questions:
-                            st.session_state.wrong_questions.append(q)
-                    if mode in ("exam", "exam_sim"):
-                        st.session_state.q_idx += 1
-                        st.session_state.q_start = time.time()
-                    st.rerun()
-            with sc2:
-                if st.button("⏭ Skip", key=f"skip_{idx}", use_container_width=True):
+            # Submit — full width for easy tapping on mobile
+            if st.button("✅  Submit Answer", key=f"sub_{idx}", use_container_width=True, type="primary"):
+                choice       = st.session_state[sel_key]
+                correct_flag = (choice == correct)
+                t_taken      = int(time.time() - (st.session_state.q_start or time.time()))
+                st.session_state.answers[idx] = {"answer": choice, "correct": correct_flag, "time": t_taken}
+                st.session_state.q_times[idx]  = t_taken
+                st.session_state.total_attempted += 1
+                if correct_flag:
+                    st.session_state.total_correct += 1
+                    st.session_state.streak += 1
+                    st.session_state["_show_correct_fx"] = idx
+                else:
+                    st.session_state.streak = 0
+                    st.session_state["_show_wrong_fx"] = idx
+                    if q not in st.session_state.wrong_questions:
+                        st.session_state.wrong_questions.append(q)
+                if mode in ("exam", "exam_sim"):
+                    st.session_state.q_idx += 1
+                    st.session_state.q_start = time.time()
+                st.rerun()
+            # Skip + Bookmark in 2-col row — large tap targets
+            _sb1, _sb2 = st.columns(2)
+            with _sb1:
+                if st.button("⏭  Skip", key=f"skip_{idx}", use_container_width=True):
                     st.session_state.answers[idx] = {"answer": None, "correct": False, "skipped": True}
                     st.session_state.q_idx += 1
                     st.session_state.q_start = time.time()
                     st.rerun()
-            with sc3:
-                if st.button("🔖", key=f"bm2_{idx}", use_container_width=True):
-                    bm_id = q.get("id", idx)
-                    if bm_id in st.session_state.bookmarks:
-                        st.session_state.bookmarks.discard(bm_id)
+            with _sb2:
+                bm_id2   = q.get("id", idx)
+                bm_lbl2  = "🔖 Saved" if bm_id2 in st.session_state.bookmarks else "🔖 Save"
+                if st.button(bm_lbl2, key=f"bm2_{idx}", use_container_width=True):
+                    if bm_id2 in st.session_state.bookmarks:
+                        st.session_state.bookmarks.discard(bm_id2)
                     else:
-                        st.session_state.bookmarks.add(bm_id)
+                        st.session_state.bookmarks.add(bm_id2)
                     st.rerun()
 
     # Render in correct container
