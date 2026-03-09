@@ -1420,7 +1420,7 @@ def page_ai():
           <div class="card-meta" style="margin-bottom:0.5rem;">
             <span class="chip teal">{icon} {q.get('topic','—')}</span>
             <span class="chip" style="color:{dc};">{q.get('difficulty','—')}</span>
-            <span class="chip amber">🤖 AI Pick</span>
+            
             <span style="font-size:0.65rem;color:var(--t3);margin-left:auto;">Target: {q.get('year','')} {q.get('season','')}</span>
           </div>
           <div style="font-family:'Playfair Display',serif;font-weight:700;color:var(--t1);font-size:0.93rem;line-height:1.7;">{q['question']}</div>
@@ -1530,7 +1530,7 @@ def page_quiz():
     rm, rs = divmod(remaining or 0, 60)
     diff_color = {"Easy":"var(--green)","Medium":"var(--gold)","Hard":"var(--red)"}.get(q.get("difficulty",""),"var(--text2)")
     yr_tag = f'· {q.get("year","")} {q.get("season","")}' if q.get("year") else ""
-    ai_tag = '<span class="meta-chip cyan" style="font-size:0.65rem;padding:0.15rem 0.4rem;">🤖 AI Pick</span>' if q.get("predicted") else ""
+    ai_tag = ""  # AI tag removed from display
     is_exam_sim = (mode == "exam_sim")
 
     # Layout
@@ -1573,7 +1573,6 @@ def page_quiz():
             <span class="meta-chip" style="color:{diff_color}">{q.get("difficulty","")}</span>
             <span class="meta-chip violet">{q.get("topic","")}</span>
             <span class="meta-chip">{yr_tag}</span>
-            {ai_tag}
           </div>
         </div>""", unsafe_allow_html=True)
 
@@ -1595,6 +1594,32 @@ def page_quiz():
                     st.markdown(f'<div class="option-btn wrong-opt">❌ {clean}</div>', unsafe_allow_html=True)
                 else:
                     st.markdown(f'<div class="option-btn neutral-opt">{clean}</div>', unsafe_allow_html=True)
+
+            # ── Answer feedback effects ──────────────────────────────
+            if st.session_state.pop("_show_correct_fx", None) == idx:
+                st.balloons()
+                st.markdown("""
+                <div style="text-align:center;padding:0.75rem 0;animation:popIn 0.4s ease;">
+                  <span style="font-size:3.5rem;filter:drop-shadow(0 0 12px #22c55e);">🎉</span>
+                  <div style="font-family:'DM Sans',sans-serif;font-size:1.1rem;font-weight:700;
+                    color:#22c55e;margin-top:0.25rem;letter-spacing:0.03em;">Brilliant! Correct Answer!</div>
+                  <div style="font-size:0.8rem;color:var(--t2);margin-top:0.2rem;">Keep going! 🚀</div>
+                </div>
+                <style>@keyframes popIn{from{transform:scale(0.5);opacity:0}to{transform:scale(1);opacity:1}}</style>
+                """, unsafe_allow_html=True)
+            elif st.session_state.pop("_show_wrong_fx", None) == idx:
+                st.markdown("""
+                <div style="text-align:center;padding:0.75rem 0;animation:shakeIt 0.5s ease;">
+                  <span style="font-size:3.5rem;filter:drop-shadow(0 0 12px #f43f5e);">😢</span>
+                  <div style="font-family:'DM Sans',sans-serif;font-size:1.1rem;font-weight:700;
+                    color:#f43f5e;margin-top:0.25rem;">Oops! That was wrong</div>
+                  <div style="font-size:0.8rem;color:var(--t2);margin-top:0.2rem;">Check the explanation below 👇</div>
+                </div>
+                <style>
+                  @keyframes shakeIt{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}
+                  40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+                </style>
+                """, unsafe_allow_html=True)
 
             if q.get("explanation") and mode not in ("exam", "exam_sim"):
                 clean_exp = html.unescape(re.sub(r'<[^>]+>', '', q["explanation"])).strip()
@@ -1658,8 +1683,10 @@ def page_quiz():
                     if correct_flag:
                         st.session_state.total_correct += 1
                         st.session_state.streak += 1
+                        st.session_state["_show_correct_fx"] = idx
                     else:
                         st.session_state.streak = 0
+                        st.session_state["_show_wrong_fx"] = idx
                         if q not in st.session_state.wrong_questions:
                             st.session_state.wrong_questions.append(q)
                     if mode in ("exam", "exam_sim"):
