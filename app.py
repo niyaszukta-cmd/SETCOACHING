@@ -1032,7 +1032,7 @@ def page_home():
     cards = [
         ("📅", "PYQ Yearwise",   "15-Q tests by year, season & topic",  "pyq",   "var(--amber)",   "amber",   "2023 · 2022 · 15 Qs each"),
         ("🧪", "Mock Tests",     "15-Q sprints, full mocks & exam sim", "mock",  "var(--indigo)",  "indigo",  "⚡ 15-Q · 🎓 Exam Sim"),
-        ("🤖", "AI Predicted",   "Smart questions for upcoming exams",  "ai",    "var(--teal)",    "teal",    "June 2025 focus"),
+        ("🤖", "AI Predicted",   "Smart questions for upcoming exams",  "ai",    "var(--teal)",    "teal",    "June 2026 focus"),
         ("⚡", "Quick Drill",    "15 questions, 15 min sprint",         "quick", "var(--emerald)", "emerald", "All topics mixed"),
     ]
     c1, c2, c3, c4 = st.columns(4)
