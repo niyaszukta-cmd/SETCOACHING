@@ -41,386 +41,920 @@ SEASONS   = ["June", "December"]
 def inject_styles():
     st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700&family=Outfit:wght@300;400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap');
 
+/* ══════════════════════════════════════════════════════
+   DESIGN TOKEN SYSTEM — Obsidian & Amber
+══════════════════════════════════════════════════════ */
 :root {
-  --ink:    #0a0c10;
-  --ink2:   #111520;
-  --ink3:   #1a1f2e;
-  --card:   #141824;
-  --border: #232a3a;
-  --border2:#2e3a52;
-  --gold:   #f5a623;
-  --gold2:  #fbbf24;
-  --cyan:   #00d4ff;
-  --green:  #00e5a0;
-  --red:    #ff4d6d;
-  --violet: #7c5cfc;
-  --violet2:#a78bfa;
-  --text:   #f0f4ff;
-  --text2:  #8892a4;
-  --text3:  #4a5568;
-  --r:12px; --rl:18px; --rxl:24px;
+  /* Surfaces */
+  --bg:       #080b12;
+  --bg2:      #0d1220;
+  --bg3:      #111828;
+  --surface:  #141c2e;
+  --surface2: #1a2438;
+  --surface3: #1f2d45;
+
+  /* Borders */
+  --line:     #1e2d45;
+  --line2:    #263650;
+  --line3:    #2e4268;
+
+  /* Brand palette */
+  --amber:    #e8a020;
+  --amber2:   #f5bc4a;
+  --amber-glow: rgba(232,160,32,0.12);
+  --teal:     #0fb8c9;
+  --teal2:    #4dd9e8;
+  --teal-glow: rgba(15,184,201,0.10);
+  --emerald:  #10b981;
+  --rose:     #f43f5e;
+  --indigo:   #6366f1;
+  --indigo2:  #818cf8;
+  --indigo-glow: rgba(99,102,241,0.12);
+
+  /* Text */
+  --t1: #eef2ff;
+  --t2: #8ba0c0;
+  --t3: #4e6285;
+  --t4: #2e3d55;
+
+  /* Radii */
+  --r-sm: 8px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+
+  /* Shadows */
+  --shadow-card: 0 2px 24px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.3);
+  --shadow-glow-amber: 0 0 32px rgba(232,160,32,0.15);
+  --shadow-glow-teal:  0 0 32px rgba(15,184,201,0.12);
 }
 
-*{box-sizing:border-box;margin:0;padding:0;}
-body,.stApp{background:var(--ink)!important;font-family:'Space Grotesk',sans-serif!important;color:var(--text)!important;}
-#MainMenu,footer,header,.stDeployButton{display:none!important;}
+/* ══════════════════════════════════════════════════════
+   RESET & BASE
+══════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ── MAIN PADDING ── */
-.main .block-container{padding:0 0.75rem 5rem!important;max-width:100%!important;}
-@media(min-width:768px){.main .block-container{padding:0 1.5rem 4rem!important;max-width:1280px!important;margin:0 auto!important;}}
-
-/* ── CUSTOM SCROLLBAR ── */
-::-webkit-scrollbar{width:4px;height:4px;}
-::-webkit-scrollbar-track{background:var(--ink);}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
-
-/* ══════════════════════════════
-   TOP NAV BAR
-══════════════════════════════ */
-.topbar{
-  position:sticky;top:0;z-index:1000;
-  background:rgba(10,12,16,0.92);
-  backdrop-filter:blur(12px);
-  border-bottom:1px solid var(--border);
-  padding:0.75rem 1.5rem;
-  display:flex;align-items:center;justify-content:space-between;
-  margin-bottom:0;
-}
-.topbar-brand{
-  font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;
-  background:linear-gradient(90deg,var(--gold),var(--cyan));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-  letter-spacing:-0.02em;
-}
-.topbar-nav{display:flex;gap:0.25rem;align-items:center;}
-.nav-pill{
-  padding:0.4rem 0.9rem;border-radius:50px;font-size:0.8rem;font-weight:600;
-  color:var(--text2);cursor:pointer;border:1px solid transparent;
-  transition:all 0.2s;white-space:nowrap;
-}
-.nav-pill:hover,.nav-pill.active{background:var(--card);color:var(--text);border-color:var(--border);}
-.nav-pill.active{color:var(--gold)!important;border-color:rgba(245,166,35,0.4)!important;}
-.user-chip{
-  display:flex;align-items:center;gap:0.5rem;
-  background:var(--card);border:1px solid var(--border);border-radius:50px;
-  padding:0.35rem 0.9rem;font-size:0.8rem;font-weight:600;
-}
-.user-avatar{
-  width:1.5rem;height:1.5rem;border-radius:50%;
-  background:linear-gradient(135deg,var(--violet),var(--cyan));
-  display:flex;align-items:center;justify-content:center;
-  font-size:0.65rem;font-weight:800;color:#fff;flex-shrink:0;
+body, .stApp {
+  background: var(--bg) !important;
+  font-family: 'Outfit', sans-serif !important;
+  color: var(--t1) !important;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* ══════════════════════════════
-   HERO
-══════════════════════════════ */
-.hero{
-  text-align:center;padding:3rem 1rem 2rem;
-  background:radial-gradient(ellipse 80% 60% at 50% -20%,rgba(124,92,252,0.18),transparent),
-             radial-gradient(ellipse 60% 40% at 80% 120%,rgba(0,212,255,0.1),transparent);
+#MainMenu, footer, header, .stDeployButton, [data-testid="stText"] {
+  display: none !important;
 }
-.hero-eyebrow{
-  display:inline-flex;align-items:center;gap:0.5rem;
-  background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.35);
-  color:var(--gold);padding:0.3rem 1rem;border-radius:50px;
-  font-size:0.72rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:1.2rem;
-}
-.hero-title{
-  font-family:'Syne',sans-serif;
-  font-size:clamp(2rem,7vw,4.5rem);font-weight:800;
-  color:var(--text);line-height:1.05;margin-bottom:1rem;letter-spacing:-0.03em;
-}
-.hero-title .hl{
-  background:linear-gradient(90deg,var(--gold),var(--gold2),var(--cyan));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-}
-.hero-sub{font-size:1rem;color:var(--text2);max-width:580px;margin:0 auto 2rem;line-height:1.7;}
-.hero-cta-row{display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap;}
 
-/* ══════════════════════════════
+/* ── Main container ── */
+.main .block-container {
+  padding: 0 1rem 6rem !important;
+  max-width: 100% !important;
+}
+@media (min-width: 900px) {
+  .main .block-container {
+    padding: 0 2.5rem 5rem !important;
+    max-width: 1360px !important;
+    margin: 0 auto !important;
+  }
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--line3); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--indigo); }
+
+/* ══════════════════════════════════════════════════════
+   NAVIGATION BAR
+══════════════════════════════════════════════════════ */
+.topbar {
+  position: sticky; top: 0; z-index: 1000;
+  background: rgba(8, 11, 18, 0.94);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--line);
+  padding: 0 1.5rem;
+  height: 60px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem;
+}
+
+.topbar-brand {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.25rem; font-weight: 800;
+  letter-spacing: -0.01em; white-space: nowrap;
+  background: linear-gradient(110deg, var(--amber) 0%, var(--amber2) 40%, var(--teal2) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.topbar-brand span {
+  font-style: italic; font-weight: 700;
+}
+
+.topbar-nav {
+  display: flex; align-items: center; gap: 2px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.topbar-nav::-webkit-scrollbar { display: none; }
+
+.nav-pill {
+  padding: 0.4rem 0.85rem;
+  border-radius: 50px;
+  font-size: 0.79rem; font-weight: 600;
+  color: var(--t3); cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.18s ease;
+  white-space: nowrap; letter-spacing: 0.01em;
+}
+.nav-pill:hover {
+  color: var(--t1); background: var(--surface);
+  border-color: var(--line2);
+}
+.nav-pill.active {
+  color: var(--amber) !important;
+  background: var(--amber-glow) !important;
+  border-color: rgba(232,160,32,0.3) !important;
+}
+
+.user-chip {
+  display: flex; align-items: center; gap: 0.5rem;
+  background: var(--surface); border: 1px solid var(--line2);
+  border-radius: 50px; padding: 0.3rem 0.85rem 0.3rem 0.3rem;
+  font-size: 0.79rem; font-weight: 600; color: var(--t1);
+  white-space: nowrap; flex-shrink: 0;
+  transition: border-color 0.2s;
+}
+.user-chip:hover { border-color: var(--line3); }
+
+.user-avatar {
+  width: 1.6rem; height: 1.6rem; border-radius: 50%;
+  background: linear-gradient(135deg, var(--indigo), var(--teal));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.62rem; font-weight: 800; color: #fff; flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.3);
+}
+
+/* ══════════════════════════════════════════════════════
+   PAGE ANATOMY HELPERS
+══════════════════════════════════════════════════════ */
+.page-wrap { padding-top: 1.5rem; animation: fadeUp 0.35s ease both; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.page-header {
+  margin-bottom: 1.75rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+.page-header h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+  font-weight: 800; color: var(--t1);
+  letter-spacing: -0.02em; line-height: 1.15;
+  margin-bottom: 0.4rem;
+}
+.page-header p {
+  font-size: 0.9rem; color: var(--t2); line-height: 1.6;
+  max-width: 680px;
+}
+
+.section-label {
+  display: flex; align-items: center; gap: 0.75rem;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--t3);
+  margin: 2rem 0 1rem;
+}
+.section-label::before { content: ''; width: 3px; height: 14px; border-radius: 2px; background: var(--amber); flex-shrink: 0; }
+.section-label::after  { content: ''; flex: 1; height: 1px; background: var(--line); }
+.section-label .pill {
+  background: var(--surface); border: 1px solid var(--line2);
+  color: var(--t3); font-size: 0.6rem; padding: 0.15rem 0.5rem;
+  border-radius: 20px; font-weight: 600; text-transform: uppercase;
+}
+
+/* ══════════════════════════════════════════════════════
+   HERO SECTION
+══════════════════════════════════════════════════════ */
+.hero {
+  text-align: center;
+  padding: 3.5rem 1.5rem 2.5rem;
+  position: relative; overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(99,102,241,0.14), transparent),
+    radial-gradient(ellipse 50% 40% at 90% 100%, rgba(15,184,201,0.08), transparent),
+    radial-gradient(ellipse 40% 30% at 10% 80%, rgba(232,160,32,0.07), transparent);
+  pointer-events: none;
+}
+
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  background: var(--amber-glow);
+  border: 1px solid rgba(232,160,32,0.28);
+  color: var(--amber); padding: 0.35rem 1.1rem; border-radius: 50px;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; margin-bottom: 1.5rem;
+  animation: fadeUp 0.4s 0.1s ease both;
+}
+.hero-badge::before { content: '●'; font-size: 0.45rem; animation: blink 2s infinite; }
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+.hero-title {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(2.4rem, 7vw, 5rem);
+  font-weight: 900; line-height: 1.05;
+  color: var(--t1); letter-spacing: -0.03em;
+  margin-bottom: 1.1rem;
+  animation: fadeUp 0.4s 0.2s ease both;
+}
+.hero-title em {
+  font-style: italic;
+  background: linear-gradient(110deg, var(--amber), var(--amber2), var(--teal2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-sub {
+  font-size: 1.05rem; color: var(--t2); line-height: 1.75;
+  max-width: 560px; margin: 0 auto 2rem;
+  animation: fadeUp 0.4s 0.3s ease both;
+}
+
+/* ══════════════════════════════════════════════════════
    STAT STRIP
-══════════════════════════════ */
-.stat-strip{
-  display:flex;justify-content:center;gap:0;
-  background:var(--card);border:1px solid var(--border);border-radius:var(--rl);
-  overflow:hidden;margin:1.5rem 0;
+══════════════════════════════════════════════════════ */
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  margin: 1.75rem 0;
+  box-shadow: var(--shadow-card);
 }
-.stat-cell{
-  flex:1;padding:1.2rem 1rem;text-align:center;
-  border-right:1px solid var(--border);min-width:0;
-}
-.stat-cell:last-child{border-right:none;}
-.stat-val{
-  font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;display:block;
-  background:linear-gradient(135deg,var(--gold),var(--cyan));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-}
-.stat-lbl{font-size:0.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-top:0.2rem;}
+@media (max-width: 600px) { .stat-strip { grid-template-columns: repeat(3, 1fr); } }
 
-/* ══════════════════════════════
-   SECTION LABEL
-══════════════════════════════ */
-.section-label{
-  display:flex;align-items:center;gap:0.75rem;
-  font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;
-  color:var(--text);margin:2rem 0 1rem;
+.stat-cell {
+  padding: 1.25rem 0.75rem;
+  text-align: center;
+  border-right: 1px solid var(--line);
+  position: relative;
+  transition: background 0.2s;
 }
-.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
-.section-label .tag{
-  font-size:0.65rem;background:var(--border);color:var(--text2);
-  padding:0.2rem 0.5rem;border-radius:4px;font-weight:600;
-  text-transform:uppercase;letter-spacing:0.1em;
-}
+.stat-cell:last-child { border-right: none; }
+.stat-cell:hover { background: var(--surface2); }
 
-/* ══════════════════════════════
-   CARDS  
-══════════════════════════════ */
-.card{
-  background:var(--card);border:1px solid var(--border);border-radius:var(--rl);
-  padding:1.4rem;position:relative;overflow:hidden;transition:border-color 0.2s,transform 0.2s;
+.stat-val {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.9rem; font-weight: 800;
+  display: block; line-height: 1;
+  background: linear-gradient(135deg, var(--amber), var(--teal2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.3rem;
 }
-.card:hover{border-color:var(--border2);transform:translateY(-2px);}
-.card-accent-top{position:absolute;top:0;left:0;right:0;height:3px;}
-.card-icon{font-size:1.8rem;margin-bottom:0.75rem;display:block;}
-.card-title{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:var(--text);margin-bottom:0.4rem;}
-.card-desc{font-size:0.82rem;color:var(--text2);line-height:1.6;}
-.card-meta{display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.75rem;}
-.meta-chip{
-  font-size:0.68rem;font-weight:700;padding:0.2rem 0.55rem;border-radius:4px;
-  background:var(--border);color:var(--text2);
-}
-.meta-chip.gold{background:rgba(245,166,35,0.15);color:var(--gold);}
-.meta-chip.cyan{background:rgba(0,212,255,0.12);color:var(--cyan);}
-.meta-chip.green{background:rgba(0,229,160,0.12);color:var(--green);}
-.meta-chip.red{background:rgba(255,77,109,0.12);color:var(--red);}
-.meta-chip.violet{background:rgba(124,92,252,0.15);color:var(--violet2);}
-
-/* ══════════════════════════════
-   PYQ YEAR GRID
-══════════════════════════════ */
-.year-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;}
-@media(min-width:600px){.year-grid{grid-template-columns:repeat(5,1fr);}}
-@media(min-width:900px){.year-grid{grid-template-columns:repeat(9,1fr);}}
-.year-card{
-  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
-  padding:1rem 0.5rem;text-align:center;cursor:pointer;transition:all 0.2s;position:relative;
-}
-.year-card:hover,.year-card.active{border-color:var(--gold);background:rgba(245,166,35,0.08);}
-.year-num{font-family:'Syne',sans-serif;font-size:1.15rem;font-weight:800;color:var(--gold);}
-.year-count{font-size:0.65rem;color:var(--text3);margin-top:0.2rem;}
-.season-badge{
-  position:absolute;top:0.3rem;right:0.3rem;
-  font-size:0.55rem;font-weight:700;padding:0.1rem 0.35rem;
-  border-radius:3px;background:rgba(0,212,255,0.2);color:var(--cyan);
+.stat-lbl {
+  font-size: 0.62rem; color: var(--t3);
+  text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700;
 }
 
-/* ══════════════════════════════
-   QUIZ INTERFACE
-══════════════════════════════ */
-.quiz-bar{
-  display:flex;align-items:center;justify-content:space-between;
-  background:var(--card);border-bottom:1px solid var(--border);
-  padding:0.75rem 1rem;position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:0.5rem;
+/* ══════════════════════════════════════════════════════
+   CARDS
+══════════════════════════════════════════════════════ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 1.5rem;
+  position: relative; overflow: hidden;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  box-shadow: var(--shadow-card);
 }
-.quiz-bar-left{display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;}
-.q-badge{
-  font-family:'JetBrains Mono',monospace;font-size:0.8rem;font-weight:700;
-  background:var(--border);color:var(--text);padding:0.3rem 0.7rem;border-radius:6px;
+.card:hover {
+  border-color: var(--line3);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
 }
-.timer-display{
-  font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:700;
-  padding:0.35rem 0.9rem;border-radius:8px;border:1px solid;min-width:5.5rem;text-align:center;
-}
-.timer-ok  {color:var(--cyan); border-color:rgba(0,212,255,0.4);  background:rgba(0,212,255,0.08);}
-.timer-warn{color:var(--gold); border-color:rgba(245,166,35,0.4); background:rgba(245,166,35,0.08);}
-.timer-crit{color:var(--red);  border-color:rgba(255,77,109,0.4); background:rgba(255,77,109,0.08);animation:pulse 0.8s infinite;}
-@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.6;}}
 
-.progress-track{height:3px;background:var(--border);border-radius:2px;margin-bottom:1rem;position:relative;}
-.progress-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--violet),var(--cyan));transition:width 0.4s;}
+.card-accent-top {
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+.card-glow {
+  position: absolute; top: -30px; right: -30px;
+  width: 100px; height: 100px; border-radius: 50%;
+  opacity: 0.07; pointer-events: none;
+  filter: blur(25px);
+}
 
-.question-wrap{
-  background:var(--card);border:1px solid var(--border2);border-radius:var(--rxl);
-  padding:1.5rem 1.25rem;margin:0.75rem 0;position:relative;
+.card-icon {
+  font-size: 1.75rem; margin-bottom: 0.85rem; display: block;
+  line-height: 1;
 }
-@media(min-width:768px){.question-wrap{padding:2.5rem 2.5rem;}}
-.question-wrap::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--rxl) var(--rxl) 0 0;
-  background:linear-gradient(90deg,var(--violet),var(--cyan),var(--gold));
+.card-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.05rem; font-weight: 700;
+  color: var(--t1); margin-bottom: 0.5rem;
+  letter-spacing: -0.01em;
 }
-.q-num{
-  font-family:'JetBrains Mono',monospace;font-size:0.78rem;font-weight:700;
-  color:var(--violet2);letter-spacing:0.08em;margin-bottom:1rem;
+.card-desc {
+  font-size: 0.83rem; color: var(--t2); line-height: 1.65;
 }
-.q-text{
-  font-family:'Syne',sans-serif;font-size:clamp(1rem,2.5vw,1.3rem);
-  font-weight:700;color:var(--text);line-height:1.7;
-}
-.q-tags{display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.75rem;}
+.card-meta { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.9rem; }
 
-/* OPTIONS */
-.opt-btn{
-  display:block;width:100%;text-align:left;padding:0.9rem 1.2rem;
-  background:var(--ink2);border:2px solid var(--border);border-radius:12px;
-  color:var(--text)!important;font-size:0.95rem;font-weight:500;
-  cursor:pointer;margin:0.4rem 0;transition:all 0.15s;line-height:1.5;
-  font-family:'Space Grotesk',sans-serif;
+.chip {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em;
+  padding: 0.2rem 0.55rem; border-radius: 4px;
+  background: var(--surface3); color: var(--t3);
+  border: 1px solid var(--line2);
 }
-.opt-btn:hover{border-color:var(--violet2);background:rgba(124,92,252,0.1)!important;}
-.opt-selected{
-  background:rgba(124,92,252,0.18)!important;border-color:var(--violet)!important;
-  color:var(--text)!important;font-weight:600!important;
-}
-.opt-correct{background:rgba(0,229,160,0.15)!important;border-color:var(--green)!important;color:var(--green)!important;}
-.opt-wrong  {background:rgba(255,77,109,0.12)!important;border-color:var(--red)!important;color:var(--red)!important;}
-.opt-neutral{background:var(--ink2)!important;border-color:var(--border)!important;color:var(--text3)!important;}
+.chip.amber  { background: rgba(232,160,32,0.1);  color: var(--amber);   border-color: rgba(232,160,32,0.2); }
+.chip.teal   { background: rgba(15,184,201,0.1);  color: var(--teal2);   border-color: rgba(15,184,201,0.2); }
+.chip.emerald{ background: rgba(16,185,129,0.1);  color: var(--emerald); border-color: rgba(16,185,129,0.2); }
+.chip.rose   { background: rgba(244,63,94,0.1);   color: var(--rose);    border-color: rgba(244,63,94,0.2);  }
+.chip.indigo { background: rgba(99,102,241,0.12); color: var(--indigo2); border-color: rgba(99,102,241,0.2); }
 
-.explanation{
-  background:linear-gradient(135deg,rgba(124,92,252,0.1),rgba(0,212,255,0.05));
-  border:1px solid rgba(124,92,252,0.35);border-radius:var(--r);
-  padding:1.1rem 1.3rem;margin-top:1rem;
+/* ══════════════════════════════════════════════════════
+   PYQ YEAR CARDS
+══════════════════════════════════════════════════════ */
+.year-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 1rem 0.6rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative; overflow: hidden;
 }
-.exp-head{font-weight:700;color:var(--violet2);font-size:0.85rem;margin-bottom:0.4rem;}
-.exp-body{color:var(--text2);font-size:0.88rem;line-height:1.7;}
+.year-card::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--amber), var(--teal));
+  transform: scaleX(0); transform-origin: left;
+  transition: transform 0.25s ease;
+}
+.year-card:hover { border-color: var(--amber); background: var(--amber-glow); }
+.year-card:hover::after { transform: scaleX(1); }
 
-/* ══════════════════════════════
-   EXAM PANEL (question navigator)
-══════════════════════════════ */
-.exam-grid{
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(2.4rem,1fr));gap:0.35rem;
-  max-height:18rem;overflow-y:auto;padding:0.25rem;
+.year-num {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.2rem; font-weight: 800;
+  color: var(--amber); display: block;
+  letter-spacing: -0.02em;
 }
-.exam-q-btn{
-  aspect-ratio:1;border-radius:6px;border:1px solid var(--border);
-  background:var(--ink2);color:var(--text2);font-size:0.72rem;font-weight:700;
-  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.15s;
-  font-family:'JetBrains Mono',monospace;
+.year-count {
+  font-size: 0.62rem; color: var(--t3);
+  margin-top: 0.25rem; line-height: 1.6;
 }
-.exam-q-btn.answered{background:rgba(0,229,160,0.15);border-color:var(--green);color:var(--green);}
-.exam-q-btn.current {background:var(--violet);border-color:var(--violet);color:#fff;}
-.exam-q-btn.skipped {background:rgba(245,166,35,0.15);border-color:var(--gold);color:var(--gold);}
 
-/* ══════════════════════════════
-   RESULTS
-══════════════════════════════ */
-.result-hero{
-  text-align:center;padding:2.5rem 1rem 2rem;
-  background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(124,92,252,0.15),transparent);
-  border-radius:var(--rxl);border:1px solid var(--border2);margin-bottom:1.5rem;
+/* ══════════════════════════════════════════════════════
+   QUIZ ENGINE
+══════════════════════════════════════════════════════ */
+/* Progress bar */
+.progress-track {
+  height: 3px; background: var(--line);
+  border-radius: 10px; margin-bottom: 1.25rem;
+  overflow: hidden;
 }
-.grade-letter{
-  font-family:'Syne',sans-serif;font-size:5rem;font-weight:800;
-  line-height:1;margin-bottom:0.5rem;display:block;
+.progress-fill {
+  height: 100%; border-radius: 10px;
+  background: linear-gradient(90deg, var(--indigo), var(--teal));
+  transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+  position: relative;
 }
-.result-score{font-family:'JetBrains Mono',monospace;font-size:2rem;font-weight:700;color:var(--text);}
-.result-pct{font-size:1rem;color:var(--text2);margin:0.4rem 0;}
-.result-msg{font-size:0.95rem;color:var(--gold);font-style:italic;}
+.progress-fill::after {
+  content: '';
+  position: absolute; right: 0; top: -1px;
+  width: 8px; height: 5px;
+  background: var(--teal2);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--teal);
+}
 
-/* ══════════════════════════════
+/* Timer */
+.timer-display {
+  font-family: 'Fira Code', monospace;
+  font-size: 1.05rem; font-weight: 600;
+  padding: 0.35rem 1rem; border-radius: var(--r-sm);
+  border: 1px solid; min-width: 5.5rem; text-align: center;
+  letter-spacing: 0.05em;
+}
+.timer-ok   { color: var(--teal2);  border-color: rgba(15,184,201,0.3);  background: rgba(15,184,201,0.07);  }
+.timer-warn { color: var(--amber);  border-color: rgba(232,160,32,0.3);  background: rgba(232,160,32,0.07);  }
+.timer-crit { color: var(--rose);   border-color: rgba(244,63,94,0.35);  background: rgba(244,63,94,0.08);
+              animation: pulse-crit 0.8s ease-in-out infinite; }
+@keyframes pulse-crit {
+  0%, 100% { opacity: 1; box-shadow: none; }
+  50% { opacity: 0.7; box-shadow: 0 0 12px rgba(244,63,94,0.4); }
+}
+
+/* Question card */
+.question-wrap {
+  background: var(--surface);
+  border: 1px solid var(--line2);
+  border-radius: var(--r-xl);
+  padding: 1.75rem 1.5rem;
+  margin: 0.75rem 0 1rem;
+  position: relative;
+  box-shadow: var(--shadow-card);
+  animation: fadeUp 0.25s ease both;
+}
+@media (min-width: 768px) { .question-wrap { padding: 2.75rem 3rem; } }
+
+.question-wrap::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  background: linear-gradient(90deg, var(--indigo), var(--teal), var(--amber));
+}
+
+.q-num {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.72rem; font-weight: 600;
+  color: var(--indigo2); letter-spacing: 0.1em;
+  margin-bottom: 1.1rem; text-transform: uppercase;
+}
+
+.q-text {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(1rem, 2.4vw, 1.28rem);
+  font-weight: 700; color: var(--t1);
+  line-height: 1.75; letter-spacing: -0.01em;
+}
+
+.q-tags { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 1rem; }
+
+/* Answer options */
+.opt-wrap { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.25rem; }
+
+.opt-btn {
+  display: block; width: 100%; text-align: left;
+  padding: 0.9rem 1.2rem 0.9rem 1rem;
+  background: var(--bg2);
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--t1) !important; font-size: 0.93rem; font-weight: 500;
+  cursor: pointer; transition: all 0.15s ease; line-height: 1.55;
+  font-family: 'Outfit', sans-serif;
+  position: relative;
+}
+.opt-btn::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; border-radius: var(--r-md) 0 0 var(--r-md);
+  background: transparent;
+  transition: background 0.15s;
+}
+.opt-btn:hover {
+  border-color: var(--indigo2);
+  background: rgba(99,102,241,0.07) !important;
+}
+.opt-btn:hover::before { background: var(--indigo); }
+
+.opt-selected {
+  background: rgba(99,102,241,0.1) !important;
+  border-color: var(--indigo) !important;
+  color: var(--t1) !important; font-weight: 600 !important;
+}
+.opt-selected::before { background: var(--indigo) !important; }
+
+.opt-correct {
+  background: rgba(16,185,129,0.1) !important;
+  border-color: var(--emerald) !important;
+  color: var(--emerald) !important;
+}
+.opt-correct::before { background: var(--emerald) !important; }
+
+.opt-wrong {
+  background: rgba(244,63,94,0.08) !important;
+  border-color: var(--rose) !important;
+  color: var(--rose) !important;
+}
+.opt-wrong::before { background: var(--rose) !important; }
+
+.opt-neutral {
+  background: var(--bg2) !important;
+  border-color: var(--line) !important;
+  color: var(--t3) !important;
+}
+
+/* Explanation */
+.explanation {
+  background: linear-gradient(135deg, rgba(99,102,241,0.07), rgba(15,184,201,0.04));
+  border: 1px solid rgba(99,102,241,0.2);
+  border-left: 3px solid var(--indigo);
+  border-radius: var(--r-md);
+  padding: 1.1rem 1.4rem;
+  margin-top: 1.25rem;
+  animation: fadeUp 0.2s ease both;
+}
+.exp-head {
+  font-weight: 700; color: var(--indigo2);
+  font-size: 0.8rem; letter-spacing: 0.06em;
+  text-transform: uppercase; margin-bottom: 0.5rem;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.exp-body { color: var(--t2); font-size: 0.88rem; line-height: 1.75; }
+
+/* ══════════════════════════════════════════════════════
+   EXAM NAVIGATOR PANEL
+══════════════════════════════════════════════════════ */
+.exam-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 1.25rem;
+  position: sticky; top: 4.5rem;
+  box-shadow: var(--shadow-card);
+}
+.exam-panel-title {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--t3);
+  margin-bottom: 0.85rem; padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.exam-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.3rem, 1fr));
+  gap: 0.3rem;
+  max-height: 16rem; overflow-y: auto;
+  margin-bottom: 0.75rem;
+}
+
+.exam-q-btn {
+  aspect-ratio: 1; border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--bg2); color: var(--t3);
+  font-size: 0.68rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.12s;
+  font-family: 'Fira Code', monospace;
+}
+.exam-q-btn:hover { border-color: var(--indigo2); color: var(--indigo2); }
+.exam-q-btn.answered {
+  background: rgba(16,185,129,0.12);
+  border-color: rgba(16,185,129,0.4);
+  color: var(--emerald);
+}
+.exam-q-btn.current {
+  background: var(--indigo);
+  border-color: var(--indigo);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(99,102,241,0.4);
+}
+.exam-q-btn.skipped {
+  background: rgba(232,160,32,0.12);
+  border-color: rgba(232,160,32,0.35);
+  color: var(--amber);
+}
+
+.exam-legend {
+  display: flex; gap: 0.85rem; flex-wrap: wrap;
+  font-size: 0.64rem; color: var(--t3); margin-top: 0.6rem;
+}
+.legend-dot { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 3px; }
+
+/* ══════════════════════════════════════════════════════
+   RESULTS PAGE
+══════════════════════════════════════════════════════ */
+.result-hero {
+  text-align: center;
+  padding: 3rem 1.5rem 2.5rem;
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(99,102,241,0.12), transparent);
+  border-radius: var(--r-xl);
+  border: 1px solid var(--line2);
+  margin-bottom: 1.75rem;
+  position: relative; overflow: hidden;
+  animation: fadeUp 0.3s ease both;
+}
+.result-hero::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--indigo), var(--teal), var(--amber));
+}
+
+.grade-letter {
+  font-family: 'Playfair Display', serif;
+  font-size: 6rem; font-weight: 900;
+  line-height: 1; display: block;
+  margin-bottom: 0.5rem;
+  filter: drop-shadow(0 0 20px currentColor);
+}
+.result-score {
+  font-family: 'Fira Code', monospace;
+  font-size: 2.2rem; font-weight: 600;
+  color: var(--t1); letter-spacing: -0.02em;
+}
+.result-pct { font-size: 1rem; color: var(--t2); margin: 0.4rem 0; }
+.result-msg {
+  font-family: 'Playfair Display', serif;
+  font-size: 1rem; color: var(--amber);
+  font-style: italic; margin-top: 0.5rem;
+}
+
+.stat-card-mini {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 1rem 0.75rem;
+  text-align: center;
+  border-top-width: 3px;
+  transition: transform 0.2s;
+}
+.stat-card-mini:hover { transform: translateY(-2px); }
+.stat-card-mini .val {
+  font-family: 'Fira Code', monospace;
+  font-size: 1.65rem; font-weight: 700;
+  display: block; line-height: 1.1; margin-bottom: 0.25rem;
+}
+.stat-card-mini .lbl {
+  font-size: 0.64rem; color: var(--t3);
+  text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700;
+}
+
+/* ══════════════════════════════════════════════════════
    LEADERBOARD
-══════════════════════════════ */
-.lb-row{
-  display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;
-  background:var(--card);border:1px solid var(--border);border-radius:var(--r);margin-bottom:0.4rem;
-  transition:border-color 0.15s;
+══════════════════════════════════════════════════════ */
+.lb-row {
+  display: flex; align-items: center; gap: 0.85rem;
+  padding: 0.85rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  margin-bottom: 0.4rem;
+  transition: all 0.15s;
+  animation: fadeUp 0.25s ease both;
 }
-.lb-row:hover{border-color:var(--border2);}
-.lb-row.me{border-color:var(--gold)!important;background:rgba(245,166,35,0.06)!important;}
-.lb-rank{
-  font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;
-  min-width:2rem;text-align:center;
+.lb-row:hover { border-color: var(--line3); transform: translateX(3px); }
+.lb-row.me {
+  border-color: var(--amber) !important;
+  background: linear-gradient(90deg, rgba(232,160,32,0.06), transparent) !important;
 }
-.lb-rank.gold  {color:var(--gold);}
-.lb-rank.silver{color:#b0b8c8;}
-.lb-rank.bronze{color:#cd7f32;}
-.lb-rank.rest  {color:var(--text3);}
-.lb-avatar{
-  width:2.2rem;height:2.2rem;border-radius:50%;flex-shrink:0;
-  background:linear-gradient(135deg,var(--violet),var(--cyan));
-  display:flex;align-items:center;justify-content:center;
-  font-weight:800;font-size:0.78rem;color:#fff;
-}
-.lb-name{font-weight:600;font-size:0.9rem;color:var(--text);flex:1;}
-.lb-score{font-family:'JetBrains Mono',monospace;font-size:0.88rem;font-weight:700;color:var(--cyan);}
-.lb-detail{font-size:0.7rem;color:var(--text3);margin-top:0.1rem;}
 
-/* ══════════════════════════════
+.lb-rank {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.1rem; font-weight: 800;
+  min-width: 2rem; text-align: center;
+}
+.lb-rank.gold   { color: var(--amber); }
+.lb-rank.silver { color: #9fb3cc; }
+.lb-rank.bronze { color: #b87333; }
+.lb-rank.rest   { color: var(--t4); font-family: 'Fira Code', monospace; font-size: 0.85rem; }
+
+.lb-avatar {
+  width: 2.4rem; height: 2.4rem; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--indigo), var(--teal));
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 0.78rem; color: #fff;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.2);
+}
+.lb-name   { font-weight: 600; font-size: 0.9rem; color: var(--t1); }
+.lb-detail { font-size: 0.68rem; color: var(--t3); margin-top: 0.15rem; }
+.lb-score  {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.9rem; font-weight: 600; color: var(--teal2);
+  text-align: right;
+}
+
+/* Podium */
+.podium-card {
+  background: var(--surface);
+  border: 1px solid var(--line2);
+  border-radius: var(--r-lg);
+  padding: 1.5rem 1rem; text-align: center;
+  transition: transform 0.2s;
+}
+.podium-card:hover { transform: translateY(-4px); }
+.podium-card.first {
+  border-color: rgba(232,160,32,0.4);
+  background: linear-gradient(180deg, rgba(232,160,32,0.06), transparent);
+}
+
+/* ══════════════════════════════════════════════════════
    LOGIN PAGE
-══════════════════════════════ */
-.login-wrap{
-  max-width:420px;margin:4rem auto;
-  background:var(--card);border:1px solid var(--border);border-radius:var(--rxl);
-  padding:2.5rem 2rem;text-align:center;
+══════════════════════════════════════════════════════ */
+.login-wrap {
+  max-width: 440px; margin: 3rem auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  padding: 3rem 2.5rem;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  animation: fadeUp 0.3s ease both;
+  position: relative; overflow: hidden;
 }
-.login-logo{font-size:3rem;margin-bottom:1rem;display:block;}
-.login-title{font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:var(--text);margin-bottom:0.4rem;}
-.login-sub{font-size:0.85rem;color:var(--text2);margin-bottom:2rem;}
+.login-wrap::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--amber), var(--teal));
+}
+.login-logo {
+  font-size: 3rem; margin-bottom: 1rem; display: block;
+  filter: drop-shadow(0 4px 12px rgba(232,160,32,0.3));
+}
+.login-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem; font-weight: 800; color: var(--t1);
+  margin-bottom: 0.4rem; letter-spacing: -0.02em;
+}
+.login-sub { font-size: 0.85rem; color: var(--t2); margin-bottom: 2rem; line-height: 1.6; }
 
-/* ══════════════════════════════
-   BUTTON OVERRIDES
-══════════════════════════════ */
-button,button *,.stButton button,.stButton button *{color:var(--text)!important;font-family:'Space Grotesk',sans-serif!important;}
-.stButton button{border-radius:10px!important;font-weight:600!important;transition:all 0.2s!important;}
-.stButton button[kind="primary"]{
-  background:linear-gradient(135deg,#7c5cfc,#a78bfa)!important;
-  color:#fff!important;border:none!important;
-  box-shadow:0 4px 20px rgba(124,92,252,0.35)!important;
+/* ══════════════════════════════════════════════════════
+   STREAMLIT WIDGET OVERRIDES
+══════════════════════════════════════════════════════ */
+/* All button text color fix */
+button, button *, .stButton button, .stButton button * {
+  color: var(--t1) !important;
+  font-family: 'Outfit', sans-serif !important;
 }
-.stButton button[kind="primary"] *{color:#fff!important;}
-.stButton button[kind="primary"]:hover{box-shadow:0 6px 28px rgba(124,92,252,0.5)!important;transform:translateY(-1px)!important;}
-.stButton button[kind="secondary"]{
-  background:var(--card)!important;color:var(--text)!important;
-  border:1px solid var(--border2)!important;
-}
-[data-testid="baseButton-primary"],[data-testid="baseButton-primary"] *{color:#fff!important;}
-[data-testid="baseButton-primary"]{background:linear-gradient(135deg,#7c5cfc,#a78bfa)!important;border:none!important;}
-[data-testid="baseButton-secondary"]{background:var(--card)!important;border:1px solid var(--border2)!important;}
-div[data-testid="stForm"]{border:none!important;padding:0!important;background:transparent!important;}
-div[data-testid="stForm"] button{color:var(--text)!important;}
-div[data-testid="stForm"] button *{color:inherit!important;}
 
-/* ══════════════════════════════
-   WIDGET STYLING
-══════════════════════════════ */
-.stTextInput input,.stTextArea textarea{
-  background:var(--ink2)!important;border:1px solid var(--border2)!important;
-  color:var(--text)!important;border-radius:10px!important;
-  font-family:'Space Grotesk',sans-serif!important;
+.stButton > button {
+  border-radius: var(--r-sm) !important;
+  font-weight: 600 !important;
+  font-size: 0.88rem !important;
+  transition: all 0.18s ease !important;
+  letter-spacing: 0.01em !important;
 }
-.stSelectbox label,.stMultiSelect label,.stSlider label,.stRadio label,.stCheckbox label,
-.stTextInput label,.stTextArea label,.stToggle label,.stSelectSlider label{
-  color:var(--text2)!important;font-weight:600!important;font-size:0.85rem!important;
-}
-div[data-baseweb="select"]{background:var(--ink2)!important;border-color:var(--border2)!important;}
-div[data-baseweb="select"] *{color:var(--text)!important;}
-.stProgress>div>div>div>div{background:linear-gradient(90deg,var(--violet),var(--cyan))!important;}
-.stInfo{background:rgba(124,92,252,0.1)!important;border-color:rgba(124,92,252,0.4)!important;color:var(--text2)!important;border-radius:10px!important;}
-.stSuccess{background:rgba(0,229,160,0.1)!important;border-color:var(--green)!important;color:var(--green)!important;border-radius:10px!important;}
-.stError{background:rgba(255,77,109,0.1)!important;border-color:var(--red)!important;color:var(--red)!important;border-radius:10px!important;}
-.stWarning{background:rgba(245,166,35,0.1)!important;border-color:var(--gold)!important;color:var(--gold)!important;border-radius:10px!important;}
-[data-testid="stText"]{display:none!important;}
-hr{border-color:var(--border)!important;}
-[data-testid="stSidebar"]{background:var(--ink2)!important;border-right:1px solid var(--border)!important;}
 
-/* ══════════════════════════════
-   MOBILE HAMBURGER
-══════════════════════════════ */
-#net-menu-btn{
-  position:fixed;top:0.65rem;right:0.75rem;z-index:9999;
-  width:2.2rem;height:2.2rem;border-radius:50%;
-  background:linear-gradient(135deg,var(--violet),#a78bfa);
-  border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
-  box-shadow:0 4px 14px rgba(124,92,252,0.4);
+/* Primary buttons */
+.stButton > button[kind="primary"],
+[data-testid="baseButton-primary"] {
+  background: linear-gradient(135deg, var(--indigo) 0%, #7c8ff0 100%) !important;
+  color: #fff !important;
+  border: none !important;
+  box-shadow: 0 4px 18px rgba(99,102,241,0.3) !important;
 }
-#net-menu-btn svg{fill:#fff;width:1rem;height:1rem;pointer-events:none;}
+.stButton > button[kind="primary"] *,
+[data-testid="baseButton-primary"] * { color: #fff !important; }
+.stButton > button[kind="primary"]:hover,
+[data-testid="baseButton-primary"]:hover {
+  box-shadow: 0 6px 28px rgba(99,102,241,0.5) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Secondary buttons */
+.stButton > button[kind="secondary"],
+[data-testid="baseButton-secondary"] {
+  background: var(--surface) !important;
+  border: 1px solid var(--line2) !important;
+  color: var(--t1) !important;
+}
+.stButton > button[kind="secondary"]:hover,
+[data-testid="baseButton-secondary"]:hover {
+  border-color: var(--line3) !important;
+  background: var(--surface2) !important;
+}
+
+/* Form containers */
+div[data-testid="stForm"] {
+  border: none !important; padding: 0 !important; background: transparent !important;
+}
+div[data-testid="stForm"] button { color: var(--t1) !important; }
+div[data-testid="stForm"] button * { color: inherit !important; }
+
+/* Text inputs */
+.stTextInput input, .stTextArea textarea {
+  background: var(--bg2) !important;
+  border: 1px solid var(--line2) !important;
+  color: var(--t1) !important;
+  border-radius: var(--r-sm) !important;
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 0.92rem !important;
+  padding: 0.6rem 0.85rem !important;
+  transition: border-color 0.15s !important;
+}
+.stTextInput input:focus, .stTextArea textarea:focus {
+  border-color: var(--indigo) !important;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15) !important;
+  outline: none !important;
+}
+
+/* Labels */
+.stSelectbox label, .stMultiSelect label, .stSlider label, .stRadio label,
+.stCheckbox label, .stTextInput label, .stTextArea label,
+.stToggle label, .stSelectSlider label, .stNumberInput label {
+  color: var(--t2) !important; font-weight: 600 !important;
+  font-size: 0.82rem !important; letter-spacing: 0.02em !important;
+  text-transform: uppercase !important;
+}
+
+/* Selectboxes */
+div[data-baseweb="select"] {
+  background: var(--bg2) !important; border-color: var(--line2) !important;
+  border-radius: var(--r-sm) !important;
+}
+div[data-baseweb="select"] * { color: var(--t1) !important; }
+div[data-baseweb="select"]:focus-within { border-color: var(--indigo) !important; }
+
+/* Progress */
+.stProgress > div > div > div > div {
+  background: linear-gradient(90deg, var(--indigo), var(--teal)) !important;
+  border-radius: 10px !important;
+}
+
+/* Alerts */
+.stInfo    { background: rgba(99,102,241,0.08) !important; border-color: rgba(99,102,241,0.3) !important;   color: var(--indigo2) !important; border-radius: var(--r-md) !important; }
+.stSuccess { background: rgba(16,185,129,0.08) !important; border-color: rgba(16,185,129,0.3) !important;   color: var(--emerald) !important; border-radius: var(--r-md) !important; }
+.stError   { background: rgba(244,63,94,0.08)  !important; border-color: rgba(244,63,94,0.3)  !important;   color: var(--rose) !important;    border-radius: var(--r-md) !important; }
+.stWarning { background: rgba(232,160,32,0.08) !important; border-color: rgba(232,160,32,0.3) !important;   color: var(--amber) !important;   border-radius: var(--r-md) !important; }
+
+/* Tabs */
+.stTabs [data-baseweb="tab-list"] {
+  background: var(--surface) !important;
+  border-radius: var(--r-sm) !important;
+  gap: 0 !important; padding: 3px !important;
+  border: 1px solid var(--line) !important;
+}
+.stTabs [data-baseweb="tab"] {
+  border-radius: 6px !important; color: var(--t2) !important;
+  font-weight: 600 !important; font-size: 0.85rem !important;
+  transition: all 0.2s !important;
+}
+.stTabs [aria-selected="true"] {
+  background: var(--bg3) !important; color: var(--t1) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
+}
+.stTabs [data-baseweb="tab-border"] { display: none !important; }
+
+/* Checkboxes & radio */
+.stCheckbox > label { gap: 0.5rem !important; }
+.stRadio [role="radio"] { accent-color: var(--indigo) !important; }
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+  background: var(--bg2) !important;
+  border-right: 1px solid var(--line) !important;
+}
+
+/* HR */
+hr { border: none !important; border-top: 1px solid var(--line) !important; margin: 1.5rem 0 !important; }
+
+/* Expander */
+.streamlit-expanderHeader {
+  background: var(--surface) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: var(--r-sm) !important;
+  color: var(--t1) !important;
+}
+
+/* Toggle */
+.stToggle input:checked + div { background: var(--indigo) !important; }
+
+/* Multiselect tags */
+[data-baseweb="tag"] {
+  background: rgba(99,102,241,0.15) !important;
+  border-color: rgba(99,102,241,0.3) !important;
+}
+[data-baseweb="tag"] span { color: var(--indigo2) !important; }
+
+/* ══════════════════════════════════════════════════════
+   MISC UTILITIES
+══════════════════════════════════════════════════════ */
+.divider { height: 1px; background: var(--line); margin: 1.5rem 0; }
+.text-muted { color: var(--t2); font-size: 0.85rem; }
+.text-tiny  { color: var(--t3); font-size: 0.72rem; }
+
+/* Empty state */
+.empty-state {
+  text-align: center; padding: 4rem 2rem;
+  color: var(--t3);
+}
+.empty-state .icon { font-size: 2.5rem; display: block; margin-bottom: 1rem; opacity: 0.5; }
+.empty-state h3 { font-family: 'Playfair Display', serif; color: var(--t2); margin-bottom: 0.4rem; }
+
+/* Mobile */
+@media (max-width: 600px) {
+  .topbar { padding: 0 0.75rem; }
+  .topbar-nav { display: none; }
+  .stat-strip .stat-cell:nth-child(n+4) { display: none; }
+  .page-header h1 { font-size: 1.4rem; }
+}
 </style>
+
 <script>
+/* Fix Streamlit button text color inheritance */
 (function(){
-  function fix(){document.querySelectorAll("button").forEach(function(b){b.querySelectorAll("p,span,div").forEach(function(e){e.style.setProperty("color","inherit","important");});});}
-  fix();new MutationObserver(fix).observe(document.body,{childList:true,subtree:true});
+  function fix() {
+    document.querySelectorAll('button').forEach(function(b){
+      b.querySelectorAll('p,span,div').forEach(function(el){
+        el.style.setProperty('color','inherit','important');
+      });
+    });
+  }
+  fix();
+  new MutationObserver(fix).observe(document.body, {childList:true, subtree:true});
 })();
 </script>
 """, unsafe_allow_html=True)
@@ -659,7 +1193,7 @@ def topbar():
         initials = "".join(w[0].upper() for w in user.get("name","U").split()[:2])
         nav_html += f'<div class="user-chip"><div class="user-avatar">{initials}</div><span>{user.get("name","").split()[0]}</span></div>'
     else:
-        nav_html += '<div class="user-chip" style="color:var(--gold);border-color:rgba(245,166,35,0.4);cursor:pointer;" onclick="">👤 Login</div>'
+        nav_html += '<div class="user-chip" style="color:var(--amber);border-color:rgba(232,160,32,0.35);cursor:pointer;">👤 Login</div>'
     nav_html += "</div>"
 
     st.markdown(nav_html, unsafe_allow_html=True)
@@ -677,10 +1211,9 @@ def topbar():
                 st.rerun()
     with cols[len(all_pages)]:
         if user:
-            if st.button("🚪 Logout", key="nav_logout", use_container_width=True):
-                st.session_state.user = None
-                st.session_state.username = None
-                st.session_state.page = "home"
+            initials_short = "".join(w[0].upper() for w in user.get("name","U").split()[:2])
+            if st.button(f"👤 {initials_short}", key="nav_profile", use_container_width=True, type="primary"):
+                st.session_state.page = "login"  # profile page reuses login
                 st.rerun()
         else:
             if st.button("👤 Login", key="nav_login", use_container_width=True, type="primary"):
@@ -705,88 +1238,99 @@ def page_home():
     years = qb.get_years()
     user  = st.session_state.user
 
+    # ── Hero ──────────────────────────────────────
     st.markdown("""
     <div class="hero">
-      <div class="hero-eyebrow">🏛️ UGC NET · Paper 1 · NYZTrade Education</div>
-      <h1 class="hero-title">Crack NET with<br><span class="hl">Smart Practice</span></h1>
-      <p class="hero-sub">PYQ year-wise · Mock tests · AI-predicted questions · Exam simulation · Live leaderboard</p>
+      <div class="hero-badge">🏛️ UGC NET · Paper 1 · NYZTrade Education</div>
+      <h1 class="hero-title">Master NET with<br><em>Intelligent Practice</em></h1>
+      <p class="hero-sub">PYQ year-wise · Full mock tests · AI-predicted questions · Live exam simulation · Student leaderboard</p>
     </div>""", unsafe_allow_html=True)
 
-    # Stat strip
+    # ── Stat strip ────────────────────────────────
     user_attempts = st.session_state.total_attempted
-    user_accuracy = round(st.session_state.total_correct/user_attempts*100) if user_attempts else 0
+    user_accuracy = round(st.session_state.total_correct / user_attempts * 100) if user_attempts else 0
     st.markdown(f"""
     <div class="stat-strip">
       <div class="stat-cell"><span class="stat-val">{total}+</span><span class="stat-lbl">Questions</span></div>
-      <div class="stat-cell"><span class="stat-val">{len(years)}</span><span class="stat-lbl">Years PYQ</span></div>
+      <div class="stat-cell"><span class="stat-val">{len(years)}</span><span class="stat-lbl">PYQ Years</span></div>
       <div class="stat-cell"><span class="stat-val">10</span><span class="stat-lbl">Topics</span></div>
       <div class="stat-cell"><span class="stat-val">{user_attempts}</span><span class="stat-lbl">Your Attempts</span></div>
       <div class="stat-cell"><span class="stat-val">{user_accuracy}%</span><span class="stat-lbl">Accuracy</span></div>
     </div>""", unsafe_allow_html=True)
 
-    # Quick action cards
-    st.markdown('<div class="section-label">⚡ Quick Start <span class="tag">Choose a mode</span></div>', unsafe_allow_html=True)
+    # ── Quick-start cards ─────────────────────────
+    st.markdown('<div class="section-label">Quick Start <span class="pill">choose a mode</span></div>', unsafe_allow_html=True)
 
-    c1,c2,c3,c4 = st.columns(4)
     cards = [
-        (c1,"📅","PYQ Practice","Year-wise previous papers","pyq","gold","2023 · 2022 · 2021..."),
-        (c2,"🧪","Mock Tests","Full-length exam simulations","mock","violet","50 Qs · 180 min"),
-        (c3,"🤖","AI Predicted","Smart questions for upcoming exam","ai","cyan","June 2025 focus"),
-        (c4,"⚡","Quick Drill","15 Qs, 15 min rapid practice","quick","green","All topics mixed"),
+        ("📅", "PYQ Practice",   "Year-wise previous year questions",  "pyq",   "var(--amber)",   "amber",   "2023 · 2022 · 2021"),
+        ("🧪", "Mock Tests",     "Full-length timed exam simulations",  "mock",  "var(--indigo)",  "indigo",  "50 Qs · 180 min"),
+        ("🤖", "AI Predicted",   "Smart questions for upcoming exams",  "ai",    "var(--teal)",    "teal",    "June 2025 focus"),
+        ("⚡", "Quick Drill",    "15 questions, 15 min sprint",         "quick", "var(--emerald)", "emerald", "All topics mixed"),
     ]
-    for col, icon, title, desc, dest, color, meta in cards:
+    c1, c2, c3, c4 = st.columns(4)
+    for col, (icon, title, desc, dest, accent, chip_cls, meta) in zip([c1,c2,c3,c4], cards):
         with col:
-            color_map = {"gold":"var(--gold)","violet":"var(--violet)","cyan":"var(--cyan)","green":"var(--green)"}
-            c = color_map.get(color,"var(--violet)")
             st.markdown(f"""<div class="card">
-              <div class="card-accent-top" style="background:{c};"></div>
+              <div class="card-accent-top" style="background:{accent};"></div>
+              <div class="card-glow" style="background:{accent};"></div>
               <span class="card-icon">{icon}</span>
               <div class="card-title">{title}</div>
               <div class="card-desc">{desc}</div>
-              <div class="card-meta"><span class="meta-chip {color}">{meta}</span></div>
+              <div class="card-meta"><span class="chip {chip_cls}">{meta}</span></div>
             </div>""", unsafe_allow_html=True)
-            if st.button(f"Start →", key=f"home_{dest}", use_container_width=True, type="primary"):
+            if st.button("Start →", key=f"home_{dest}", use_container_width=True, type="primary"):
                 if dest == "quick":
-                    _start_quiz(QuestionBank().get_filtered(n=15,shuffle=True), "practice", "Quick Drill (15 Qs)", 15*60)
+                    _start_quiz(QuestionBank().get_filtered(n=15, shuffle=True), "practice", "Quick Drill (15 Qs)", 15*60)
                 else:
                     st.session_state.page = dest
                 st.rerun()
 
-    # Recent PYQ years preview
-    st.markdown('<div class="section-label">📅 PYQ Years <span class="tag">Click to practice</span></div>', unsafe_allow_html=True)
-    year_cols = st.columns(min(len(years), 9))
+    # ── PYQ Year Grid ─────────────────────────────
+    st.markdown('<div class="section-label">PYQ Years <span class="pill">click to practice</span></div>', unsafe_allow_html=True)
     all_q = qb.get_all()
-    for i, yr in enumerate(years[:9]):
-        cnt = len([q for q in all_q if str(q.get("year","")) == str(yr)])
-        with year_cols[i]:
-            st.markdown(f"""<div class="year-card">
-              <div class="year-num">{yr}</div>
-              <div class="year-count">{cnt} Qs</div>
-            </div>""", unsafe_allow_html=True)
-            if st.button(str(yr), key=f"home_yr_{yr}", use_container_width=True):
-                qs = qb.get_filtered(years=[yr], n=50)
-                _start_quiz(qs, "practice", f"PYQ {yr}", 60*60)
-                st.rerun()
+    n_years = min(len(years), 9)
+    if n_years:
+        year_cols = st.columns(n_years)
+        for i, yr in enumerate(years[:n_years]):
+            cnt = len([q for q in all_q if str(q.get("year","")) == str(yr)])
+            with year_cols[i]:
+                st.markdown(f"""<div class="year-card">
+                  <span class="year-num">{yr}</span>
+                  <div class="year-count">{cnt} Qs</div>
+                </div>""", unsafe_allow_html=True)
+                if st.button(str(yr), key=f"home_yr_{yr}", use_container_width=True):
+                    qs = qb.get_filtered(years=[yr], n=50)
+                    _start_quiz(qs, "practice", f"PYQ {yr}", 60*60)
+                    st.rerun()
 
-    # Leaderboard preview
-    st.markdown('<div class="section-label">🏆 Top Rankers <span class="tag">This week</span></div>', unsafe_allow_html=True)
+    # ── Leaderboard preview ───────────────────────
+    st.markdown('<div class="section-label">Top Rankers <span class="pill">leaderboard</span></div>', unsafe_allow_html=True)
     lb = get_leaderboard(limit=5)
     if lb:
         for i, row in enumerate(lb):
-            rank_class = ["gold","silver","bronze","rest","rest"][i]
-            medal = ["🥇","🥈","🥉","4","5"][i]
+            rank_cls = ["gold","silver","bronze","rest","rest"][i]
+            medal    = ["🥇","🥈","🥉","4","5"][i]
             initials = "".join(w[0].upper() for w in row["name"].split()[:2])
-            is_me = row["username"] == st.session_state.username
-            me_cls = "lb-row me" if is_me else "lb-row"
+            is_me    = row["username"] == st.session_state.username
+            me_cls   = "lb-row me" if is_me else "lb-row"
+            ts_str   = datetime.fromisoformat(row["ts"]).strftime("%d %b") if row.get("ts") else ""
             st.markdown(f"""<div class="{me_cls}">
-              <div class="lb-rank {rank_class}">{medal}</div>
+              <div class="lb-rank {rank_cls}">{medal}</div>
               <div class="lb-avatar">{initials}</div>
-              <div style="flex:1"><div class="lb-name">{row["name"]} {"⭐" if is_me else ""}</div>
-              <div class="lb-detail">{row.get("mode","—")} · {datetime.fromisoformat(row["ts"]).strftime("%d %b") if row.get("ts") else ""}</div></div>
-              <div class="lb-score">{row["pct"]}% <span style="color:var(--text3);font-size:0.72rem;">({row["score"]}/{row["total"]})</span></div>
+              <div style="flex:1">
+                <div class="lb-name">{row["name"]} {"⭐" if is_me else ""}</div>
+                <div class="lb-detail">{row.get("mode","—")} · {ts_str}</div>
+              </div>
+              <div class="lb-score">{row["pct"]}%
+                <div style="color:var(--t3);font-size:0.68rem;">{row["score"]}/{row["total"]}</div>
+              </div>
             </div>""", unsafe_allow_html=True)
     else:
-        st.markdown('<div style="text-align:center;color:var(--text3);padding:2rem;">No scores yet. Be the first! 🎯</div>', unsafe_allow_html=True)
+        st.markdown("""<div class="empty-state">
+          <span class="icon">🏆</span>
+          <h3>No scores yet</h3>
+          <p>Complete a quiz to appear on the leaderboard!</p>
+        </div>""", unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════
@@ -796,173 +1340,236 @@ def page_pyq():
     qb = QuestionBank()
     all_q = qb.get_all()
 
-    st.markdown('<h2 style="font-family:Syne,sans-serif;font-size:1.5rem;font-weight:800;margin-bottom:0.25rem;">📅 Previous Year Questions</h2>', unsafe_allow_html=True)
-    st.markdown('<p style="color:var(--text2);font-size:0.85rem;margin-bottom:1.5rem;">Practice questions from actual UGC NET exams, organized by year and season.</p>', unsafe_allow_html=True)
+    st.markdown("""<div class="page-header">
+      <h1>📅 Previous Year Questions</h1>
+      <p>Practice questions from actual UGC NET exams — organized by year, season, topic, and difficulty. Each session: <strong>15 questions</strong>.</p>
+    </div>""", unsafe_allow_html=True)
 
-    # Filter row
-    fc1, fc2, fc3 = st.columns([2,2,2])
-    with fc1:
-        sel_years = st.multiselect("📆 Year", options=qb.get_years(), default=[], placeholder="All years", key="pyq_years")
-    with fc2:
-        sel_seasons = st.multiselect("🌤️ Season", options=qb.get_seasons(), default=[], placeholder="All seasons", key="pyq_seasons")
-    with fc3:
-        sel_topics = st.multiselect("📚 Topics", options=qb.get_topics(), default=[], placeholder="All topics", key="pyq_topics")
-
-    fc4, fc5, fc6 = st.columns(3)
-    with fc4:
-        sel_diff = st.selectbox("📊 Difficulty", ["Mixed","Easy","Medium","Hard"], key="pyq_diff")
-    with fc5:
-        sel_n = st.select_slider("Questions", [10,15,20,25,30,50], value=15, key="pyq_n")
-    with fc6:
-        timed = st.toggle("⏱️ Timed", value=True, key="pyq_timed")
-        t_limit = sel_n * 72  # 72 sec per Q
-
-    # Preview
-    preview = qb.get_filtered(
-        topics=sel_topics or None,
-        difficulty=sel_diff,
-        years=sel_years or None,
-        seasons=sel_seasons or None,
-        n=9999, shuffle=False
-    )
-    st.markdown(f'<div style="color:var(--violet2);font-weight:700;font-size:0.85rem;margin-bottom:1rem;">✅ {len(preview)} questions match · {min(sel_n,len(preview))} will be used</div>', unsafe_allow_html=True)
-
-    # Year cards grid
-    st.markdown('<div class="section-label">Select Year to Quick-Launch</div>', unsafe_allow_html=True)
+    # ── Year cards — primary feature ─────────────
+    st.markdown('<div class="section-label">📅 Select Year <span class="pill">15 Qs per session · click to launch</span></div>', unsafe_allow_html=True)
     available_years = qb.get_years()
-    year_row = st.columns(min(len(available_years), 5))
-    for i, yr in enumerate(available_years[:5]):
-        june_cnt = len([q for q in all_q if str(q.get("year",""))==str(yr) and q.get("season")=="June"])
-        dec_cnt  = len([q for q in all_q if str(q.get("year",""))==str(yr) and q.get("season")=="December"])
-        with year_row[i]:
-            st.markdown(f"""<div class="year-card" style="margin-bottom:0.5rem;">
-              <div class="year-num">{yr}</div>
-              <div class="year-count">☀️{june_cnt} ❄️{dec_cnt}</div>
-            </div>""", unsafe_allow_html=True)
-            if st.button(f"🎯 {yr}", key=f"pyq_yr_{yr}", use_container_width=True, type="primary"):
-                qs = qb.get_filtered(years=[yr], n=sel_n if sel_n else 15)
-                label = f"PYQ {yr}"
-                _start_quiz(qs, "practice", label, t_limit if timed else 0)
-                st.rerun()
+
+    if not available_years:
+        st.markdown("""<div class="card" style="text-align:center;padding:2.5rem;border-color:rgba(232,160,32,0.25);">
+          <div style="font-size:2.5rem;margin-bottom:0.75rem;">📂</div>
+          <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:1rem;color:var(--t2);">No PYQ data yet</div>
+          <div style="color:var(--t3);font-size:0.82rem;margin-top:0.4rem;">Upload PDF question papers via Developer mode to populate year-wise questions.</div>
+        </div>""", unsafe_allow_html=True)
+    else:
+        # Show year grid — up to 8 years, 4 per row
+        yr_rows = [available_years[i:i+4] for i in range(0, min(len(available_years), 8), 4)]
+        for row in yr_rows:
+            yr_cols = st.columns(len(row))
+            for i, yr in enumerate(row):
+                yr_q    = [q for q in all_q if str(q.get("year",""))==str(yr)]
+                june_cnt = len([q for q in yr_q if q.get("season")=="June"])
+                dec_cnt  = len([q for q in yr_q if q.get("season")=="December"])
+                total_cnt= len(yr_q)
+                with yr_cols[i]:
+                    st.markdown(f"""<div class="year-card">
+                      <span class="year-num">{yr}</span>
+                      <div class="year-count">☀️ {june_cnt} &nbsp; ❄️ {dec_cnt}</div>
+                      <div style="font-size:0.65rem;color:var(--t3);margin-top:0.2rem;">{total_cnt} questions</div>
+                    </div>""", unsafe_allow_html=True)
+                    c_june, c_dec = st.columns(2)
+                    with c_june:
+                        if st.button(f"☀️ Jun", key=f"pyq_june_{yr}", use_container_width=True,
+                                     type="primary" if june_cnt>0 else "secondary", disabled=june_cnt==0):
+                            qs = qb.get_filtered(years=[yr], seasons=["June"], n=15)
+                            _start_quiz(qs, "practice", f"PYQ {yr} June", 15*72); st.rerun()
+                    with c_dec:
+                        if st.button(f"❄️ Dec", key=f"pyq_dec_{yr}", use_container_width=True,
+                                     type="primary" if dec_cnt>0 else "secondary", disabled=dec_cnt==0):
+                            qs = qb.get_filtered(years=[yr], seasons=["December"], n=15)
+                            _start_quiz(qs, "practice", f"PYQ {yr} Dec", 15*72); st.rerun()
+                    if st.button(f"🎯 All {yr}", key=f"pyq_yr_{yr}", use_container_width=True):
+                        qs = qb.get_filtered(years=[yr], n=15)
+                        _start_quiz(qs, "practice", f"PYQ {yr} (All)", 15*72); st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Season quick launch
+    # ── Season Series cards ────────────────────────────────
+    st.markdown('<div class="section-label">📆 Season Series <span class="pill">combined across years</span></div>', unsafe_allow_html=True)
     sc1, sc2 = st.columns(2)
+    june_total = len([q for q in all_q if q.get("season")=="June"])
+    dec_total  = len([q for q in all_q if q.get("season")=="December"])
     with sc1:
-        st.markdown('<div class="card" style="border-color:rgba(245,166,35,0.4);"><div class="card-accent-top" style="background:var(--gold);"></div><div style="font-size:1.6rem;">☀️</div><div class="card-title">June Series</div><div class="card-desc">All June exam questions combined</div></div>', unsafe_allow_html=True)
-        if st.button("Start June Series →", key="pyq_june", use_container_width=True, type="primary"):
-            qs = qb.get_filtered(seasons=["June"], years=sel_years or None, n=sel_n)
-            _start_quiz(qs, "practice", "June Series", t_limit if timed else 0)
-            st.rerun()
+        st.markdown(f"""<div class="card" style="border-color:rgba(232,160,32,0.35);">
+          <div class="card-accent-top" style="background:var(--amber);"></div>
+          <span style="font-size:1.8rem;">☀️</span>
+          <div class="card-title" style="margin-top:0.5rem;">June Series</div>
+          <div class="card-desc">All June-session PYQs combined · {june_total} questions</div>
+          <div class="card-meta"><span class="chip">15 Qs</span><span class="chip amber">18 min</span></div>
+        </div>""", unsafe_allow_html=True)
+        if st.button("Start June Series →", key="pyq_june_all", use_container_width=True, type="primary", disabled=june_total==0):
+            qs = qb.get_filtered(seasons=["June"], n=15)
+            _start_quiz(qs, "practice", "June Series", 15*72); st.rerun()
+
     with sc2:
-        st.markdown('<div class="card" style="border-color:rgba(0,212,255,0.4);"><div class="card-accent-top" style="background:var(--cyan);"></div><div style="font-size:1.6rem;">❄️</div><div class="card-title">December Series</div><div class="card-desc">All December exam questions combined</div></div>', unsafe_allow_html=True)
-        if st.button("Start December Series →", key="pyq_dec", use_container_width=True, type="primary"):
-            qs = qb.get_filtered(seasons=["December"], years=sel_years or None, n=sel_n)
-            _start_quiz(qs, "practice", "December Series", t_limit if timed else 0)
-            st.rerun()
+        st.markdown(f"""<div class="card" style="border-color:rgba(15,184,201,0.35);">
+          <div class="card-accent-top" style="background:var(--teal);"></div>
+          <span style="font-size:1.8rem;">❄️</span>
+          <div class="card-title" style="margin-top:0.5rem;">December Series</div>
+          <div class="card-desc">All December-session PYQs combined · {dec_total} questions</div>
+          <div class="card-meta"><span class="chip">15 Qs</span><span class="chip teal">18 min</span></div>
+        </div>""", unsafe_allow_html=True)
+        if st.button("Start December Series →", key="pyq_dec_all", use_container_width=True, type="primary", disabled=dec_total==0):
+            qs = qb.get_filtered(seasons=["December"], n=15)
+            _start_quiz(qs, "practice", "December Series", 15*72); st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🚀 Start Filtered Session", use_container_width=True, type="primary", key="pyq_start"):
-        qs = qb.get_filtered(
-            topics=sel_topics or None, difficulty=sel_diff,
-            years=sel_years or None, seasons=sel_seasons or None,
-            n=sel_n
-        )
-        if not qs: st.error("No questions match. Try different filters.")
-        else:
-            _start_quiz(qs, "practice", f"PYQ Custom ({sel_diff})", t_limit if timed else 0)
-            st.rerun()
+
+    # ── Custom filter session ─────────────────────
+    st.markdown('<div class="section-label">🔎 Custom Filter Session</div>', unsafe_allow_html=True)
+    with st.expander("▸ Filters (year, season, topic, difficulty)", expanded=False):
+        fc1, fc2, fc3 = st.columns(3)
+        with fc1: sel_years   = st.multiselect("Year",     options=qb.get_years(),   default=[], placeholder="All years",   key="pyq_years")
+        with fc2: sel_seasons = st.multiselect("Season",   options=qb.get_seasons(), default=[], placeholder="All seasons", key="pyq_seasons")
+        with fc3: sel_topics  = st.multiselect("Topics",   options=qb.get_topics(),  default=[], placeholder="All topics",  key="pyq_topics")
+        fc4, fc5, fc6 = st.columns(3)
+        with fc4: sel_diff = st.selectbox("Difficulty", ["Mixed","Easy","Medium","Hard"], key="pyq_diff")
+        with fc5: sel_n    = st.select_slider("Questions", [10,15,20,25,30,50], value=15, key="pyq_n")
+        with fc6:
+            timed   = st.toggle("⏱ Timed Mode", value=True, key="pyq_timed")
+            t_limit = sel_n * 72
+
+        preview = qb.get_filtered(topics=sel_topics or None, difficulty=sel_diff,
+                                   years=sel_years or None, seasons=sel_seasons or None, n=9999, shuffle=False)
+        st.markdown(f'<div style="color:var(--indigo2);font-weight:700;font-size:0.84rem;margin-bottom:0.5rem;">✅ {len(preview)} questions match · {min(sel_n,len(preview))} will be used</div>', unsafe_allow_html=True)
+
+        if st.button("🚀 Start Filtered Session", use_container_width=True, type="primary", key="pyq_start"):
+            qs = qb.get_filtered(topics=sel_topics or None, difficulty=sel_diff,
+                                 years=sel_years or None, seasons=sel_seasons or None, n=sel_n)
+            if not qs: st.error("No questions match your filters. Try broadening the selection.")
+            else:
+                _start_quiz(qs, "practice", f"PYQ Custom ({sel_diff})", t_limit if timed else 0); st.rerun()
 
 
 # ═══════════════════════════════════════════════
 # MOCK TESTS PAGE
 # ═══════════════════════════════════════════════
 MOCK_BLUEPRINTS = [
-    {"id":"m_full1", "name":"Full Mock — Set 1", "icon":"🎯", "tag":"Full Exam","tag_c":"violet","total":50,"mins":180,"diff":"Mixed","topics":None,"seasons":None,"desc":"50 questions · All topics · 3 hours · Exam simulation"},
-    {"id":"m_full2", "name":"Full Mock — Set 2", "icon":"🎯", "tag":"Full Exam","tag_c":"violet","total":50,"mins":180,"diff":"Mixed","topics":None,"seasons":None,"desc":"Fresh shuffle of full question bank"},
-    {"id":"m_15_1",  "name":"15-Q Sprint — Set A","icon":"⚡","tag":"15 Min","tag_c":"gold","total":15,"mins":15,"diff":"Mixed","topics":None,"seasons":None,"desc":"15 questions · 15 minutes · All topics"},
-    {"id":"m_15_2",  "name":"15-Q Sprint — Set B","icon":"⚡","tag":"15 Min","tag_c":"gold","total":15,"mins":15,"diff":"Mixed","topics":None,"seasons":None,"desc":"Second set of 15-question sprint"},
-    {"id":"m_15_3",  "name":"15-Q Hard Only","icon":"🔥","tag":"15 Min","tag_c":"red","total":15,"mins":15,"diff":"Hard","topics":None,"seasons":None,"desc":"15 hard questions · 15 min · Challenge mode"},
-    {"id":"m_teach", "name":"Teaching Sprint","icon":"🧠","tag":"Topic","tag_c":"cyan","total":25,"mins":40,"diff":"Mixed","topics":["Teaching Aptitude"],"seasons":None,"desc":"25 questions on Teaching Aptitude only"},
-    {"id":"m_res",   "name":"Research Sprint","icon":"🔬","tag":"Topic","tag_c":"cyan","total":25,"mins":40,"diff":"Mixed","topics":["Research Aptitude"],"seasons":None,"desc":"25 questions on Research Aptitude only"},
-    {"id":"m_ict",   "name":"ICT + Reasoning","icon":"💻","tag":"Topic","tag_c":"cyan","total":20,"mins":30,"diff":"Mixed","topics":["ICT","Reasoning"],"seasons":None,"desc":"ICT and Reasoning combined sprint"},
-    {"id":"m_june",  "name":"June Exam Series","icon":"☀️","tag":"Season","tag_c":"gold","total":50,"mins":180,"diff":"Mixed","topics":None,"seasons":["June"],"desc":"All June exam PYQ questions"},
-    {"id":"m_dec",   "name":"December Series","icon":"❄️","tag":"Season","tag_c":"gold","total":50,"mins":180,"diff":"Mixed","topics":None,"seasons":["December"],"desc":"All December exam PYQ questions"},
+    # Exam Simulation
+    {"id":"m_exam1","name":"Exam Simulation — Set 1","icon":"🎓","tag":"Exam Simulation","tag_c":"violet","total":50,"mins":180,"diff":"Mixed","topics":None,"seasons":None,"desc":"Full UGC NET pattern · 50 Qs · 3 hrs · Live countdown · Auto-submit","exam_sim":True},
+    {"id":"m_exam2","name":"Exam Simulation — Set 2","icon":"🎓","tag":"Exam Simulation","tag_c":"violet","total":50,"mins":180,"diff":"Mixed","topics":None,"seasons":None,"desc":"New shuffle · same exam conditions · ranked on leaderboard","exam_sim":True},
+    # Full Mock Tests
+    {"id":"m_full1","name":"Full Mock — Set 1","icon":"🎯","tag":"Full Mock","tag_c":"indigo","total":50,"mins":90,"diff":"Mixed","topics":None,"seasons":None,"desc":"50 questions · 90 min · All topics · Full bank shuffle","exam_sim":False},
+    {"id":"m_full2","name":"Full Mock — Set 2","icon":"🎯","tag":"Full Mock","tag_c":"indigo","total":50,"mins":90,"diff":"Mixed","topics":None,"seasons":None,"desc":"Fresh shuffle · same pattern · compare your score","exam_sim":False},
+    # 15-Q Sprints
+    {"id":"m_15_1","name":"15-Q Sprint — Set A","icon":"⚡","tag":"15-Q Sprint","tag_c":"gold","total":15,"mins":18,"diff":"Mixed","topics":None,"seasons":None,"desc":"15 questions · 18 min · Perfect for quick revision","exam_sim":False},
+    {"id":"m_15_2","name":"15-Q Sprint — Set B","icon":"⚡","tag":"15-Q Sprint","tag_c":"gold","total":15,"mins":18,"diff":"Mixed","topics":None,"seasons":None,"desc":"Second sprint set · different question selection","exam_sim":False},
+    {"id":"m_15_3","name":"15-Q Hard Challenge","icon":"🔥","tag":"15-Q Sprint","tag_c":"red","total":15,"mins":18,"diff":"Hard","topics":None,"seasons":None,"desc":"15 hard questions only · tests your limits · 18 min","exam_sim":False},
+    {"id":"m_15_easy","name":"15-Q Warm-Up","icon":"🌱","tag":"15-Q Sprint","tag_c":"green","total":15,"mins":18,"diff":"Easy","topics":None,"seasons":None,"desc":"Easy questions · great for beginners and warm-up","exam_sim":False},
+    # Topic Sprints
+    {"id":"m_teach","name":"Teaching Sprint","icon":"🧠","tag":"Topic Sprint","tag_c":"cyan","total":25,"mins":40,"diff":"Mixed","topics":["Teaching Aptitude"],"seasons":None,"desc":"25 questions · Teaching Aptitude only · 40 min","exam_sim":False},
+    {"id":"m_res","name":"Research Sprint","icon":"🔬","tag":"Topic Sprint","tag_c":"cyan","total":25,"mins":40,"diff":"Mixed","topics":["Research Aptitude"],"seasons":None,"desc":"25 questions · Research Aptitude only · 40 min","exam_sim":False},
+    {"id":"m_ict","name":"ICT + Reasoning","icon":"💻","tag":"Topic Sprint","tag_c":"cyan","total":20,"mins":30,"diff":"Mixed","topics":["ICT","Reasoning"],"seasons":None,"desc":"ICT and Reasoning combined · 20 Qs · 30 min","exam_sim":False},
+    {"id":"m_env","name":"Environment Sprint","icon":"🌿","tag":"Topic Sprint","tag_c":"cyan","total":20,"mins":30,"diff":"Mixed","topics":["Environment & Ecology"],"seasons":None,"desc":"Environment & Ecology only · 20 Qs · 30 min","exam_sim":False},
+    # Season PYQ Mocks
+    {"id":"m_june","name":"June PYQ Series","icon":"☀️","tag":"Season Mock","tag_c":"gold","total":50,"mins":90,"diff":"Mixed","topics":None,"seasons":["June"],"desc":"All June-session PYQs · 50 Qs · 90 min","exam_sim":False},
+    {"id":"m_dec","name":"December PYQ Series","icon":"❄️","tag":"Season Mock","tag_c":"gold","total":50,"mins":90,"diff":"Mixed","topics":None,"seasons":["December"],"desc":"All December-session PYQs · 50 Qs · 90 min","exam_sim":False},
 ]
 
 def page_mock():
     qb = QuestionBank()
 
-    st.markdown('<h2 style="font-family:Syne,sans-serif;font-size:1.5rem;font-weight:800;margin-bottom:0.25rem;">🧪 Mock Tests</h2>', unsafe_allow_html=True)
-    st.markdown('<p style="color:var(--text2);font-size:0.85rem;margin-bottom:1.5rem;">Structured exam-pattern tests. Full mock = 50 Qs, 180 min. 15-Q sprints = 15 min.</p>', unsafe_allow_html=True)
+    st.markdown("""<div class="page-header">
+      <h1>🧪 Mock Tests</h1>
+      <p>Structured tests for every need — Exam Simulation · Full Mocks · 15-Q Sprints · Topic Sprints · Season PYQs. All auto-scored and ranked.</p>
+    </div>""", unsafe_allow_html=True)
 
-    # Group by tag
+    # ── Exam Simulation banner ─────────────────────
+    sim_mocks = [m for m in MOCK_BLUEPRINTS if m.get("exam_sim")]
+    st.markdown('<div class="section-label">🎓 Exam Simulation <span class="pill">UGC NET real conditions · 50 Qs · 3 hrs · auto-submit</span></div>', unsafe_allow_html=True)
+    sim_cols = st.columns(len(sim_mocks))
+    for i, m in enumerate(sim_mocks):
+        avail = qb.get_filtered(topics=m["topics"], difficulty=m["diff"], seasons=m["seasons"], n=9999, shuffle=False)
+        cnt = len(avail); can = cnt > 0; used = min(m["total"], cnt)
+        avail_color = "var(--emerald)" if can else "var(--rose)"
+        with sim_cols[i]:
+            st.markdown(f"""<div class="card" style="border-color:rgba(99,102,241,0.5);background:linear-gradient(135deg,rgba(99,102,241,0.07),rgba(15,184,201,0.04));">
+              <div class="card-accent-top" style="background:linear-gradient(90deg,var(--indigo),var(--teal));"></div>
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;">
+                <span style="font-size:2rem;">{m["icon"]}</span>
+                <span style="font-size:0.68rem;color:{avail_color};font-weight:700;">✓ {cnt} Qs available</span>
+              </div>
+              <div class="card-title" style="color:var(--indigo2);">{m["name"]}</div>
+              <div class="card-desc">{m["desc"]}</div>
+              <div class="card-meta">
+                <span class="chip" style="color:var(--indigo2);border-color:rgba(99,102,241,0.3);">📝 {used} Qs</span>
+                <span class="chip amber">⏱ 180 min</span>
+                <span class="chip" style="color:var(--rose);border-color:rgba(244,63,94,0.3);">🔒 No pause</span>
+              </div>
+            </div>""", unsafe_allow_html=True)
+            if st.button(f"🎓 Start {m['name'][:28]}", key=f"mock_{m['id']}", use_container_width=True,
+                         type="primary" if can else "secondary", disabled=not can):
+                qs = qb.get_filtered(topics=m["topics"], difficulty=m["diff"], seasons=m["seasons"], n=m["total"])
+                _start_quiz(qs, "exam_sim", m["name"], m["mins"]*60); st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── All other mock groups ──────────────────────
+    tag_order  = ["Full Mock", "15-Q Sprint", "Topic Sprint", "Season Mock"]
+    tag_colors = {"Full Mock":"var(--indigo)","15-Q Sprint":"var(--amber)","Topic Sprint":"var(--teal)","Season Mock":"var(--amber2)"}
+
     tags = {}
     for m in MOCK_BLUEPRINTS:
-        tags.setdefault(m["tag"], []).append(m)
+        if not m.get("exam_sim"):
+            tags.setdefault(m["tag"], []).append(m)
 
-    color_map = {"violet":"var(--violet2)","gold":"var(--gold)","cyan":"var(--cyan)","green":"var(--green)","red":"var(--red)"}
+    for tag in tag_order:
+        mocks = tags.get(tag, [])
+        if not mocks: continue
+        chip_color = tag_colors.get(tag, "var(--teal)")
+        st.markdown(f'<div class="section-label">{tag} <span class="pill">{len(mocks)} tests</span></div>', unsafe_allow_html=True)
 
-    for tag, mocks in tags.items():
-        tc = color_map.get(mocks[0]["tag_c"], "var(--text2)")
-        st.markdown(f'<div style="display:inline-block;background:rgba(255,255,255,0.05);border:1px solid var(--border);color:{tc};border-radius:6px;padding:0.2rem 0.75rem;font-size:0.72rem;font-weight:700;margin:1rem 0 0.6rem;text-transform:uppercase;letter-spacing:0.1em;">▸ {tag}</div>', unsafe_allow_html=True)
-
-        cols = st.columns(min(len(mocks), 2))
+        cols = st.columns(min(len(mocks), 2) if len(mocks) <= 4 else 3)
         for i, m in enumerate(mocks):
-            avail = qb.get_filtered(topics=m["topics"],difficulty=m["diff"],seasons=m["seasons"],n=9999,shuffle=False)
-            cnt = len(avail)
-            used = min(m["total"], cnt)
-            can = cnt > 0
-            tc2 = color_map.get(m["tag_c"], "var(--text2)")
-            with cols[i % 2]:
+            avail = qb.get_filtered(topics=m["topics"], difficulty=m["diff"], seasons=m["seasons"], n=9999, shuffle=False)
+            cnt   = len(avail); used = min(m["total"], cnt); can = cnt > 0
+            avail_color = "var(--emerald)" if can else "var(--rose)"
+            avail_label = f"✓ {cnt} available" if can else "⚠ No questions"
+            with cols[i % len(cols)]:
                 st.markdown(f"""<div class="card">
-                  <div class="card-accent-top" style="background:{tc2};"></div>
-                  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.6rem;">
-                    <span style="font-size:1.6rem;">{m["icon"]}</span>
-                    <span style="font-size:0.7rem;color:{"var(--green)" if can else "var(--red)"};font-weight:700;">{"✓ "+str(cnt)+" available" if can else "⚠ No questions"}</span>
+                  <div class="card-accent-top" style="background:{chip_color};"></div>
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;">
+                    <span style="font-size:1.5rem;">{m["icon"]}</span>
+                    <span style="font-size:0.65rem;color:{avail_color};font-weight:700;">{avail_label}</span>
                   </div>
-                  <div class="card-title">{m["name"]}</div>
-                  <div class="card-desc">{m["desc"]}</div>
+                  <div class="card-title" style="font-size:0.9rem;">{m["name"]}</div>
+                  <div class="card-desc" style="font-size:0.77rem;">{m["desc"]}</div>
                   <div class="card-meta">
-                    <span class="meta-chip">📝 {used} Qs</span>
-                    <span class="meta-chip">⏱ {m["mins"]} min</span>
-                    <span class="meta-chip {m["tag_c"]}">{m["diff"]}</span>
+                    <span class="chip">📝 {used} Qs</span>
+                    <span class="chip">⏱ {m["mins"]}m</span>
+                    <span class="chip teal">{m["diff"]}</span>
                   </div>
                 </div>""", unsafe_allow_html=True)
-                if st.button(f"Start {m['name'][:20]}→", key=f"mock_{m['id']}", use_container_width=True,
+                if st.button(f"Start →", key=f"mock_{m['id']}", use_container_width=True,
                              type="primary" if can else "secondary", disabled=not can):
-                    qs = qb.get_filtered(topics=m["topics"],difficulty=m["diff"],seasons=m["seasons"],n=m["total"])
-                    _start_quiz(qs, "exam", m["name"], m["mins"]*60)
-                    st.rerun()
+                    qs = qb.get_filtered(topics=m["topics"], difficulty=m["diff"], seasons=m["seasons"], n=m["total"])
+                    _start_quiz(qs, "exam", m["name"], m["mins"]*60); st.rerun()
 
-    # Custom builder
-    st.markdown('<div class="section-label">🛠️ Custom Mock Builder</div>', unsafe_allow_html=True)
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    r1c1, r1c2, r1c3 = st.columns(3)
-    with r1c1:
-        cy = st.multiselect("Year(s)", qb.get_years(), default=[], key="cb_years", placeholder="All")
-    with r1c2:
-        cs = st.multiselect("Season(s)", qb.get_seasons(), default=[], key="cb_seasons", placeholder="All")
-    with r1c3:
-        ct = st.multiselect("Topic(s)", qb.get_topics(), default=[], key="cb_topics", placeholder="All")
-    r2c1, r2c2, r2c3 = st.columns(3)
-    with r2c1:
-        cn = st.select_slider("Questions", [10,15,20,25,30,50], value=15, key="cb_n")
-    with r2c2:
-        cd = st.selectbox("Difficulty", ["Mixed","Easy","Medium","Hard"], key="cb_diff")
-    with r2c3:
-        ct2 = st.select_slider("Time (min)", [10,15,20,30,45,60,90,120,180], value=15, key="cb_time")
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    prev = qb.get_filtered(topics=ct or None, difficulty=cd, years=cy or None, seasons=cs or None, n=9999, shuffle=False)
-    st.markdown(f'<div style="color:var(--violet2);font-weight:700;font-size:0.85rem;">✅ {len(prev)} match · {min(cn,len(prev))} will be used</div>', unsafe_allow_html=True)
-    if st.button("🚀 Launch Custom Mock", key="cb_start", use_container_width=True, type="primary"):
-        qs = qb.get_filtered(topics=ct or None, difficulty=cd, years=cy or None, seasons=cs or None, n=cn)
-        if not qs: st.error("No questions found. Adjust filters.")
-        else:
-            _start_quiz(qs, "exam", f"Custom Mock ({cd})", ct2*60)
-            st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    # ── Custom Mock Builder ────────────────────────
+    st.markdown('<div class="section-label">🔧 Custom Mock Builder <span class="pill">build your own</span></div>', unsafe_allow_html=True)
+    with st.expander("▸ Configure Custom Mock", expanded=False):
+        r1c1, r1c2, r1c3 = st.columns(3)
+        with r1c1: cy = st.multiselect("Year(s)",   qb.get_years(),   default=[], key="cb_years",   placeholder="All")
+        with r1c2: cs = st.multiselect("Season(s)", qb.get_seasons(), default=[], key="cb_seasons", placeholder="All")
+        with r1c3: ct = st.multiselect("Topic(s)",  qb.get_topics(),  default=[], key="cb_topics",  placeholder="All")
+        r2c1, r2c2, r2c3 = st.columns(3)
+        with r2c1: cn  = st.select_slider("Questions", [10,15,20,25,30,50], value=15, key="cb_n")
+        with r2c2: cd  = st.selectbox("Difficulty", ["Mixed","Easy","Medium","Hard"], key="cb_diff")
+        with r2c3: ct2 = st.select_slider("Time (min)", [10,15,18,20,30,45,60,90,120,180], value=18, key="cb_time")
+
+        prev = qb.get_filtered(topics=ct or None, difficulty=cd, years=cy or None, seasons=cs or None, n=9999, shuffle=False)
+        st.markdown(f'<div style="color:var(--indigo2);font-weight:700;font-size:0.84rem;margin-bottom:0.75rem;">✅ {len(prev)} match · {min(cn,len(prev))} will be used</div>', unsafe_allow_html=True)
+        if st.button("🚀 Launch Custom Mock", key="cb_start", use_container_width=True, type="primary"):
+            qs = qb.get_filtered(topics=ct or None, difficulty=cd, years=cy or None, seasons=cs or None, n=cn)
+            if not qs: st.error("No questions found. Adjust filters.")
+            else:
+                _start_quiz(qs, "exam", f"Custom Mock ({cd})", ct2*60); st.rerun()
 
 
 # ═══════════════════════════════════════════════
@@ -971,53 +1578,47 @@ def page_mock():
 def page_ai():
     qb = QuestionBank()
 
-    st.markdown('<h2 style="font-family:Syne,sans-serif;font-size:1.5rem;font-weight:800;margin-bottom:0.25rem;">🤖 AI Predicted Questions</h2>', unsafe_allow_html=True)
-    st.markdown('<p style="color:var(--text2);font-size:0.85rem;margin-bottom:1.5rem;">Questions predicted by AI analysis of recent exam trends, NEP 2020 reforms, and topic frequency patterns.</p>', unsafe_allow_html=True)
+    st.markdown("""<div class="page-header">
+      <h1>🤖 AI Predicted Questions</h1>
+      <p>Questions curated by AI analysis of exam trends, NEP 2020 reforms, and topic frequency — targeted at upcoming exams.</p>
+    </div>""", unsafe_allow_html=True)
 
     ai_qs = [q for q in qb.get_all() if q.get("predicted")]
 
-    st.markdown(f"""<div class="card" style="border-color:rgba(0,212,255,0.35);margin-bottom:1.5rem;">
-      <div class="card-accent-top" style="background:linear-gradient(90deg,var(--cyan),var(--violet));"></div>
+    st.markdown(f"""<div class="card" style="border-color:rgba(15,184,201,0.3);margin-bottom:1.5rem;">
+      <div class="card-accent-top" style="background:linear-gradient(90deg,var(--teal),var(--indigo));"></div>
       <div style="display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;">
-        <div style="font-size:2.5rem;">🤖</div>
+        <div style="font-size:2.8rem;line-height:1;">🤖</div>
         <div>
-          <div style="font-family:Syne,sans-serif;font-weight:800;font-size:1.1rem;color:var(--cyan);">{len(ai_qs)} AI-Predicted Questions</div>
-          <div style="color:var(--text2);font-size:0.85rem;margin-top:0.25rem;">Based on trend analysis · June 2025 focus · Updated regularly</div>
+          <div style="font-family:'Playfair Display',serif;font-weight:800;font-size:1.15rem;color:var(--teal2);">{len(ai_qs)} AI-Predicted Questions</div>
+          <div style="color:var(--t2);font-size:0.85rem;margin-top:0.3rem;">Based on trend analysis · June 2025 focus · NEP 2020 aligned</div>
         </div>
       </div>
     </div>""", unsafe_allow_html=True)
 
-    if ai_qs:
-        # Preview cards
-        for q in ai_qs:
-            topic_color = "cyan"
-            st.markdown(f"""<div class="card" style="margin-bottom:0.6rem;">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;">
-                <div class="card-meta" style="margin:0;">
-                  <span class="meta-chip cyan">{q.get("topic","—")}</span>
-                  <span class="meta-chip">{q.get("difficulty","—")}</span>
-                  <span class="meta-chip gold">🤖 AI Pick</span>
-                </div>
-              </div>
-              <div style="font-weight:600;color:var(--text);font-size:0.9rem;margin-top:0.6rem;line-height:1.6;">{q["question"]}</div>
-            </div>""", unsafe_allow_html=True)
+    diff_colors = {"Easy":"var(--emerald)","Medium":"var(--amber)","Hard":"var(--rose)"}
+    for q in ai_qs:
+        dc = diff_colors.get(q.get("difficulty",""), "var(--t2)")
+        st.markdown(f"""<div class="card" style="margin-bottom:0.6rem;">
+          <div class="card-meta" style="margin-bottom:0.6rem;">
+            <span class="chip teal">{q.get("topic","—")}</span>
+            <span class="chip" style="color:{dc};border-color:{dc}20;">{q.get("difficulty","—")}</span>
+            <span class="chip amber">🤖 AI Pick</span>
+          </div>
+          <div style="font-family:'Playfair Display',serif;font-weight:700;color:var(--t1);font-size:0.95rem;line-height:1.65;">{q["question"]}</div>
+        </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("🚀 Practice AI Questions (All)", use_container_width=True, type="primary", key="ai_all"):
-            if ai_qs:
-                _start_quiz(ai_qs, "practice", "AI Predicted Questions", len(ai_qs)*90)
-                st.rerun()
+        if st.button("🚀 Practice All AI Questions", use_container_width=True, type="primary", key="ai_all"):
+            if ai_qs: _start_quiz(ai_qs, "practice", "AI Predicted Questions", len(ai_qs)*90); st.rerun()
             else: st.error("No AI predicted questions in bank yet.")
     with c2:
-        if st.button("🧪 Add to Mock Test", use_container_width=True, key="ai_mock"):
-            # Mix AI + regular for a 20-Q mock
+        if st.button("🧪 AI + PYQ Mix Mock", use_container_width=True, key="ai_mock"):
             reg_qs = qb.get_filtered(n=15, shuffle=True)
-            mixed  = (ai_qs + reg_qs)[:20]
-            random.shuffle(mixed)
-            _start_quiz(mixed, "exam", "AI Predicted Mix Mock", 20*90)
-            st.rerun()
+            mixed  = (ai_qs + reg_qs)[:20]; random.shuffle(mixed)
+            _start_quiz(mixed, "exam", "AI Predicted Mix Mock", 20*90); st.rerun()
 
 
 # ═══════════════════════════════════════════════
@@ -1067,31 +1668,17 @@ def page_quiz():
         st.rerun()
         return
 
-    # ── LIVE TIMER: auto-rerun every second ──
+    # ── LIVE TIMER: working countdown via st.rerun ──
+    # Store last rerun time to throttle refreshes to ~5s intervals
     if remaining is not None and remaining > 0:
-        import time as _t
-        # Inject a JS timer that forces Streamlit to rerun every second
-        st.markdown(f"""
-        <script>
-        (function() {{
-            if (window._netTimerActive) return;
-            window._netTimerActive = true;
-            var interval = setInterval(function() {{
-                var btns = parent.document.querySelectorAll('button');
-                for (var i = 0; i < btns.length; i++) {{
-                    if (btns[i].innerText && btns[i].innerText.includes('⏱')) {{
-                        clearInterval(interval);
-                        window._netTimerActive = false;
-                        return;
-                    }}
-                }}
-            }}, 1000);
-            setTimeout(function() {{
-                window._netTimerActive = false;
-            }}, 300000);
-        }})();
-        </script>
-        """, unsafe_allow_html=True)
+        last_refresh = st.session_state.get("_timer_refresh", 0)
+        now_t = time.time()
+        if now_t - last_refresh >= 5:
+            st.session_state["_timer_refresh"] = now_t
+            import streamlit as _st
+            # Auto-rerun to update timer display every 5 seconds
+            time.sleep(0.05)
+            st.rerun()
 
     # Timer display
     rm, rs = divmod(remaining or 0, 60)
@@ -1110,21 +1697,40 @@ def page_quiz():
     yr_tag = f'· {q.get("year","")} {q.get("season","")}' if q.get("year") else ""
     ai_tag = '<span class="meta-chip cyan" style="font-size:0.65rem;padding:0.15rem 0.4rem;">🤖 AI Pick</span>' if q.get("predicted") else ""
 
-    col_q, col_nav = (st.columns([3, 1]) if mode == "exam" else (st.container(), None))
+    is_exam_sim = (mode == "exam_sim")
 
-    with (col_q if mode == "exam" else col_q):
-        # Progress bar
-        pct_done = idx / total
-        st.markdown(f'<div class="progress-track"><div class="progress-fill" style="width:{pct_done*100:.1f}%"></div></div>', unsafe_allow_html=True)
+    col_q, col_nav = (st.columns([3, 1]) if mode in ("exam", "exam_sim") else (st.container(), None))
 
-        # Label + timer row
-        lc1, lc2, lc3 = st.columns([3, 2, 1])
-        with lc1:
-            st.markdown(f'<div style="font-size:0.8rem;color:var(--text2);font-weight:600;">📝 {label}</div>', unsafe_allow_html=True)
-        with lc2:
-            st.markdown(f'<div style="display:flex;justify-content:center;">{timer_html}</div>', unsafe_allow_html=True)
-        with lc3:
-            st.markdown(f'<div style="text-align:right;font-family:JetBrains Mono,monospace;font-size:0.8rem;color:var(--text2);">{idx+1}/{total}</div>', unsafe_allow_html=True)
+    with (col_q if mode in ("exam", "exam_sim") else col_q):
+        # ── Exam Simulation header bar ─────────────
+        if is_exam_sim:
+            timer_color = "var(--rose)" if (remaining is not None and remaining < 600) else ("var(--amber)" if (remaining is not None and remaining < 1800) else "var(--teal2)")
+            st.markdown(f"""<div style="background:rgba(10,14,22,0.95);border:1px solid rgba(99,102,241,0.4);border-radius:12px;
+                padding:0.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;
+                margin-bottom:1rem;gap:1rem;flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span style="font-size:1.1rem;">🎓</span>
+                <span style="font-weight:700;font-size:0.88rem;color:var(--indigo2);">{label}</span>
+              </div>
+              <div style="font-family:'Fira Code',monospace;font-size:1.6rem;font-weight:700;color:{timer_color};
+                  letter-spacing:0.05em;text-shadow:0 0 20px {timer_color}40;">
+                ⏱ {rm:02d}:{rs:02d}
+              </div>
+              <div style="font-size:0.82rem;color:var(--t2);">Q {idx+1} / {total}</div>
+            </div>""", unsafe_allow_html=True)
+        else:
+            # Progress bar
+            pct_done = idx / total
+            st.markdown(f'<div class="progress-track"><div class="progress-fill" style="width:{pct_done*100:.1f}%"></div></div>', unsafe_allow_html=True)
+
+            # Label + timer row
+            lc1, lc2, lc3 = st.columns([3, 2, 1])
+            with lc1:
+                st.markdown(f'<div style="font-size:0.8rem;color:var(--text2);font-weight:600;">📝 {label}</div>', unsafe_allow_html=True)
+            with lc2:
+                st.markdown(f'<div style="display:flex;justify-content:center;">{timer_html}</div>', unsafe_allow_html=True)
+            with lc3:
+                st.markdown(f'<div style="text-align:right;font-family:JetBrains Mono,monospace;font-size:0.8rem;color:var(--text2);">{idx+1}/{total}</div>', unsafe_allow_html=True)
 
         # Question card
         clean_q = html.unescape(re.sub(r'<[^>]+>', '', q["question"])).strip()
@@ -1297,25 +1903,24 @@ def page_quiz_config():
 # RESULTS
 # ═══════════════════════════════════════════════
 def get_grade(pct):
-    if pct >= 90: return "A+","#00e5a0","Outstanding! 🏆"
-    if pct >= 75: return "A", "var(--green)","Excellent! 🎉"
-    if pct >= 60: return "B+","var(--cyan)","Good work! 👍"
-    if pct >= 50: return "B", "var(--gold)","Keep practicing 💪"
-    if pct >= 35: return "C", "var(--gold)","Need more revision 📖"
-    return "D","var(--red)","Don't give up! 🔥"
+    if pct >= 90: return "A+", "var(--emerald)", "Outstanding! 🏆"
+    if pct >= 75: return "A",  "var(--emerald)", "Excellent! 🎉"
+    if pct >= 60: return "B+", "var(--teal2)",   "Good work! 👍"
+    if pct >= 50: return "B",  "var(--amber)",   "Keep practicing 💪"
+    if pct >= 35: return "C",  "var(--amber)",   "Need more revision 📖"
+    return "D", "var(--rose)", "Don't give up! 🔥"
 
 def page_results():
-    score = st.session_state.get("score", 0)
-    total = len(st.session_state.questions)
-    pct   = round(score/total*100) if total else 0
+    score   = st.session_state.get("score", 0)
+    total   = len(st.session_state.questions)
+    pct     = round(score/total*100) if total else 0
     elapsed = int(time.time() - (st.session_state.start_time or time.time()))
     em, es  = divmod(elapsed, 60)
     grade, gc, gm = get_grade(pct)
-    label = st.session_state.quiz_label
+    label   = st.session_state.quiz_label
 
-    # Save score if logged in
     user = st.session_state.user
-    if user and st.session_state.quiz_mode in ("exam","practice"):
+    if user and st.session_state.quiz_mode in ("exam", "exam_sim", "practice"):
         save_score(st.session_state.username, user["name"], score, total, pct,
                    st.session_state.quiz_mode, elapsed)
 
@@ -1324,42 +1929,48 @@ def page_results():
     avg_t   = round(sum(st.session_state.q_times.values())/len(st.session_state.q_times)) if st.session_state.q_times else 0
 
     st.markdown(f"""<div class="result-hero">
-      <div style="font-size:0.8rem;color:var(--text2);margin-bottom:0.5rem;">📝 {label}</div>
+      <div style="font-size:0.8rem;color:var(--t2);margin-bottom:0.75rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;">📝 {label}</div>
       <span class="grade-letter" style="color:{gc};">{grade}</span>
       <div class="result-score">{score} / {total}</div>
       <div class="result-pct">{pct}% Accuracy</div>
       <div class="result-msg">{gm}</div>
     </div>""", unsafe_allow_html=True)
 
-    s1,s2,s3,s4,s5 = st.columns(5)
+    stat_cols = st.columns(5)
     for col, val, lbl, c in [
-        (s1,score,"Correct","#00e5a0"),(s2,wrong,"Wrong","#ff4d6d"),
-        (s3,skipped,"Skipped","#f5a623"),
-        (s4,f"{em}m{es}s","Time","#7c5cfc"),(s5,f"{avg_t}s","Avg/Q","#00d4ff"),
+        (stat_cols[0], score,         "Correct", "var(--emerald)"),
+        (stat_cols[1], wrong,         "Wrong",   "var(--rose)"),
+        (stat_cols[2], skipped,       "Skipped", "var(--amber)"),
+        (stat_cols[3], f"{em}m{es}s", "Time",    "var(--indigo2)"),
+        (stat_cols[4], f"{avg_t}s",   "Avg / Q", "var(--teal2)"),
     ]:
         with col:
-            st.markdown(f'<div class="card" style="text-align:center;padding:0.9rem;border-top:3px solid {c}"><div style="font-family:JetBrains Mono,monospace;font-size:1.5rem;font-weight:800;color:{c};">{val}</div><div style="font-size:0.68rem;color:var(--text3);text-transform:uppercase;margin-top:0.2rem;">{lbl}</div></div>', unsafe_allow_html=True)
+            st.markdown(f"""<div class="stat-card-mini" style="border-top-color:{c};">
+              <span class="val" style="color:{c};">{val}</span>
+              <span class="lbl">{lbl}</span>
+            </div>""", unsafe_allow_html=True)
 
-    # My rank (if logged in)
     if user:
         lb = get_leaderboard(mode=st.session_state.quiz_mode)
         my_rank = next((i+1 for i,r in enumerate(lb) if r["username"]==st.session_state.username), None)
         if my_rank:
-            st.markdown(f'<div style="text-align:center;margin:1rem 0;font-family:Syne,sans-serif;font-size:1.1rem;font-weight:800;color:var(--gold);">🏆 Your Rank: #{my_rank} out of {len(lb)}</div>', unsafe_allow_html=True)
+            st.markdown(f"""<div style="text-align:center;margin:1.5rem 0;padding:1rem;background:var(--amber-glow);border:1px solid rgba(232,160,32,0.3);border-radius:var(--r-md);">
+              <span style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:800;color:var(--amber);">🏆 Your Rank: #{my_rank} out of {len(lb)}</span>
+            </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    rc1,rc2,rc3,rc4 = st.columns(4)
+    rc1, rc2, rc3, rc4 = st.columns(4)
     with rc1:
-        if st.button("🔄 Retry", use_container_width=True, type="primary"):
+        if st.button("🔄 Retry",       use_container_width=True, type="primary"):
             st.session_state.quiz_active=False; st.session_state.quiz_done=False; st.rerun()
     with rc2:
-        if st.button("📊 Analytics", use_container_width=True):
+        if st.button("📊 Analytics",   use_container_width=True):
             st.session_state.page="analytics"; st.session_state.quiz_active=False; st.session_state.quiz_done=False; st.rerun()
     with rc3:
         if st.button("🏆 Leaderboard", use_container_width=True):
             st.session_state.page="leaderboard"; st.session_state.quiz_active=False; st.session_state.quiz_done=False; st.rerun()
     with rc4:
-        if st.button("🏛️ Home", use_container_width=True):
+        if st.button("🏛️ Home",        use_container_width=True):
             st.session_state.page="home"; st.session_state.quiz_active=False; st.session_state.quiz_done=False; st.rerun()
 
 
@@ -1369,13 +1980,33 @@ def page_results():
 def page_leaderboard():
     st.markdown('<h2 style="font-family:Syne,sans-serif;font-size:1.5rem;font-weight:800;margin-bottom:0.5rem;">🏆 Leaderboard</h2>', unsafe_allow_html=True)
 
-    lc1, lc2 = st.columns([2,1])
+    lc1, lc2, lc3 = st.columns([2,1,1])
     with lc1:
-        mode_filter = st.selectbox("Filter by mode", ["All","exam","practice"], key="lb_mode")
+        mode_filter = st.selectbox("Filter by mode", ["All","exam_sim","exam","practice"], key="lb_mode",
+                                   format_func=lambda x: {"All":"All Modes","exam_sim":"🎓 Exam Simulation","exam":"🧪 Mock Test","practice":"📝 Practice"}.get(x,x))
     with lc2:
         n_show = st.select_slider("Show", [10,20,50], value=20, key="lb_n")
+    with lc3:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔄 Refresh", use_container_width=True):
+            st.rerun()
 
     lb = get_leaderboard(mode=mode_filter if mode_filter != "All" else None, limit=n_show)
+
+    # Show current user's rank
+    if st.session_state.username:
+        lb_all = get_leaderboard(mode=mode_filter if mode_filter != "All" else None, limit=200)
+        my_rank = next((i+1 for i,r in enumerate(lb_all) if r["username"]==st.session_state.username), None)
+        total_students = len(lb_all)
+        if my_rank:
+            pct_rank = round((total_students - my_rank + 1)/total_students*100) if total_students else 0
+            st.markdown(f"""<div style="background:var(--indigo-glow);border:1px solid rgba(99,102,241,0.35);border-radius:var(--r-md);
+                padding:0.85rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+              <span style="font-size:0.9rem;color:var(--t2);">📍 Your Standing</span>
+              <span style="font-family:'Fira Code',monospace;font-weight:800;font-size:1.05rem;color:var(--indigo2);">
+                Rank #{my_rank} of {total_students} students · Top {pct_rank}%
+              </span>
+            </div>""", unsafe_allow_html=True)
 
     medals = ["🥇","🥈","🥉"]
     rank_colors = ["gold","silver","bronze"]
@@ -1510,17 +2141,89 @@ def page_bookmarks():
 # LOGIN / REGISTER
 # ═══════════════════════════════════════════════
 def page_login():
+    user = st.session_state.user
+    uname = st.session_state.username or ""
+
+    # ── If already logged in, show profile card ──
+    if user:
+        scores = load_scores()
+        my_scores = [s for s in scores if s.get("username")==uname]
+        attempts  = len(my_scores)
+        best_pct  = max((s["pct"] for s in my_scores), default=0)
+        avg_pct   = round(sum(s["pct"] for s in my_scores)/attempts) if attempts else 0
+        lb_all    = get_leaderboard(limit=200)
+        my_rank   = next((i+1 for i,r in enumerate(lb_all) if r["username"]==uname), None)
+        initials  = "".join(w[0].upper() for w in user["name"].split()[:2])
+
+        st.markdown(f"""<div class="page-header">
+          <h1>👤 My Profile</h1>
+        </div>""", unsafe_allow_html=True)
+
+        st.markdown(f"""<div class="card" style="border-color:rgba(99,102,241,0.4);margin-bottom:1.5rem;">
+          <div class="card-accent-top" style="background:linear-gradient(90deg,var(--indigo),var(--teal));"></div>
+          <div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;">
+            <div style="width:4rem;height:4rem;border-radius:50%;background:linear-gradient(135deg,var(--indigo),var(--teal));
+              display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.4rem;color:#fff;flex-shrink:0;">
+              {initials}
+            </div>
+            <div style="flex:1;">
+              <div style="font-family:'Playfair Display',serif;font-weight:800;font-size:1.2rem;color:var(--t1);">{user["name"]}</div>
+              <div style="color:var(--t3);font-size:0.8rem;">@{uname} · Joined {user.get("joined","—")}</div>
+            </div>
+            {f'<div style="font-family:Fira Code,monospace;font-size:1.5rem;font-weight:800;color:var(--amber);">🏆 #{my_rank}</div>' if my_rank else ""}
+          </div>
+        </div>""", unsafe_allow_html=True)
+
+        sc = st.columns(4)
+        for col, val, lbl, c in [
+            (sc[0], attempts,  "Attempts",   "var(--indigo2)"),
+            (sc[1], f"{best_pct}%", "Best Score", "var(--emerald)"),
+            (sc[2], f"{avg_pct}%",  "Avg Score",  "var(--amber)"),
+            (sc[3], f"#{my_rank}" if my_rank else "—", "Rank", "var(--teal2)"),
+        ]:
+            with col:
+                st.markdown(f"""<div class="card" style="text-align:center;padding:1rem;border-top:3px solid {c};">
+                  <div style="font-family:'Fira Code',monospace;font-size:1.5rem;font-weight:800;color:{c};">{val}</div>
+                  <div style="font-size:0.68rem;color:var(--t3);text-transform:uppercase;margin-top:0.2rem;">{lbl}</div>
+                </div>""", unsafe_allow_html=True)
+
+        if my_scores:
+            st.markdown('<div class="section-label">Recent Attempts</div>', unsafe_allow_html=True)
+            for s in sorted(my_scores, key=lambda x: x.get("ts",""), reverse=True)[:5]:
+                ts = datetime.fromisoformat(s["ts"]).strftime("%d %b %Y %H:%M") if s.get("ts") else "—"
+                mode_badge = {"exam_sim":"🎓 Exam Sim","exam":"🧪 Mock","practice":"📝 Practice"}.get(s.get("mode",""), s.get("mode","—"))
+                c = "var(--emerald)" if s["pct"]>=60 else ("var(--amber)" if s["pct"]>=40 else "var(--rose)")
+                st.markdown(f"""<div class="card" style="padding:0.75rem 1rem;margin-bottom:0.4rem;display:flex;align-items:center;
+                    justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                  <span style="font-size:0.82rem;color:var(--t2);">{mode_badge}</span>
+                  <span style="font-size:0.75rem;color:var(--t3);">{ts}</span>
+                  <span style="font-family:'Fira Code',monospace;font-weight:700;color:{c};">{s["pct"]}% ({s["score"]}/{s["total"]})</span>
+                </div>""", unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🏆 View Leaderboard", use_container_width=True, type="primary"):
+                st.session_state.page = "leaderboard"; st.rerun()
+        with col2:
+            if st.button("🚪 Logout", use_container_width=True):
+                st.session_state.user = None; st.session_state.username = None
+                st.session_state.page = "home"; st.rerun()
+        return
+
+    # ── Login / Register form ────────────────────
     st.markdown('<div class="login-wrap">', unsafe_allow_html=True)
     st.markdown('<span class="login-logo">🏛️</span>', unsafe_allow_html=True)
     st.markdown('<div class="login-title">NET Guru</div>', unsafe_allow_html=True)
-    st.markdown('<div class="login-sub">Login to track your progress and join the leaderboard</div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-sub">Sign in to track progress, earn ranks, and join the student leaderboard</div>', unsafe_allow_html=True)
 
-    tab1, tab2 = st.tabs(["Login", "Register"])
+    tab1, tab2 = st.tabs(["🔑 Login", "📝 Register"])
 
     with tab1:
         un = st.text_input("Username", key="login_un", placeholder="your_username")
         pw = st.text_input("Password", type="password", key="login_pw", placeholder="••••••••")
-        if st.button("Login", use_container_width=True, type="primary", key="do_login"):
+        st.markdown('<div style="font-size:0.75rem;color:var(--t3);margin-top:-0.5rem;margin-bottom:0.5rem;">Default demo: username <b>demo</b> · password <b>demo123</b></div>', unsafe_allow_html=True)
+        if st.button("Login →", use_container_width=True, type="primary", key="do_login"):
             ok, user_data = verify_user(un, pw)
             if ok:
                 st.session_state.user = user_data
@@ -1532,14 +2235,14 @@ def page_login():
                 st.error("Invalid username or password.")
 
     with tab2:
-        rname = st.text_input("Full Name",   key="reg_name", placeholder="Your Name")
-        run   = st.text_input("Username",    key="reg_un",   placeholder="choose_username")
-        rpw   = st.text_input("Password",    type="password", key="reg_pw", placeholder="min 6 chars")
-        rpw2  = st.text_input("Confirm PWD", type="password", key="reg_pw2")
-        if st.button("Create Account", use_container_width=True, type="primary", key="do_reg"):
-            if not rname or not run or not rpw: st.error("Fill all fields.")
+        rname = st.text_input("Full Name",   key="reg_name", placeholder="Your Full Name")
+        run   = st.text_input("Username",    key="reg_un",   placeholder="choose_a_username")
+        rpw   = st.text_input("Password",    type="password", key="reg_pw", placeholder="minimum 6 characters")
+        rpw2  = st.text_input("Confirm Password", type="password", key="reg_pw2", placeholder="repeat password")
+        if st.button("Create Account →", use_container_width=True, type="primary", key="do_reg"):
+            if not rname or not run or not rpw: st.error("Please fill all fields.")
             elif rpw != rpw2: st.error("Passwords don't match.")
-            elif len(rpw) < 6: st.error("Password min 6 characters.")
+            elif len(rpw) < 6: st.error("Password must be at least 6 characters.")
             else:
                 ok, msg = register_user(run, rpw, rname)
                 if ok:
@@ -1547,11 +2250,18 @@ def page_login():
                     st.session_state.user = udata
                     st.session_state.username = run
                     st.session_state.page = "home"
-                    st.success(f"Account created! Welcome {rname} 🎉")
+                    st.success(f"Account created! Welcome, {rname} 🎉")
                     st.rerun()
                 else: st.error(msg)
 
     st.markdown('</div>', unsafe_allow_html=True)
+
+    # Auto-create demo account if it doesn't exist
+    try:
+        users = load_users()
+        if "demo" not in users:
+            register_user("demo", "demo123", "Demo Student")
+    except: pass
 
 
 # ═══════════════════════════════════════════════
