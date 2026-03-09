@@ -718,7 +718,23 @@ hr { border: none !important; border-top: 1px solid var(--border) !important; ma
 # ═══════════════════════════════════════════════
 # QUESTION BANK
 # ═══════════════════════════════════════════════
-BUILTIN_QUESTIONS = [
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║              UGC NET PAPER 1 — QUESTION BANK                        ║
+# ║  Organised by topic. To add questions, paste new dicts into the     ║
+# ║  matching Q_<TOPIC> list below, then save. That's it!               ║
+# ║                                                                      ║
+# ║  TEMPLATE (copy-paste and fill):                                     ║
+# ║  {"id":"ta009","topic":"Teaching Aptitude",                          ║
+# ║   "difficulty":"Easy|Medium|Hard",                                   ║
+# ║   "year":2024,"season":"June|December",                              ║
+# ║   "question":"Your question?",                                       ║
+# ║   "options":["A","B","C","D"],                                       ║
+# ║   "correct_answer":"A",                                              ║
+# ║   "explanation":"Why A is correct."},                                ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+
+# ── 1. TEACHING APTITUDE ─────────────────────────────────────────────
+Q_TEACHING_APTITUDE = [
     {"id":"ta001","topic":"Teaching Aptitude","difficulty":"Medium","year":2023,"season":"June","question":"Which level of teaching focuses on the development of thinking power and reasoning in students?","options":["Memory level","Understanding level","Reflective level","None of these"],"correct_answer":"Reflective level","explanation":"Reflective level teaching by Morrison focuses on critical thinking, problem-solving, and independent reasoning."},
     {"id":"ta002","topic":"Teaching Aptitude","difficulty":"Easy","year":2022,"season":"December","question":"Which of the following is NOT a characteristic of effective teaching?","options":["Clarity of goals","Flexibility","Dogmatic approach","Student-centered learning"],"correct_answer":"Dogmatic approach","explanation":"Effective teaching is flexible and student-centered; a dogmatic approach hinders learning."},
     {"id":"ta003","topic":"Teaching Aptitude","difficulty":"Hard","year":2023,"season":"December","question":"In the context of Bloom's Taxonomy (revised), which cognitive level represents the highest order of thinking?","options":["Evaluation","Synthesis","Creating","Analysis"],"correct_answer":"Creating","explanation":"The revised Bloom's Taxonomy places 'Creating' at the apex — generating new ideas, products, or ways of viewing things."},
@@ -727,46 +743,108 @@ BUILTIN_QUESTIONS = [
     {"id":"ta006","topic":"Teaching Aptitude","difficulty":"Easy","year":2019,"season":"June","question":"Which of the following best describes 'formative evaluation'?","options":["Evaluation at the end of the course","Evaluation to assign final grades","Ongoing evaluation during instruction","Evaluation before the course begins"],"correct_answer":"Ongoing evaluation during instruction","explanation":"Formative evaluation is continuous assessment conducted during the instructional process."},
     {"id":"ta007","topic":"Teaching Aptitude","difficulty":"Hard","year":2018,"season":"December","question":"Which theory proposes that students have different 'learning styles'?","options":["Constructivism","VAK/VARK Model","Behaviorism","Gestalt Theory"],"correct_answer":"VAK/VARK Model","explanation":"The VARK model categorizes learners by Visual, Auditory, Read/Write, and Kinesthetic modes."},
     {"id":"ta008","topic":"Teaching Aptitude","difficulty":"Medium","year":2022,"season":"June","question":"The 'Socratic Method' of teaching primarily involves:","options":["Lecture and demonstration","Asking probing questions","Group projects","Use of audio-visual aids"],"correct_answer":"Asking probing questions","explanation":"The Socratic method uses disciplined questioning to stimulate critical thinking."},
+    # ── ADD MORE Teaching Aptitude QUESTIONS BELOW THIS LINE ──────────
+]
+
+# ── 2. RESEARCH APTITUDE ─────────────────────────────────────────────
+Q_RESEARCH_APTITUDE = [
     {"id":"ra001","topic":"Research Aptitude","difficulty":"Medium","year":2023,"season":"June","question":"Which type of research aims to solve immediate practical problems?","options":["Fundamental research","Applied research","Action research","Historical research"],"correct_answer":"Action research","explanation":"Action research is conducted by practitioners to solve specific, immediate problems."},
     {"id":"ra002","topic":"Research Aptitude","difficulty":"Easy","year":2021,"season":"December","question":"A hypothesis is best described as:","options":["A proven fact","A tentative statement to be tested","A summary of findings","A literature review"],"correct_answer":"A tentative statement to be tested","explanation":"A hypothesis is a tentative, testable proposition about the relationship between variables."},
     {"id":"ra003","topic":"Research Aptitude","difficulty":"Hard","year":2020,"season":"December","question":"Which sampling method ensures every member has an equal chance of being selected?","options":["Purposive sampling","Snowball sampling","Simple Random Sampling","Quota sampling"],"correct_answer":"Simple Random Sampling","explanation":"Simple Random Sampling gives every individual an equal probability of selection."},
     {"id":"ra004","topic":"Research Aptitude","difficulty":"Medium","year":2019,"season":"June","question":"The term 'triangulation' in research refers to:","options":["Geometric analysis","Using multiple methods to validate findings","A statistical test","Sampling technique"],"correct_answer":"Using multiple methods to validate findings","explanation":"Triangulation uses multiple data sources to cross-check and validate research findings."},
     {"id":"ra005","topic":"Research Aptitude","difficulty":"Medium","year":2018,"season":"June","question":"Which research design determines cause-and-effect relationships?","options":["Descriptive","Correlational","Experimental","Ethnographic"],"correct_answer":"Experimental","explanation":"Experimental research establishes causality by manipulating an independent variable."},
     {"id":"ra006","topic":"Research Aptitude","difficulty":"Hard","year":2017,"season":"December","question":"A Type I error in research refers to:","options":["Accepting a false null hypothesis","Rejecting a true null hypothesis","Failing to collect data","Using the wrong test"],"correct_answer":"Rejecting a true null hypothesis","explanation":"A Type I error occurs when the null hypothesis is true but incorrectly rejected."},
+    # ── ADD MORE Research Aptitude QUESTIONS BELOW THIS LINE ──────────
+]
+
+# ── 3. READING COMPREHENSION ─────────────────────────────────────────
+Q_READING_COMPREHENSION = [
     {"id":"rc001","topic":"Reading Comprehension","difficulty":"Medium","year":2023,"season":"December","question":"Inferential comprehension requires the reader to:","options":["Locate directly stated info","Draw conclusions beyond what is stated","Memorize the passage","Summarize only"],"correct_answer":"Draw conclusions beyond what is stated","explanation":"Inferential comprehension involves reading between the lines to draw logical conclusions."},
     {"id":"rc002","topic":"Reading Comprehension","difficulty":"Easy","year":2022,"season":"June","question":"The main idea of a passage is:","options":["A supporting detail","The central thought or theme","The title","A specific example"],"correct_answer":"The central thought or theme","explanation":"The main idea is the primary message the author wants to communicate."},
+    # ── ADD MORE Reading Comprehension QUESTIONS BELOW THIS LINE ──────
+]
+
+# ── 4. COMMUNICATION ─────────────────────────────────────────────────
+Q_COMMUNICATION = [
     {"id":"comm001","topic":"Communication","difficulty":"Medium","year":2023,"season":"June","question":"Which type of communication uses symbols, gestures and body language?","options":["Verbal communication","Non-verbal communication","Written communication","Formal communication"],"correct_answer":"Non-verbal communication","explanation":"Non-verbal communication includes body language, gestures, facial expressions, and other non-linguistic signals."},
     {"id":"comm002","topic":"Communication","difficulty":"Easy","year":2021,"season":"June","question":"'Noise' in the communication process refers to:","options":["Loud sounds only","Any interference disrupting the message","The sender's voice","Background music"],"correct_answer":"Any interference disrupting the message","explanation":"Noise is any barrier — physical, psychological, or semantic — that distorts communication."},
     {"id":"comm003","topic":"Communication","difficulty":"Hard","year":2020,"season":"December","question":"The Shannon-Weaver model of communication is also known as:","options":["Transactional model","Mathematical model","Interactional model","Linear model"],"correct_answer":"Mathematical model","explanation":"Shannon and Weaver's 1949 model, originally developed for telephone communication, is called the Mathematical Model."},
+    # ── ADD MORE Communication QUESTIONS BELOW THIS LINE ─────────────
+]
+
+# ── 5. REASONING ─────────────────────────────────────────────────────
+Q_REASONING = [
     {"id":"rea001","topic":"Reasoning","difficulty":"Medium","year":2023,"season":"June","question":"If all roses are flowers and some flowers fade quickly, which conclusion is valid?","options":["All roses fade quickly","Some roses may fade quickly","No roses fade quickly","All flowers are roses"],"correct_answer":"Some roses may fade quickly","explanation":"From the given premises, we can only conclude that some roses may fade quickly — not all or none."},
     {"id":"rea002","topic":"Reasoning","difficulty":"Hard","year":2022,"season":"December","question":"In a series: 2, 6, 12, 20, 30, __ what is the next number?","options":["40","42","44","48"],"correct_answer":"42","explanation":"Differences: 4,6,8,10,12. Next term = 30+12 = 42. Pattern: n(n+1) for n=1,2,3..."},
     {"id":"rea003","topic":"Reasoning","difficulty":"Easy","year":2021,"season":"June","question":"Which diagram best represents the relationship between Teachers, Professors, and Humans?","options":["Three separate circles","Concentric circles","Two overlapping circles inside one large circle","All identical circles"],"correct_answer":"Two overlapping circles inside one large circle","explanation":"Teachers and Professors are subsets of Humans; they overlap as some professors teach."},
+    # ── ADD MORE Reasoning QUESTIONS BELOW THIS LINE ──────────────────
+]
+
+# ── 6. ICT ───────────────────────────────────────────────────────────
+Q_ICT = [
     {"id":"ict001","topic":"ICT","difficulty":"Easy","year":2023,"season":"December","question":"What does 'www' stand for in a web address?","options":["World Wide Web","World Web Works","Wide World Web","Web World Wire"],"correct_answer":"World Wide Web","explanation":"WWW stands for World Wide Web — the information system accessed via the Internet using URLs."},
     {"id":"ict002","topic":"ICT","difficulty":"Medium","year":2022,"season":"June","question":"Which protocol is used to transfer files over the internet?","options":["HTTP","FTP","SMTP","TCP"],"correct_answer":"FTP","explanation":"FTP (File Transfer Protocol) is specifically designed for transferring files between client and server."},
     {"id":"ict003","topic":"ICT","difficulty":"Hard","year":2019,"season":"December","question":"Which generation of computers used transistors?","options":["First generation","Second generation","Third generation","Fourth generation"],"correct_answer":"Second generation","explanation":"Second-generation computers (1956-1963) used transistors, replacing vacuum tubes."},
     {"id":"ict004","topic":"ICT","difficulty":"Hard","year":2018,"season":"June","question":"Moore's Law states transistor count doubles approximately every:","options":["6 months","1 year","2 years","5 years"],"correct_answer":"2 years","explanation":"Gordon Moore observed in 1965 that transistor count doubles roughly every two years."},
+    # ── ADD MORE ICT QUESTIONS BELOW THIS LINE ────────────────────────
+]
+
+# ── 7. ENVIRONMENT & ECOLOGY ─────────────────────────────────────────
+Q_ENVIRONMENT = [
     {"id":"env001","topic":"Environment & Ecology","difficulty":"Medium","year":2023,"season":"June","question":"The 'Paris Agreement' primarily addresses:","options":["Nuclear non-proliferation","Climate change and global warming","Trade barriers","Ozone depletion"],"correct_answer":"Climate change and global warming","explanation":"The Paris Agreement (2015) limits global warming to well below 2 degrees Celsius."},
     {"id":"env002","topic":"Environment & Ecology","difficulty":"Easy","year":2022,"season":"December","question":"Which gas is primarily responsible for the greenhouse effect?","options":["Oxygen","Nitrogen","Carbon Dioxide","Hydrogen"],"correct_answer":"Carbon Dioxide","explanation":"CO2 is the primary anthropogenic greenhouse gas."},
     {"id":"env003","topic":"Environment & Ecology","difficulty":"Hard","year":2021,"season":"June","question":"The 'Chipko Movement' in India was primarily associated with:","options":["Water conservation","Forest and tree conservation","Wildlife protection","Soil conservation"],"correct_answer":"Forest and tree conservation","explanation":"The Chipko Movement (1973) was a protest where villagers embraced trees to prevent their felling."},
+    # ── ADD MORE Environment & Ecology QUESTIONS BELOW THIS LINE ──────
+]
+
+# ── 8. HIGHER EDUCATION ──────────────────────────────────────────────
+Q_HIGHER_EDUCATION = [
     {"id":"he001","topic":"Higher Education","difficulty":"Medium","year":2023,"season":"December","question":"The NEP 2020 recommends the school curriculum to be restructured as:","options":["10+2","5+3+3+4","8+4","6+3+2+1"],"correct_answer":"5+3+3+4","explanation":"NEP 2020 proposes a 5+3+3+4 curricular structure."},
     {"id":"he002","topic":"Higher Education","difficulty":"Easy","year":2022,"season":"June","question":"UGC stands for:","options":["University Grants Commission","United Graduates Council","Universal Government College","University General Council"],"correct_answer":"University Grants Commission","explanation":"UGC is the statutory body for coordination and maintenance of standards in higher education."},
     {"id":"he003","topic":"Higher Education","difficulty":"Hard","year":2020,"season":"December","question":"'Autonomous Institutions' in Indian higher education means:","options":["Complete independence","Freedom to design curriculum and conduct exams","Government-funded colleges","Deemed universities"],"correct_answer":"Freedom to design curriculum and conduct exams","explanation":"Autonomous institutions have freedom to design curriculum, conduct exams, and declare results."},
+    # ── ADD MORE Higher Education QUESTIONS BELOW THIS LINE ───────────
+]
+
+# ── 9. INDIAN CONSTITUTION & GOVERNANCE ─────────────────────────────
+Q_GOVERNANCE = [
     {"id":"gov001","topic":"Indian Constitution & Governance","difficulty":"Easy","year":2023,"season":"June","question":"The Preamble describes India as:","options":["Federal, Democratic Republic","Sovereign, Socialist, Secular, Democratic Republic","Federal, Socialist State","Secular Parliamentary Democracy"],"correct_answer":"Sovereign, Socialist, Secular, Democratic Republic","explanation":"The Preamble declares India to be a Sovereign, Socialist, Secular, Democratic Republic."},
     {"id":"gov002","topic":"Indian Constitution & Governance","difficulty":"Medium","year":2022,"season":"December","question":"Which Article guarantees Right to Education?","options":["Article 19","Article 21A","Article 25","Article 32"],"correct_answer":"Article 21A","explanation":"Article 21A provides free and compulsory education to children aged 6-14."},
     {"id":"gov003","topic":"Indian Constitution & Governance","difficulty":"Hard","year":2021,"season":"June","question":"The 'Basic Structure' doctrine was established by:","options":["Golaknath case (1967)","Kesavananda Bharati case (1973)","Minerva Mills case (1980)","Maneka Gandhi case (1978)"],"correct_answer":"Kesavananda Bharati case (1973)","explanation":"The Basic Structure Doctrine established that Parliament cannot alter the basic structure of the Constitution."},
+    # ── ADD MORE Indian Constitution & Governance QUESTIONS BELOW ─────
+]
+
+# ── 10. DATA INTERPRETATION ──────────────────────────────────────────
+Q_DATA_INTERPRETATION = [
     {"id":"di001","topic":"Data Interpretation","difficulty":"Medium","year":2023,"season":"June","question":"If the mean of 5 numbers is 30 and mean of 3 of them is 20, what is mean of remaining 2?","options":["35","45","40","50"],"correct_answer":"45","explanation":"Total=150, Sum of 3=60, Remaining=90, Mean=45."},
     {"id":"di002","topic":"Data Interpretation","difficulty":"Easy","year":2022,"season":"June","question":"Which measure of central tendency is most affected by extreme values?","options":["Mode","Median","Mean","None"],"correct_answer":"Mean","explanation":"The arithmetic mean is significantly affected by extreme values."},
     {"id":"di003","topic":"Data Interpretation","difficulty":"Hard","year":2021,"season":"December","question":"The coefficient of variation (CV) is calculated as:","options":["(Mean/SD)x100","(SD/Mean)x100","SD x Mean","Mean/Variance"],"correct_answer":"(SD/Mean)x100","explanation":"CV = (SD/Mean) x 100, expressing variability as a percentage of mean."},
+    # ── ADD MORE Data Interpretation QUESTIONS BELOW THIS LINE ────────
 ]
 
-# AI Predicted questions (marked with predicted=True)
-AI_PREDICTED_QUESTIONS = [
+# ── AI PREDICTED (upcoming exam focus) ───────────────────────────────
+Q_AI_PREDICTED = [
     {"id":"ai001","topic":"Teaching Aptitude","difficulty":"Hard","year":2025,"season":"June","predicted":True,"question":"Based on NEP 2020 implementation trends, which pedagogical shift is most likely to be tested?","options":["Shift from rote learning to competency-based education","Increased emphasis on standardized testing","Reduction in teacher training programs","Focus on single-language instruction"],"correct_answer":"Shift from rote learning to competency-based education","explanation":"NEP 2020 emphasizes competency-based education as a core reform — highly likely to appear in upcoming exams."},
     {"id":"ai002","topic":"Research Aptitude","difficulty":"Medium","year":2025,"season":"June","predicted":True,"question":"With increasing use of AI in research, which ethical concern is most prominent?","options":["Data fabrication","Algorithmic bias and transparency","Plagiarism only","Sample size issues"],"correct_answer":"Algorithmic bias and transparency","explanation":"AI-driven research raises significant concerns about algorithmic bias, reproducibility, and transparency — a trending exam topic."},
     {"id":"ai003","topic":"ICT","difficulty":"Medium","year":2025,"season":"June","predicted":True,"question":"Which technology is central to India's Digital India initiative for education?","options":["Blockchain","Cloud computing and mobile internet","Quantum computing","5G only"],"correct_answer":"Cloud computing and mobile internet","explanation":"Digital India's education thrust relies on cloud-based platforms and mobile internet access for DIKSHA, SWAYAM, etc."},
     {"id":"ai004","topic":"Environment & Ecology","difficulty":"Hard","year":2025,"season":"June","predicted":True,"question":"India's National Action Plan on Climate Change (NAPCC) includes how many missions?","options":["6","8","10","12"],"correct_answer":"8","explanation":"NAPCC has 8 national missions covering solar energy, water, forests, sustainable agriculture, etc. — frequently tested."},
     {"id":"ai005","topic":"Higher Education","difficulty":"Medium","year":2025,"season":"December","predicted":True,"question":"The Academic Bank of Credits (ABC) under NEP 2020 primarily facilitates:","options":["Financial aid to students","Multiple entry/exit and credit transfer","Faculty recruitment","Research funding"],"correct_answer":"Multiple entry/exit and credit transfer","explanation":"ABC enables credit accumulation and transfer, supporting flexible degree completion pathways under NEP 2020."},
+    # ── ADD MORE AI Predicted QUESTIONS BELOW THIS LINE ───────────────
 ]
+
+# ── Master list: all topics combined ─────────────────────────────────
+BUILTIN_QUESTIONS = (
+    Q_TEACHING_APTITUDE +
+    Q_RESEARCH_APTITUDE +
+    Q_READING_COMPREHENSION +
+    Q_COMMUNICATION +
+    Q_REASONING +
+    Q_ICT +
+    Q_ENVIRONMENT +
+    Q_HIGHER_EDUCATION +
+    Q_GOVERNANCE +
+    Q_DATA_INTERPRETATION
+)
+AI_PREDICTED_QUESTIONS = Q_AI_PREDICTED
 
 
 class QuestionBank:
@@ -1102,7 +1180,7 @@ def page_home():
     st.markdown(f"""
     <div class="hero">
       <div class="hero-badge">🏛️ UGC NET &nbsp;·&nbsp; Paper 1 &nbsp;·&nbsp; NYZTrade Education</div>
-      <h1 class="hero-title">Master NET with<br><em>ZODHA Research</em></h1>
+      <h1 class="hero-title">Master NET with<br><em>Intelligent Practice</em></h1>
       <div class="hero-features">
         <span class="hero-pill"><span class="pill-icon">📅</span> PYQ Year-wise Tests</span>
         <span class="hero-pill"><span class="pill-icon">🧪</span> Mock &amp; Exam Simulation</span>
