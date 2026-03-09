@@ -2135,11 +2135,8 @@ def page_quiz():
     ai_tag = ""  # AI tag removed from display
     is_exam_sim = (mode == "exam_sim")
 
-    # Layout
-    if mode in ("exam", "exam_sim"):
-        col_q, col_nav = st.columns([3, 1])
-    else:
-        col_q = col_nav = None
+    # Layout — full width always (navigator removed)
+    col_q = col_nav = None
 
     def _render_body():
         # ── Header / Timer ──
@@ -2312,76 +2309,19 @@ def page_quiz():
                         st.session_state.bookmarks.add(bm_id2)
                     st.rerun()
 
-    # Render in correct container
-    if col_q is not None:
-        with col_q:
-            _render_body()
-    else:
-        _render_body()
+    # Render quiz body (full width)
+    _render_body()
 
-    # ── Exam navigator panel (CLICKABLE) ─────────────────────────────
-    if mode in ("exam", "exam_sim") and col_nav is not None:
-        with col_nav:
-            answered_count = sum(1 for a in st.session_state.answers.values() if not a.get("skipped"))
-
-            st.markdown('<div class="exam-panel-title">QUESTION NAVIGATOR</div>', unsafe_allow_html=True)
-
-            # Navigator button CSS
-            st.markdown("""<style>
-            .nav-btn-grid {display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:0.5rem;}
-            .nav-btn {border:1px solid rgba(255,255,255,0.15);border-radius:6px;text-align:center;
-                      padding:5px 2px;font-size:0.72rem;font-weight:600;cursor:pointer;
-                      background:rgba(255,255,255,0.05);color:var(--t1);line-height:1;}
-            .nav-btn.current  {background:var(--violet)!important;border-color:var(--violet)!important;
-                               color:#fff!important;box-shadow:0 0 8px rgba(139,92,246,0.6);}
-            .nav-btn.answered {background:var(--green)!important;border-color:var(--green)!important;color:#000!important;}
-            .nav-btn.skipped  {background:var(--gold)!important;border-color:var(--gold)!important;color:#000!important;}
-            </style>""", unsafe_allow_html=True)
-
-            # Render color indicator row (visual only)
-            nav_html = '<div class="nav-btn-grid">'
-            for qi in range(total):
-                if qi == idx:            cls = "nav-btn current"
-                elif qi in st.session_state.answers:
-                    cls = "nav-btn answered" if not st.session_state.answers[qi].get("skipped") else "nav-btn skipped"
-                else:                    cls = "nav-btn"
-                nav_html += f'<div class="{cls}">{qi+1}</div>'
-            nav_html += '</div>'
-            st.markdown(nav_html, unsafe_allow_html=True)
-
-            # Clickable jump buttons — compact rows of 7
-            cols_per_row = 7
-            for row_start in range(0, total, cols_per_row):
-                row_qs = list(range(row_start, min(row_start + cols_per_row, total)))
-                btn_cols = st.columns(len(row_qs))
-                for bi, qi in enumerate(row_qs):
-                    with btn_cols[bi]:
-                        btn_label = str(qi + 1)
-                        if st.button(btn_label, key=f"nav_q_{qi}",
-                                     use_container_width=True,
-                                     help=f"Jump to Question {qi+1}"):
-                            st.session_state.quiz_idx = qi
-                            st.rerun()
-
-            # Legend + stats
-            st.markdown(f"""
-            <div style="margin-top:0.5rem;display:flex;gap:0.75rem;flex-wrap:wrap;font-size:0.7rem;color:var(--t2);">
-              <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;
-                background:var(--violet);margin-right:3px;vertical-align:middle;"></span>Now</span>
-              <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;
-                background:var(--green);margin-right:3px;vertical-align:middle;"></span>Done</span>
-              <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;
-                background:var(--gold);margin-right:3px;vertical-align:middle;"></span>Skip</span>
-            </div>
-            <div style="margin-top:0.35rem;font-size:0.78rem;color:var(--t2);">
-              Answered: <b style="color:var(--green);">{answered_count}</b> / {total}
-            </div>""", unsafe_allow_html=True)
-
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("🏁 Submit Exam", key="exam_submit", use_container_width=True, type="primary"):
-                st.session_state.quiz_done = True
-                st.session_state.score = sum(1 for a in st.session_state.answers.values() if a.get("correct"))
-                st.rerun()
+    # Submit Exam button for exam/exam_sim modes
+    if mode in ("exam", "exam_sim"):
+        answered_count = sum(1 for a in st.session_state.answers.values() if not a.get("skipped"))
+        st.markdown(
+            f'<div style="text-align:right;font-size:0.8rem;color:var(--t2);margin-bottom:0.4rem;">'            f'Answered: <b style="color:var(--green);">{answered_count}</b> / {total}</div>',
+            unsafe_allow_html=True)
+        if st.button("🏁 Submit Exam", key="exam_submit", use_container_width=True, type="primary"):
+            st.session_state.quiz_done = True
+            st.session_state.score = sum(1 for a in st.session_state.answers.values() if a.get("correct"))
+            st.rerun()
 
 
 def page_quiz_config():
