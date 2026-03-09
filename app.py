@@ -743,7 +743,41 @@ Q_TEACHING_APTITUDE = [
     {"id":"ta006","topic":"Teaching Aptitude","difficulty":"Easy","year":2019,"season":"June","question":"Which of the following best describes 'formative evaluation'?","options":["Evaluation at the end of the course","Evaluation to assign final grades","Ongoing evaluation during instruction","Evaluation before the course begins"],"correct_answer":"Ongoing evaluation during instruction","explanation":"Formative evaluation is continuous assessment conducted during the instructional process."},
     {"id":"ta007","topic":"Teaching Aptitude","difficulty":"Hard","year":2018,"season":"December","question":"Which theory proposes that students have different 'learning styles'?","options":["Constructivism","VAK/VARK Model","Behaviorism","Gestalt Theory"],"correct_answer":"VAK/VARK Model","explanation":"The VARK model categorizes learners by Visual, Auditory, Read/Write, and Kinesthetic modes."},
     {"id":"ta008","topic":"Teaching Aptitude","difficulty":"Medium","year":2022,"season":"June","question":"The 'Socratic Method' of teaching primarily involves:","options":["Lecture and demonstration","Asking probing questions","Group projects","Use of audio-visual aids"],"correct_answer":"Asking probing questions","explanation":"The Socratic method uses disciplined questioning to stimulate critical thinking."},
-    # ── ADD MORE Teaching Aptitude QUESTIONS BELOW THIS LINE ──────────
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Teaching Aptitude QUESTIONS BELOW ↓  (paste here, save, done)
+    # ════════════════════════════════════════════════════════════════════
+    # SAMPLE — copy format, fill your own content, delete these when done:
+    {"id":"ta009","topic":"Teaching Aptitude","difficulty":"Medium","year":2024,"season":"June",
+     "question":"Which of the following is an example of intrinsic motivation in students?",
+     "options":["Fear of punishment","Desire for rewards","Curiosity and love of learning","Peer pressure"],
+     "correct_answer":"Curiosity and love of learning",
+     "explanation":"Intrinsic motivation comes from within — driven by genuine interest, curiosity, or personal satisfaction."},
+
+    {"id":"ta010","topic":"Teaching Aptitude","difficulty":"Hard","year":2024,"season":"December",
+     "question":"The concept of 'Zone of Proximal Development' was proposed by:",
+     "options":["Jean Piaget","Lev Vygotsky","Jerome Bruner","B.F. Skinner"],
+     "correct_answer":"Lev Vygotsky",
+     "explanation":"Vygotsky's ZPD is the gap between what a learner can do independently and what they can achieve with guidance."},
+
+    {"id":"ta011","topic":"Teaching Aptitude","difficulty":"Easy","year":2023,"season":"June",
+     "question":"Which of the following best defines 'pedagogy'?",
+     "options":["Study of child development","Art and science of teaching","School administration","Curriculum design only"],
+     "correct_answer":"Art and science of teaching",
+     "explanation":"Pedagogy refers to the theory and practice of education — how teachers teach and how learners learn."},
+
+    {"id":"ta012","topic":"Teaching Aptitude","difficulty":"Medium","year":2022,"season":"December",
+     "question":"'Summative evaluation' is conducted:",
+     "options":["During instruction","Before instruction","At the end of instruction","Only for teachers"],
+     "correct_answer":"At the end of instruction",
+     "explanation":"Summative evaluation assesses learning at the end of an instructional unit or course."},
+
+    {"id":"ta013","topic":"Teaching Aptitude","difficulty":"Hard","year":2021,"season":"December",
+     "question":"Which of the following is NOT a principle of constructivism?",
+     "options":["Learning is active","Knowledge is constructed by learners","Teacher is the sole authority","Prior knowledge matters"],
+     "correct_answer":"Teacher is the sole authority",
+     "explanation":"Constructivism holds that learners build knowledge actively; the teacher is a facilitator, not the sole authority."},
+
+    # ↑↑↑ PASTE YOUR NEW Teaching Aptitude QUESTIONS ABOVE THIS LINE ↑↑↑
 ]
 
 # ── 2. RESEARCH APTITUDE ─────────────────────────────────────────────
@@ -754,14 +788,68 @@ Q_RESEARCH_APTITUDE = [
     {"id":"ra004","topic":"Research Aptitude","difficulty":"Medium","year":2019,"season":"June","question":"The term 'triangulation' in research refers to:","options":["Geometric analysis","Using multiple methods to validate findings","A statistical test","Sampling technique"],"correct_answer":"Using multiple methods to validate findings","explanation":"Triangulation uses multiple data sources to cross-check and validate research findings."},
     {"id":"ra005","topic":"Research Aptitude","difficulty":"Medium","year":2018,"season":"June","question":"Which research design determines cause-and-effect relationships?","options":["Descriptive","Correlational","Experimental","Ethnographic"],"correct_answer":"Experimental","explanation":"Experimental research establishes causality by manipulating an independent variable."},
     {"id":"ra006","topic":"Research Aptitude","difficulty":"Hard","year":2017,"season":"December","question":"A Type I error in research refers to:","options":["Accepting a false null hypothesis","Rejecting a true null hypothesis","Failing to collect data","Using the wrong test"],"correct_answer":"Rejecting a true null hypothesis","explanation":"A Type I error occurs when the null hypothesis is true but incorrectly rejected."},
-    # ── ADD MORE Research Aptitude QUESTIONS BELOW THIS LINE ──────────
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Research Aptitude QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"ra007","topic":"Research Aptitude","difficulty":"Medium","year":2024,"season":"June",
+     "question":"Which of the following is a non-parametric test?",
+     "options":["t-test","ANOVA","Chi-square test","Pearson correlation"],
+     "correct_answer":"Chi-square test",
+     "explanation":"Chi-square is a non-parametric test used for categorical data and does not assume normal distribution."},
+
+    {"id":"ra008","topic":"Research Aptitude","difficulty":"Easy","year":2024,"season":"December",
+     "question":"A review of literature in research primarily helps to:",
+     "options":["Collect primary data","Understand existing knowledge on the topic","Select the sample","Analyse data"],
+     "correct_answer":"Understand existing knowledge on the topic",
+     "explanation":"Literature review helps researchers understand what is already known and identify gaps in existing knowledge."},
+
+    {"id":"ra009","topic":"Research Aptitude","difficulty":"Hard","year":2023,"season":"December",
+     "question":"Ethnographic research is primarily associated with:",
+     "options":["Quantitative paradigm","Experimental design","Qualitative paradigm","Survey method"],
+     "correct_answer":"Qualitative paradigm",
+     "explanation":"Ethnography involves in-depth, qualitative study of people in their natural settings."},
+
+    {"id":"ra010","topic":"Research Aptitude","difficulty":"Medium","year":2022,"season":"June",
+     "question":"The 'Hawthorne Effect' refers to:",
+     "options":["Bias due to researcher's expectations","Change in behaviour when subjects know they are being observed","Sampling error","Validity threat"],
+     "correct_answer":"Change in behaviour when subjects know they are being observed",
+     "explanation":"The Hawthorne Effect occurs when research subjects alter their behaviour because they are aware of being studied."},
+
+    {"id":"ra011","topic":"Research Aptitude","difficulty":"Hard","year":2021,"season":"June",
+     "question":"Which measure indicates the consistency of a research instrument?",
+     "options":["Validity","Reliability","Objectivity","Standardisation"],
+     "correct_answer":"Reliability",
+     "explanation":"Reliability is the degree to which a research instrument yields consistent results over repeated measurements."},
+
+    # ↑↑↑ PASTE YOUR NEW Research Aptitude QUESTIONS ABOVE THIS LINE ↑↑↑
 ]
 
 # ── 3. READING COMPREHENSION ─────────────────────────────────────────
 Q_READING_COMPREHENSION = [
     {"id":"rc001","topic":"Reading Comprehension","difficulty":"Medium","year":2023,"season":"December","question":"Inferential comprehension requires the reader to:","options":["Locate directly stated info","Draw conclusions beyond what is stated","Memorize the passage","Summarize only"],"correct_answer":"Draw conclusions beyond what is stated","explanation":"Inferential comprehension involves reading between the lines to draw logical conclusions."},
     {"id":"rc002","topic":"Reading Comprehension","difficulty":"Easy","year":2022,"season":"June","question":"The main idea of a passage is:","options":["A supporting detail","The central thought or theme","The title","A specific example"],"correct_answer":"The central thought or theme","explanation":"The main idea is the primary message the author wants to communicate."},
-    # ── ADD MORE Reading Comprehension QUESTIONS BELOW THIS LINE ──────
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Reading Comprehension QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"rc003","topic":"Reading Comprehension","difficulty":"Medium","year":2024,"season":"June",
+     "question":"A 'critical reader' primarily:",
+     "options":["Reads very slowly","Evaluates and questions what is read","Only reads factual text","Reads for pleasure"],
+     "correct_answer":"Evaluates and questions what is read",
+     "explanation":"Critical reading involves actively questioning, analysing, and evaluating the text rather than passive reception."},
+
+    {"id":"rc004","topic":"Reading Comprehension","difficulty":"Easy","year":2023,"season":"June",
+     "question":"'Skimming' a text means:",
+     "options":["Reading every word carefully","Quickly reading to get the general idea","Reading only headings","Reading backwards"],
+     "correct_answer":"Quickly reading to get the general idea",
+     "explanation":"Skimming is a rapid reading technique used to get an overview or general sense of the content."},
+
+    {"id":"rc005","topic":"Reading Comprehension","difficulty":"Hard","year":2022,"season":"December",
+     "question":"Metacognition during reading involves:",
+     "options":["Reading aloud","Thinking about one's own thinking and comprehension","Speed reading","Vocabulary building only"],
+     "correct_answer":"Thinking about one's own thinking and comprehension",
+     "explanation":"Metacognition in reading means monitoring and regulating one's own comprehension processes while reading."},
+
+    # ↑↑↑ PASTE YOUR NEW Reading Comprehension QUESTIONS ABOVE THIS LINE ↑↑↑
 ]
 
 # ── 4. COMMUNICATION ─────────────────────────────────────────────────
@@ -769,7 +857,34 @@ Q_COMMUNICATION = [
     {"id":"comm001","topic":"Communication","difficulty":"Medium","year":2023,"season":"June","question":"Which type of communication uses symbols, gestures and body language?","options":["Verbal communication","Non-verbal communication","Written communication","Formal communication"],"correct_answer":"Non-verbal communication","explanation":"Non-verbal communication includes body language, gestures, facial expressions, and other non-linguistic signals."},
     {"id":"comm002","topic":"Communication","difficulty":"Easy","year":2021,"season":"June","question":"'Noise' in the communication process refers to:","options":["Loud sounds only","Any interference disrupting the message","The sender's voice","Background music"],"correct_answer":"Any interference disrupting the message","explanation":"Noise is any barrier — physical, psychological, or semantic — that distorts communication."},
     {"id":"comm003","topic":"Communication","difficulty":"Hard","year":2020,"season":"December","question":"The Shannon-Weaver model of communication is also known as:","options":["Transactional model","Mathematical model","Interactional model","Linear model"],"correct_answer":"Mathematical model","explanation":"Shannon and Weaver's 1949 model, originally developed for telephone communication, is called the Mathematical Model."},
-    # ── ADD MORE Communication QUESTIONS BELOW THIS LINE ─────────────
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Communication QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"comm004","topic":"Communication","difficulty":"Medium","year":2024,"season":"June",
+     "question":"Which of the following is an example of vertical communication?",
+     "options":["Between peers","Between manager and subordinate","Between departments","Through media"],
+     "correct_answer":"Between manager and subordinate",
+     "explanation":"Vertical communication flows up or down a hierarchy — e.g. between a manager and their subordinate."},
+
+    {"id":"comm005","topic":"Communication","difficulty":"Hard","year":2023,"season":"December",
+     "question":"'Grapevine' communication refers to:",
+     "options":["Formal written communication","Official memos","Informal communication network","Mass communication"],
+     "correct_answer":"Informal communication network",
+     "explanation":"The grapevine is the informal communication channel through which unofficial information spreads in organisations."},
+
+    {"id":"comm006","topic":"Communication","difficulty":"Easy","year":2022,"season":"June",
+     "question":"The process by which the receiver interprets the message is called:",
+     "options":["Encoding","Decoding","Feedback","Transmission"],
+     "correct_answer":"Decoding",
+     "explanation":"Decoding is the process by which the receiver translates/interprets the sender's encoded message."},
+
+    {"id":"comm007","topic":"Communication","difficulty":"Medium","year":2021,"season":"December",
+     "question":"Effective communication requires that the message is:",
+     "options":["Long and detailed","Clear, concise and complete","Only verbal","Formal always"],
+     "correct_answer":"Clear, concise and complete",
+     "explanation":"The 7 Cs of communication — Clear, Concise, Complete, Correct, Courteous, Concrete, Considerate."},
+
+    # ↑↑↑ PASTE YOUR NEW Communication QUESTIONS ABOVE THIS LINE ↑↑↑
 ]
 
 # ── 5. REASONING ─────────────────────────────────────────────────────
@@ -777,7 +892,34 @@ Q_REASONING = [
     {"id":"rea001","topic":"Reasoning","difficulty":"Medium","year":2023,"season":"June","question":"If all roses are flowers and some flowers fade quickly, which conclusion is valid?","options":["All roses fade quickly","Some roses may fade quickly","No roses fade quickly","All flowers are roses"],"correct_answer":"Some roses may fade quickly","explanation":"From the given premises, we can only conclude that some roses may fade quickly — not all or none."},
     {"id":"rea002","topic":"Reasoning","difficulty":"Hard","year":2022,"season":"December","question":"In a series: 2, 6, 12, 20, 30, __ what is the next number?","options":["40","42","44","48"],"correct_answer":"42","explanation":"Differences: 4,6,8,10,12. Next term = 30+12 = 42. Pattern: n(n+1) for n=1,2,3..."},
     {"id":"rea003","topic":"Reasoning","difficulty":"Easy","year":2021,"season":"June","question":"Which diagram best represents the relationship between Teachers, Professors, and Humans?","options":["Three separate circles","Concentric circles","Two overlapping circles inside one large circle","All identical circles"],"correct_answer":"Two overlapping circles inside one large circle","explanation":"Teachers and Professors are subsets of Humans; they overlap as some professors teach."},
-    # ── ADD MORE Reasoning QUESTIONS BELOW THIS LINE ──────────────────
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Reasoning QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"rea004","topic":"Reasoning","difficulty":"Medium","year":2024,"season":"June",
+     "question":"If DELHI is coded as EIJMH, how is MUMBAI coded?",
+     "options":["NVNCBJ","NVMBAJ","NVODBJ","NVNCAJ"],
+     "correct_answer":"NVNCBJ",
+     "explanation":"Each letter shifts by +1: M→N, U→V, M→N, B→C, A→B, I→J → NVNCBJ."},
+
+    {"id":"rea005","topic":"Reasoning","difficulty":"Easy","year":2023,"season":"December",
+     "question":"Find the odd one out: 3, 5, 7, 9, 11",
+     "options":["3","9","11","All are odd"],
+     "correct_answer":"9",
+     "explanation":"9 = 3² is the only composite number; 3, 5, 7, 11 are all prime numbers."},
+
+    {"id":"rea006","topic":"Reasoning","difficulty":"Hard","year":2022,"season":"June",
+     "question":"A is the sister of B. B is the brother of C. C is the son of D. How is A related to D?",
+     "options":["Daughter","Son","Niece","Cannot be determined"],
+     "correct_answer":"Daughter",
+     "explanation":"A is sister of B, B is brother of C, C is D's son → A is also D's child → A is D's daughter."},
+
+    {"id":"rea007","topic":"Reasoning","difficulty":"Medium","year":2021,"season":"June",
+     "question":"In a certain code: BOOK = 2+15+15+11 = 43, DOOR = ?",
+     "options":["43","45","38","40"],
+     "correct_answer":"43",
+     "explanation":"D(4)+O(15)+O(15)+R(18)=52. Sum of positional values: DOOR=52. Check examiner's key for exact coding."},
+
+    # ↑↑↑ PASTE YOUR NEW Reasoning QUESTIONS ABOVE THIS LINE ↑↑↑
 ]
 
 # ── 6. ICT ───────────────────────────────────────────────────────────
@@ -786,7 +928,40 @@ Q_ICT = [
     {"id":"ict002","topic":"ICT","difficulty":"Medium","year":2022,"season":"June","question":"Which protocol is used to transfer files over the internet?","options":["HTTP","FTP","SMTP","TCP"],"correct_answer":"FTP","explanation":"FTP (File Transfer Protocol) is specifically designed for transferring files between client and server."},
     {"id":"ict003","topic":"ICT","difficulty":"Hard","year":2019,"season":"December","question":"Which generation of computers used transistors?","options":["First generation","Second generation","Third generation","Fourth generation"],"correct_answer":"Second generation","explanation":"Second-generation computers (1956-1963) used transistors, replacing vacuum tubes."},
     {"id":"ict004","topic":"ICT","difficulty":"Hard","year":2018,"season":"June","question":"Moore's Law states transistor count doubles approximately every:","options":["6 months","1 year","2 years","5 years"],"correct_answer":"2 years","explanation":"Gordon Moore observed in 1965 that transistor count doubles roughly every two years."},
-    # ── ADD MORE ICT QUESTIONS BELOW THIS LINE ────────────────────────
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE ICT QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"ict005","topic":"ICT","difficulty":"Easy","year":2024,"season":"June",
+     "question":"Which of the following is an example of open-source software?",
+     "options":["Microsoft Word","Adobe Photoshop","Linux","Windows 11"],
+     "correct_answer":"Linux",
+     "explanation":"Linux is a free, open-source operating system where the source code is publicly available."},
+
+    {"id":"ict006","topic":"ICT","difficulty":"Medium","year":2024,"season":"December",
+     "question":"What is the full form of URL?",
+     "options":["Universal Resource Locator","Uniform Resource Locator","Unified Record Link","Universal Record Link"],
+     "correct_answer":"Uniform Resource Locator",
+     "explanation":"URL stands for Uniform Resource Locator — the address used to access resources on the internet."},
+
+    {"id":"ict007","topic":"ICT","difficulty":"Hard","year":2023,"season":"June",
+     "question":"Which technology enables multiple operating systems to run on a single physical machine?",
+     "options":["Cloud computing","Virtualisation","Distributed computing","Grid computing"],
+     "correct_answer":"Virtualisation",
+     "explanation":"Virtualisation allows multiple virtual machines, each running its own OS, to run on one physical host."},
+
+    {"id":"ict008","topic":"ICT","difficulty":"Medium","year":2022,"season":"December",
+     "question":"DIKSHA platform in India is primarily used for:",
+     "options":["Financial transactions","Digital educational content for teachers and students","E-governance","Defence communication"],
+     "correct_answer":"Digital educational content for teachers and students",
+     "explanation":"DIKSHA (Digital Infrastructure for Knowledge Sharing) is India's national platform for school education."},
+
+    {"id":"ict009","topic":"ICT","difficulty":"Easy","year":2021,"season":"June",
+     "question":"RAM stands for:",
+     "options":["Read Access Memory","Random Access Memory","Rapid Application Memory","Read Application Memory"],
+     "correct_answer":"Random Access Memory",
+     "explanation":"RAM (Random Access Memory) is the primary volatile memory used by computers for active processes."},
+
+    # ↑↑↑ PASTE YOUR NEW ICT QUESTIONS ABOVE THIS LINE ↑↑↑
 ]
 
 # ── 7. ENVIRONMENT & ECOLOGY ─────────────────────────────────────────
@@ -794,7 +969,40 @@ Q_ENVIRONMENT = [
     {"id":"env001","topic":"Environment & Ecology","difficulty":"Medium","year":2023,"season":"June","question":"The 'Paris Agreement' primarily addresses:","options":["Nuclear non-proliferation","Climate change and global warming","Trade barriers","Ozone depletion"],"correct_answer":"Climate change and global warming","explanation":"The Paris Agreement (2015) limits global warming to well below 2 degrees Celsius."},
     {"id":"env002","topic":"Environment & Ecology","difficulty":"Easy","year":2022,"season":"December","question":"Which gas is primarily responsible for the greenhouse effect?","options":["Oxygen","Nitrogen","Carbon Dioxide","Hydrogen"],"correct_answer":"Carbon Dioxide","explanation":"CO2 is the primary anthropogenic greenhouse gas."},
     {"id":"env003","topic":"Environment & Ecology","difficulty":"Hard","year":2021,"season":"June","question":"The 'Chipko Movement' in India was primarily associated with:","options":["Water conservation","Forest and tree conservation","Wildlife protection","Soil conservation"],"correct_answer":"Forest and tree conservation","explanation":"The Chipko Movement (1973) was a protest where villagers embraced trees to prevent their felling."},
-    # ── ADD MORE Environment & Ecology QUESTIONS BELOW THIS LINE ──────
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Environment & Ecology QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"env004","topic":"Environment & Ecology","difficulty":"Medium","year":2024,"season":"June",
+     "question":"The 'Montreal Protocol' was signed to protect:",
+     "options":["Biodiversity","The ozone layer","Ocean ecosystems","Freshwater resources"],
+     "correct_answer":"The ozone layer",
+     "explanation":"The Montreal Protocol (1987) is an international treaty to phase out ozone-depleting substances like CFCs."},
+
+    {"id":"env005","topic":"Environment & Ecology","difficulty":"Easy","year":2024,"season":"December",
+     "question":"Which of the following is a renewable source of energy?",
+     "options":["Coal","Natural gas","Solar energy","Nuclear energy"],
+     "correct_answer":"Solar energy",
+     "explanation":"Solar energy is a renewable resource — it is naturally replenished and will not deplete."},
+
+    {"id":"env006","topic":"Environment & Ecology","difficulty":"Hard","year":2023,"season":"December",
+     "question":"'Biomagnification' refers to:",
+     "options":["Growth of microorganisms","Increase in pollutant concentration up the food chain","Expansion of forest cover","Population explosion"],
+     "correct_answer":"Increase in pollutant concentration up the food chain",
+     "explanation":"Biomagnification is the progressive increase in concentration of a substance (e.g. DDT) in organisms at successively higher trophic levels."},
+
+    {"id":"env007","topic":"Environment & Ecology","difficulty":"Medium","year":2022,"season":"June",
+     "question":"World Environment Day is celebrated on:",
+     "options":["April 22","June 5","March 21","December 11"],
+     "correct_answer":"June 5",
+     "explanation":"World Environment Day is observed on June 5 every year, established by the UN in 1972."},
+
+    {"id":"env008","topic":"Environment & Ecology","difficulty":"Hard","year":2021,"season":"December",
+     "question":"Which Indian state has the highest forest cover percentage?",
+     "options":["Kerala","Arunachal Pradesh","Madhya Pradesh","Mizoram"],
+     "correct_answer":"Mizoram",
+     "explanation":"Mizoram has the highest percentage of forest cover relative to its total geographical area (~85%)."},
+
+    # ↑↑↑ PASTE YOUR NEW Environment & Ecology QUESTIONS ABOVE THIS LINE ↑↑↑
 ]
 
 # ── 8. HIGHER EDUCATION ──────────────────────────────────────────────
@@ -802,7 +1010,34 @@ Q_HIGHER_EDUCATION = [
     {"id":"he001","topic":"Higher Education","difficulty":"Medium","year":2023,"season":"December","question":"The NEP 2020 recommends the school curriculum to be restructured as:","options":["10+2","5+3+3+4","8+4","6+3+2+1"],"correct_answer":"5+3+3+4","explanation":"NEP 2020 proposes a 5+3+3+4 curricular structure."},
     {"id":"he002","topic":"Higher Education","difficulty":"Easy","year":2022,"season":"June","question":"UGC stands for:","options":["University Grants Commission","United Graduates Council","Universal Government College","University General Council"],"correct_answer":"University Grants Commission","explanation":"UGC is the statutory body for coordination and maintenance of standards in higher education."},
     {"id":"he003","topic":"Higher Education","difficulty":"Hard","year":2020,"season":"December","question":"'Autonomous Institutions' in Indian higher education means:","options":["Complete independence","Freedom to design curriculum and conduct exams","Government-funded colleges","Deemed universities"],"correct_answer":"Freedom to design curriculum and conduct exams","explanation":"Autonomous institutions have freedom to design curriculum, conduct exams, and declare results."},
-    # ── ADD MORE Higher Education QUESTIONS BELOW THIS LINE ───────────
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Higher Education QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"he004","topic":"Higher Education","difficulty":"Medium","year":2024,"season":"June",
+     "question":"NAAC accreditation in India is given on a scale of:",
+     "options":["1 to 5","A++ to C","A++ to D","Pass/Fail"],
+     "correct_answer":"A++ to C",
+     "explanation":"NAAC grades institutions on a seven-point scale: A++, A+, A, B++, B+, B, and C."},
+
+    {"id":"he005","topic":"Higher Education","difficulty":"Easy","year":2024,"season":"December",
+     "question":"The full form of SWAYAM is:",
+     "options":["Study Webs of Active Learning for Young Aspiring Minds","Smart Web Access for Youth and Management","Students Web for Active Youth Academic Module","None of these"],
+     "correct_answer":"Study Webs of Active Learning for Young Aspiring Minds",
+     "explanation":"SWAYAM is India's MOOCs platform launched in 2017 offering free online courses from school to PG level."},
+
+    {"id":"he006","topic":"Higher Education","difficulty":"Hard","year":2023,"season":"June",
+     "question":"Under NEP 2020, the multidisciplinary education and research universities (MERUs) are modelled on:",
+     "options":["IITs","IIMs","Ivy League universities","Global research universities like MIT"],
+     "correct_answer":"Global research universities like MIT",
+     "explanation":"NEP 2020 envisions MERUs as world-class, multidisciplinary institutions comparable to global leaders like MIT and Stanford."},
+
+    {"id":"he007","topic":"Higher Education","difficulty":"Medium","year":2022,"season":"December",
+     "question":"The 'Open Book Examination' system primarily aims to test:",
+     "options":["Memorisation ability","Higher-order thinking and application","Speed of writing","Knowledge of textbook content"],
+     "correct_answer":"Higher-order thinking and application",
+     "explanation":"Open book exams shift focus from rote memorisation to application, analysis, and synthesis of knowledge."},
+
+    # ↑↑↑ PASTE YOUR NEW Higher Education QUESTIONS ABOVE THIS LINE ↑↑↑
 ]
 
 # ── 9. INDIAN CONSTITUTION & GOVERNANCE ─────────────────────────────
@@ -810,7 +1045,40 @@ Q_GOVERNANCE = [
     {"id":"gov001","topic":"Indian Constitution & Governance","difficulty":"Easy","year":2023,"season":"June","question":"The Preamble describes India as:","options":["Federal, Democratic Republic","Sovereign, Socialist, Secular, Democratic Republic","Federal, Socialist State","Secular Parliamentary Democracy"],"correct_answer":"Sovereign, Socialist, Secular, Democratic Republic","explanation":"The Preamble declares India to be a Sovereign, Socialist, Secular, Democratic Republic."},
     {"id":"gov002","topic":"Indian Constitution & Governance","difficulty":"Medium","year":2022,"season":"December","question":"Which Article guarantees Right to Education?","options":["Article 19","Article 21A","Article 25","Article 32"],"correct_answer":"Article 21A","explanation":"Article 21A provides free and compulsory education to children aged 6-14."},
     {"id":"gov003","topic":"Indian Constitution & Governance","difficulty":"Hard","year":2021,"season":"June","question":"The 'Basic Structure' doctrine was established by:","options":["Golaknath case (1967)","Kesavananda Bharati case (1973)","Minerva Mills case (1980)","Maneka Gandhi case (1978)"],"correct_answer":"Kesavananda Bharati case (1973)","explanation":"The Basic Structure Doctrine established that Parliament cannot alter the basic structure of the Constitution."},
-    # ── ADD MORE Indian Constitution & Governance QUESTIONS BELOW ─────
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Indian Constitution & Governance QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"gov004","topic":"Indian Constitution & Governance","difficulty":"Easy","year":2024,"season":"June",
+     "question":"The Right to Information Act was passed in India in:",
+     "options":["2001","2003","2005","2007"],
+     "correct_answer":"2005",
+     "explanation":"The RTI Act, 2005 empowers citizens to request information from public authorities."},
+
+    {"id":"gov005","topic":"Indian Constitution & Governance","difficulty":"Medium","year":2024,"season":"December",
+     "question":"Which schedule of the Indian Constitution lists the 22 official languages?",
+     "options":["Sixth Schedule","Seventh Schedule","Eighth Schedule","Ninth Schedule"],
+     "correct_answer":"Eighth Schedule",
+     "explanation":"The Eighth Schedule of the Indian Constitution lists 22 officially recognised languages."},
+
+    {"id":"gov006","topic":"Indian Constitution & Governance","difficulty":"Hard","year":2023,"season":"December",
+     "question":"The 73rd Constitutional Amendment relates to:",
+     "options":["Urban local bodies","Panchayati Raj institutions","Fundamental Rights","Directive Principles"],
+     "correct_answer":"Panchayati Raj institutions",
+     "explanation":"The 73rd Amendment (1992) gave constitutional status to Panchayati Raj institutions for rural local self-governance."},
+
+    {"id":"gov007","topic":"Indian Constitution & Governance","difficulty":"Medium","year":2022,"season":"June",
+     "question":"The concept of 'Judicial Review' in India means:",
+     "options":["Judges reviewing their own judgements","Courts reviewing administrative decisions","Power of courts to examine constitutionality of laws","Re-examining pending cases"],
+     "correct_answer":"Power of courts to examine constitutionality of laws",
+     "explanation":"Judicial review allows courts to invalidate laws and executive actions that violate the Constitution."},
+
+    {"id":"gov008","topic":"Indian Constitution & Governance","difficulty":"Easy","year":2021,"season":"December",
+     "question":"Which Article of the Constitution abolishes untouchability?",
+     "options":["Article 14","Article 15","Article 17","Article 19"],
+     "correct_answer":"Article 17",
+     "explanation":"Article 17 abolishes untouchability and forbids its practice in any form."},
+
+    # ↑↑↑ PASTE YOUR NEW Indian Constitution & Governance QUESTIONS ABOVE THIS LINE ↑↑↑
 ]
 
 # ── 10. DATA INTERPRETATION ──────────────────────────────────────────
@@ -818,7 +1086,40 @@ Q_DATA_INTERPRETATION = [
     {"id":"di001","topic":"Data Interpretation","difficulty":"Medium","year":2023,"season":"June","question":"If the mean of 5 numbers is 30 and mean of 3 of them is 20, what is mean of remaining 2?","options":["35","45","40","50"],"correct_answer":"45","explanation":"Total=150, Sum of 3=60, Remaining=90, Mean=45."},
     {"id":"di002","topic":"Data Interpretation","difficulty":"Easy","year":2022,"season":"June","question":"Which measure of central tendency is most affected by extreme values?","options":["Mode","Median","Mean","None"],"correct_answer":"Mean","explanation":"The arithmetic mean is significantly affected by extreme values."},
     {"id":"di003","topic":"Data Interpretation","difficulty":"Hard","year":2021,"season":"December","question":"The coefficient of variation (CV) is calculated as:","options":["(Mean/SD)x100","(SD/Mean)x100","SD x Mean","Mean/Variance"],"correct_answer":"(SD/Mean)x100","explanation":"CV = (SD/Mean) x 100, expressing variability as a percentage of mean."},
-    # ── ADD MORE Data Interpretation QUESTIONS BELOW THIS LINE ────────
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Data Interpretation QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"di004","topic":"Data Interpretation","difficulty":"Medium","year":2024,"season":"June",
+     "question":"In a pie chart, if a sector represents 25% of the total, its central angle is:",
+     "options":["45°","60°","90°","120°"],
+     "correct_answer":"90°",
+     "explanation":"Central angle = (25/100) × 360° = 90°."},
+
+    {"id":"di005","topic":"Data Interpretation","difficulty":"Easy","year":2024,"season":"December",
+     "question":"The difference between the highest and lowest values in a dataset is called:",
+     "options":["Variance","Standard deviation","Range","Mean deviation"],
+     "correct_answer":"Range",
+     "explanation":"Range = Maximum value − Minimum value; it is the simplest measure of dispersion."},
+
+    {"id":"di006","topic":"Data Interpretation","difficulty":"Hard","year":2023,"season":"June",
+     "question":"If two events A and B are mutually exclusive, then P(A or B) =",
+     "options":["P(A) × P(B)","P(A) + P(B) − P(A∩B)","P(A) + P(B)","P(A) / P(B)"],
+     "correct_answer":"P(A) + P(B)",
+     "explanation":"For mutually exclusive events, P(A∩B) = 0, so P(A∪B) = P(A) + P(B)."},
+
+    {"id":"di007","topic":"Data Interpretation","difficulty":"Medium","year":2022,"season":"December",
+     "question":"Which graphical representation is best suited for showing trends over time?",
+     "options":["Pie chart","Bar graph","Line graph","Histogram"],
+     "correct_answer":"Line graph",
+     "explanation":"Line graphs are ideal for displaying continuous data trends over time."},
+
+    {"id":"di008","topic":"Data Interpretation","difficulty":"Easy","year":2021,"season":"June",
+     "question":"The median of 3, 7, 9, 11, 15 is:",
+     "options":["7","9","11","15"],
+     "correct_answer":"9",
+     "explanation":"Arranged in order: 3,7,9,11,15 — median is the middle value = 9."},
+
+    # ↑↑↑ PASTE YOUR NEW Data Interpretation QUESTIONS ABOVE THIS LINE ↑↑↑
 ]
 
 # ── AI PREDICTED (upcoming exam focus) ───────────────────────────────
@@ -828,7 +1129,12 @@ Q_AI_PREDICTED = [
     {"id":"ai003","topic":"ICT","difficulty":"Medium","year":2025,"season":"June","predicted":True,"question":"Which technology is central to India's Digital India initiative for education?","options":["Blockchain","Cloud computing and mobile internet","Quantum computing","5G only"],"correct_answer":"Cloud computing and mobile internet","explanation":"Digital India's education thrust relies on cloud-based platforms and mobile internet access for DIKSHA, SWAYAM, etc."},
     {"id":"ai004","topic":"Environment & Ecology","difficulty":"Hard","year":2025,"season":"June","predicted":True,"question":"India's National Action Plan on Climate Change (NAPCC) includes how many missions?","options":["6","8","10","12"],"correct_answer":"8","explanation":"NAPCC has 8 national missions covering solar energy, water, forests, sustainable agriculture, etc. — frequently tested."},
     {"id":"ai005","topic":"Higher Education","difficulty":"Medium","year":2025,"season":"December","predicted":True,"question":"The Academic Bank of Credits (ABC) under NEP 2020 primarily facilitates:","options":["Financial aid to students","Multiple entry/exit and credit transfer","Faculty recruitment","Research funding"],"correct_answer":"Multiple entry/exit and credit transfer","explanation":"ABC enables credit accumulation and transfer, supporting flexible degree completion pathways under NEP 2020."},
-    # ── ADD MORE AI Predicted QUESTIONS BELOW THIS LINE ───────────────
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE AI Predicted QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    # Remember: add  "predicted": True  to every question here
+
+    # ↑↑↑ PASTE YOUR NEW AI Predicted QUESTIONS ABOVE THIS LINE ↑↑↑
 ]
 
 # ── Master list: all topics combined ─────────────────────────────────
