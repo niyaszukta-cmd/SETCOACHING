@@ -977,7 +977,7 @@ def page_home():
     st.markdown(f"""
     <div class="hero">
       <div class="hero-badge">🏛️ UGC NET &nbsp;·&nbsp; Paper 1 &nbsp;·&nbsp; NYZTrade Education</div>
-      <h1 class="hero-title">Master NET with<br><em>Intelligent Practice</em></h1>
+      <h1 class="hero-title">Master NET with<br><em>Nyztrade Learnings</em></h1>
       <div class="hero-features">
         <span class="hero-pill"><span class="pill-icon">📅</span> PYQ Year-wise Tests</span>
         <span class="hero-pill"><span class="pill-icon">🧪</span> Mock &amp; Exam Simulation</span>
