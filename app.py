@@ -1,7 +1,7 @@
 """
 ╔══════════════════════════════════════════════════════════════════════╗
 ║    NET QUIZ MASTER v3.0  ·  Complete Platform Redesign              ║
-║    NYZTrade Education  ·  UGC NET Paper 1                           ║
+║   Zodha Research  ·  UGC NET Paper 1                           ║
 ╚══════════════════════════════════════════════════════════════════════╝
 """
 
@@ -957,7 +957,7 @@ def render_sidebar():
 
         st.markdown(
             '<div style="text-align:center;opacity:0.4;font-size:0.72rem;padding:0.75rem 0.5rem 0;">'
-            'NYZTrade Education<br><span style="color:#a855f7;">Built for NET Aspirants</span></div>',
+            'Zodha Research<br><span style="color:#a855f7;">Built for NET Aspirants</span></div>',
             unsafe_allow_html=True
         )
 
@@ -976,7 +976,7 @@ def page_home():
     # ── Hero ──────────────────────────────────────
     st.markdown(f"""
     <div class="hero">
-      <div class="hero-badge">🏛️ UGC NET &nbsp;·&nbsp; Paper 1 &nbsp;·&nbsp; NYZTrade Education</div>
+      <div class="hero-badge">🏛️ UGC NET &nbsp;·&nbsp; Paper 1 &nbsp;·&nbsp; Zodha Research</div>
       <h1 class="hero-title">Master NET with<br><em>Nyztrade Learnings</em></h1>
       <div class="hero-features">
         <span class="hero-pill"><span class="pill-icon">📅</span> PYQ Year-wise Tests</span>
