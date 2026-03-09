@@ -1443,6 +1443,57 @@ def _start_quiz(questions, mode, label, total_time_secs):
         "page": "quiz",
     })
 
+# ── Timer fragment: reruns every 1s independently, never blocks buttons ──
+@st.fragment(run_every=1)
+def _timer_fragment(remaining, tl, label, idx, total):
+    """Isolated fragment that only updates the header/timer row."""
+    if remaining is None:
+        st.markdown(
+            f'<div style="display:flex;align-items:center;justify-content:space-between;'
+            f'flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;">'
+            f'<div style="font-size:0.8rem;color:var(--t2);font-weight:600;">📝 {label}</div>'
+            f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:1rem;font-weight:700;'
+            f'color:var(--cyan);background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.35);'
+            f'border-radius:8px;padding:0.35rem 0.85rem;">⏱ Free</div>'
+            f'<div style="font-size:0.8rem;color:var(--t2);font-family:\'JetBrains Mono\',monospace;">'
+            f'{idx+1}/{total}</div></div>',
+            unsafe_allow_html=True
+        )
+        return
+
+    # Recalculate from session state so it's always accurate
+    elapsed   = int(time.time() - st.session_state.start_time)
+    remaining = max(0, tl - elapsed)
+    rm, rs    = divmod(remaining, 60)
+    pct       = remaining / tl if tl > 0 else 1.0
+
+    if pct > 0.4:    cls, color = "timer-ok",   "var(--cyan)"
+    elif pct > 0.15: cls, color = "timer-warn",  "var(--gold)"
+    else:            cls, color = "timer-crit",  "var(--red)"
+
+    progress_pct = (st.session_state.q_idx / total * 100) if total > 0 else 0
+
+    st.markdown(
+        f'<div class="progress-track">'
+        f'<div class="progress-fill" style="width:{progress_pct:.1f}%"></div></div>'
+        f'<div style="display:flex;align-items:center;justify-content:space-between;'
+        f'flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">'
+        f'<div style="font-size:0.8rem;color:var(--t2);font-weight:600;">📝 {label}</div>'
+        f'<div class="timer-display {cls}">⏱ {rm:02d}:{rs:02d}</div>'
+        f'<div style="font-size:0.8rem;color:var(--t2);font-family:\'JetBrains Mono\',monospace;">'
+        f'{idx+1}/{total}</div></div>',
+        unsafe_allow_html=True
+    )
+
+    # Auto-submit when time is up
+    if remaining == 0:
+        st.session_state.quiz_done = True
+        st.session_state.score = sum(
+            1 for a in st.session_state.answers.values() if a.get("correct")
+        )
+        st.rerun()
+
+
 def page_quiz():
     if st.session_state.quiz_done:
         page_results()
@@ -1463,71 +1514,57 @@ def page_quiz():
         st.rerun()
         return
 
-    q         = questions[idx]
-    elapsed   = int(time.time() - st.session_state.start_time)
-    tl        = st.session_state.total_time
+    q      = questions[idx]
+    tl     = st.session_state.total_time
+    elapsed = int(time.time() - st.session_state.start_time)
     remaining = max(0, tl - elapsed) if tl > 0 else None
 
-    # Auto-submit when time expires
+    # Auto-submit on expiry
     if remaining == 0 and tl > 0:
         st.session_state.quiz_done = True
         st.session_state.score = sum(1 for a in st.session_state.answers.values() if a.get("correct"))
         st.rerun()
         return
 
-    # Timer display
+    # For exam_sim we compute rm/rs for the big header
     rm, rs = divmod(remaining or 0, 60)
-    pct_left = (remaining / tl) if (remaining is not None and tl > 0) else 1.0
-    if pct_left > 0.4:    timer_cls = "timer-ok"
-    elif pct_left > 0.15: timer_cls = "timer-warn"
-    else:                 timer_cls = "timer-crit"
-    timer_html = (
-        f'<div class="timer-display {timer_cls}">⏱ {rm:02d}:{rs:02d}</div>'
-        if remaining is not None else
-        '<div class="timer-display timer-ok">⏱ Free</div>'
-    )
-
     diff_color = {"Easy":"var(--green)","Medium":"var(--gold)","Hard":"var(--red)"}.get(q.get("difficulty",""),"var(--text2)")
     yr_tag = f'· {q.get("year","")} {q.get("season","")}' if q.get("year") else ""
     ai_tag = '<span class="meta-chip cyan" style="font-size:0.65rem;padding:0.15rem 0.4rem;">🤖 AI Pick</span>' if q.get("predicted") else ""
     is_exam_sim = (mode == "exam_sim")
 
-    # Layout columns for exam modes
+    # Layout
     if mode in ("exam", "exam_sim"):
         col_q, col_nav = st.columns([3, 1])
     else:
-        col_q = None
-        col_nav = None
+        col_q = col_nav = None
 
-    # ── Main quiz body ──────────────────────────────────────────────────
     def _render_body():
-        # Header
+        # ── Header / Timer ──
         if is_exam_sim:
-            timer_color = "var(--rose)" if (remaining is not None and remaining < 600) else ("var(--amber)" if (remaining is not None and remaining < 1800) else "var(--cyan)")
-            st.markdown(f"""<div style="background:rgba(10,14,22,0.95);border:1px solid rgba(124,58,237,0.4);border-radius:12px;
-                padding:0.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;
-                margin-bottom:1rem;gap:1rem;flex-wrap:wrap;">
+            # Big exam-sim header with static timer (fragment handles tick separately)
+            timer_color = "var(--red)" if (remaining is not None and remaining < 600) else \
+                          ("var(--gold)" if (remaining is not None and remaining < 1800) else "var(--cyan)")
+            st.markdown(f"""<div style="background:rgba(10,14,22,0.95);border:1px solid rgba(124,58,237,0.4);
+                border-radius:12px;padding:0.75rem 1.25rem;display:flex;align-items:center;
+                justify-content:space-between;margin-bottom:1rem;gap:1rem;flex-wrap:wrap;">
               <div style="display:flex;align-items:center;gap:0.5rem;">
                 <span style="font-size:1.1rem;">🎓</span>
                 <span style="font-weight:700;font-size:0.88rem;color:var(--violet2);">{label}</span>
               </div>
-              <div style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:700;color:{timer_color};letter-spacing:0.05em;">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:700;
+                  color:{timer_color};letter-spacing:0.05em;">
                 ⏱ {rm:02d}:{rs:02d}
               </div>
               <div style="font-size:0.82rem;color:var(--t2);">Q {idx+1} / {total}</div>
             </div>""", unsafe_allow_html=True)
+            # Fragment handles live tick for exam_sim too
+            _timer_fragment(remaining, tl, label, idx, total)
         else:
-            pct_done = idx / total
-            st.markdown(f'<div class="progress-track"><div class="progress-fill" style="width:{pct_done*100:.1f}%"></div></div>', unsafe_allow_html=True)
-            lc1, lc2, lc3 = st.columns([3, 2, 1])
-            with lc1:
-                st.markdown(f'<div style="font-size:0.8rem;color:var(--t2);font-weight:600;">📝 {label}</div>', unsafe_allow_html=True)
-            with lc2:
-                st.markdown(f'<div style="display:flex;justify-content:center;">{timer_html}</div>', unsafe_allow_html=True)
-            with lc3:
-                st.markdown(f'<div style="text-align:right;font-family:JetBrains Mono,monospace;font-size:0.8rem;color:var(--t2);">{idx+1}/{total}</div>', unsafe_allow_html=True)
+            # Live-ticking timer fragment (1s updates, non-blocking)
+            _timer_fragment(remaining, tl, label, idx, total)
 
-        # Question card
+        # ── Question card ──
         clean_q = html.unescape(re.sub(r'<[^>]+>', '', q["question"])).strip()
         st.markdown(f"""<div class="question-wrap">
           <div class="q-num">QUESTION {idx+1} OF {total}</div>
@@ -1540,7 +1577,7 @@ def page_quiz():
           </div>
         </div>""", unsafe_allow_html=True)
 
-        # Options
+        # ── Options ──
         options = q.get("options", [])
         correct = q.get("correct_answer", "")
         already = idx in st.session_state.answers
@@ -1549,7 +1586,6 @@ def page_quiz():
             st.session_state[sel_key] = options[0] if options else ""
 
         if already:
-            # Post-answer: show colour-coded results
             user_ans = st.session_state.answers[idx].get("answer")
             for opt in options:
                 clean = html.unescape(re.sub(r'<[^>]+>', '', opt)).strip()
@@ -1560,25 +1596,33 @@ def page_quiz():
                 else:
                     st.markdown(f'<div class="option-btn neutral-opt">{clean}</div>', unsafe_allow_html=True)
 
-            if q.get("explanation") and mode != "exam":
+            if q.get("explanation") and mode not in ("exam", "exam_sim"):
                 clean_exp = html.unescape(re.sub(r'<[^>]+>', '', q["explanation"])).strip()
-                st.markdown(f'<div class="explanation-box"><div class="exp-title">💡 Explanation</div><div class="exp-text">{clean_exp}</div></div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="explanation-box"><div class="exp-title">💡 Explanation</div>'
+                    f'<div class="exp-text">{clean_exp}</div></div>',
+                    unsafe_allow_html=True
+                )
 
             nc1, nc2, nc3 = st.columns([1, 1, 1])
             with nc1:
                 if idx > 0 and st.button("← Prev", key=f"prev_{idx}", use_container_width=True):
                     st.session_state.q_idx -= 1; st.rerun()
             with nc2:
-                bm_id = q.get("id", idx)
+                bm_id    = q.get("id", idx)
                 bm_label = "🔖 Saved" if bm_id in st.session_state.bookmarks else "🔖 Save"
                 if st.button(bm_label, key=f"bm_{idx}", use_container_width=True):
-                    if bm_id in st.session_state.bookmarks: st.session_state.bookmarks.discard(bm_id)
-                    else: st.session_state.bookmarks.add(bm_id)
+                    if bm_id in st.session_state.bookmarks:
+                        st.session_state.bookmarks.discard(bm_id)
+                    else:
+                        st.session_state.bookmarks.add(bm_id)
                     st.rerun()
             with nc3:
                 if idx < total - 1:
                     if st.button("Next →", key=f"next_{idx}", use_container_width=True, type="primary"):
-                        st.session_state.q_idx += 1; st.session_state.q_start = time.time(); st.rerun()
+                        st.session_state.q_idx += 1
+                        st.session_state.q_start = time.time()
+                        st.rerun()
                 else:
                     if st.button("🏁 Finish", key=f"finish_{idx}", use_container_width=True, type="primary"):
                         st.session_state.quiz_done = True
@@ -1586,13 +1630,14 @@ def page_quiz():
                         st.rerun()
 
         else:
-            # Pre-answer: clickable option buttons (no duplicate HTML divs)
+            # Pre-answer: pure buttons — no duplicate HTML
             clean_opts = [html.unescape(re.sub(r'<[^>]+>', '', o)).strip() for o in options]
             for i_o, (opt, clean) in enumerate(zip(options, clean_opts)):
-                is_sel = st.session_state[sel_key] == opt
-                if is_sel:
+                if st.session_state[sel_key] == opt:
                     st.markdown(
-                        f'<div class="opt-selected"><span class="opt-dot-sel">●</span>&nbsp;&nbsp;{clean}</div>',
+                        f'<div class="opt-selected">'
+                        f'<span class="opt-dot-sel">●</span>&nbsp;&nbsp;{clean}'
+                        f'</div>',
                         unsafe_allow_html=True
                     )
                 else:
@@ -1604,9 +1649,9 @@ def page_quiz():
             sc1, sc2, sc3 = st.columns([3, 1, 1])
             with sc1:
                 if st.button("✅  Submit Answer", key=f"sub_{idx}", use_container_width=True, type="primary"):
-                    choice = st.session_state[sel_key]
+                    choice       = st.session_state[sel_key]
                     correct_flag = (choice == correct)
-                    t_taken = int(time.time() - (st.session_state.q_start or time.time()))
+                    t_taken      = int(time.time() - (st.session_state.q_start or time.time()))
                     st.session_state.answers[idx] = {"answer": choice, "correct": correct_flag, "time": t_taken}
                     st.session_state.q_times[idx]  = t_taken
                     st.session_state.total_attempted += 1
@@ -1617,38 +1662,37 @@ def page_quiz():
                         st.session_state.streak = 0
                         if q not in st.session_state.wrong_questions:
                             st.session_state.wrong_questions.append(q)
-                    if mode == "exam":
+                    if mode in ("exam", "exam_sim"):
                         st.session_state.q_idx += 1
                         st.session_state.q_start = time.time()
                     st.rerun()
             with sc2:
                 if st.button("⏭ Skip", key=f"skip_{idx}", use_container_width=True):
                     st.session_state.answers[idx] = {"answer": None, "correct": False, "skipped": True}
-                    st.session_state.q_idx += 1; st.session_state.q_start = time.time(); st.rerun()
+                    st.session_state.q_idx += 1
+                    st.session_state.q_start = time.time()
+                    st.rerun()
             with sc3:
                 if st.button("🔖", key=f"bm2_{idx}", use_container_width=True):
                     bm_id = q.get("id", idx)
-                    if bm_id in st.session_state.bookmarks: st.session_state.bookmarks.discard(bm_id)
-                    else: st.session_state.bookmarks.add(bm_id)
+                    if bm_id in st.session_state.bookmarks:
+                        st.session_state.bookmarks.discard(bm_id)
+                    else:
+                        st.session_state.bookmarks.add(bm_id)
                     st.rerun()
 
-        # Smooth 1-second timer: JS meta-refresh (non-blocking, no sleep)
-        if remaining is not None and remaining > 0:
-            st.markdown('<meta http-equiv="refresh" content="1">', unsafe_allow_html=True)
-
-    # Render body in correct container
+    # Render in correct container
     if col_q is not None:
         with col_q:
             _render_body()
     else:
         _render_body()
 
-    # Exam mode navigator panel
+    # Exam navigator panel
     if mode in ("exam", "exam_sim") and col_nav is not None:
         with col_nav:
             st.markdown('<div class="exam-panel">', unsafe_allow_html=True)
             st.markdown('<div class="exam-panel-title">Question Navigator</div>', unsafe_allow_html=True)
-            st.markdown(f'<div style="text-align:center;margin-bottom:0.75rem;">{timer_html}</div>', unsafe_allow_html=True)
             nav_html = '<div class="exam-grid">'
             for qi in range(total):
                 if qi == idx:
@@ -1661,12 +1705,16 @@ def page_quiz():
             nav_html += '</div>'
             st.markdown(nav_html, unsafe_allow_html=True)
             st.markdown("""<div class="exam-legend">
-              <span><span class="legend-dot" style="background:var(--green);"></span>Answered</span>
-              <span><span class="legend-dot" style="background:var(--gold);"></span>Skipped</span>
-              <span><span class="legend-dot" style="background:var(--violet);"></span>Current</span>
+              <span><span class="legend-dot" style="background:var(--green);"></span>Done</span>
+              <span><span class="legend-dot" style="background:var(--gold);"></span>Skip</span>
+              <span><span class="legend-dot" style="background:var(--violet);"></span>Now</span>
             </div>""", unsafe_allow_html=True)
             answered_count = sum(1 for a in st.session_state.answers.values() if not a.get("skipped"))
-            st.markdown(f'<div style="margin-top:0.5rem;font-size:0.78rem;color:var(--t2);">Answered: <b style="color:var(--green);">{answered_count}</b> / {total}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div style="margin-top:0.5rem;font-size:0.78rem;color:var(--t2);">'
+                f'Answered: <b style="color:var(--green);">{answered_count}</b> / {total}</div>',
+                unsafe_allow_html=True
+            )
             st.markdown('</div>', unsafe_allow_html=True)
             if st.button("🏁 Submit Exam", key="exam_submit", use_container_width=True, type="primary"):
                 st.session_state.quiz_done = True
