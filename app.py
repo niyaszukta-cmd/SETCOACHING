@@ -187,59 +187,115 @@ def inject_styles():
 /* ══════════════════════════════════════════════════════
    HERO SECTION
 ══════════════════════════════════════════════════════ */
-.hero, .hero-section { text-align: center; padding: 1.5rem 1rem 1rem; position: relative; overflow: hidden; }
-@media (min-width: 768px) { .hero, .hero-section { padding: 3rem 2rem 2rem; } }
+.hero, .hero-section {
+  text-align: center;
+  padding: 3.5rem 1rem 2rem;
+  position: relative;
+  overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+@media (min-width: 768px) { .hero, .hero-section { padding: 5rem 2rem 3rem; } }
+
+/* multi-layer ambient glow background */
 .hero::before {
   content: '';
   position: absolute; inset: 0;
   background:
-    radial-gradient(ellipse 70% 50% at 50% -10%, rgba(124,58,237,0.12), transparent),
-    radial-gradient(ellipse 40% 35% at 90% 100%, rgba(34,211,238,0.07), transparent);
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(124,58,237,0.18), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 20% 80%, rgba(168,85,247,0.10), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(34,211,238,0.08), transparent 70%);
   pointer-events: none;
+  z-index: 0;
 }
+/* animated top glow line */
+.hero::after {
+  content: '';
+  position: absolute; top: 0; left: 10%; right: 10%; height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(124,58,237,0.8), rgba(34,211,238,0.8), transparent);
+  border-radius: 50%;
+  animation: heroLine 3s ease-in-out infinite alternate;
+  z-index: 0;
+}
+@keyframes heroLine { from{opacity:0.4;left:20%;right:20%;} to{opacity:1;left:5%;right:5%;} }
+
+.hero > * { position: relative; z-index: 1; }
+
 .hero-badge {
   display: inline-flex; align-items: center; gap: 0.5rem;
-  background: linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15));
-  border: 1px solid rgba(168,85,247,0.6); color: #c084fc;
-  padding: 0.35rem 1.1rem; border-radius: 50px;
-  font-size: 0.78rem; font-weight: 700; letter-spacing: 0.1em;
-  text-transform: uppercase; margin-bottom: 1rem;
+  background: linear-gradient(135deg, rgba(124,58,237,0.25), rgba(168,85,247,0.12));
+  border: 1px solid rgba(168,85,247,0.55); color: #c084fc;
+  padding: 0.4rem 1.2rem; border-radius: 50px;
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; margin-bottom: 1.5rem;
+  box-shadow: 0 0 20px rgba(124,58,237,0.15);
+  animation: badgePulse 3s ease-in-out infinite;
 }
-.hero-badge::before { content: '●'; font-size: 0.45rem; animation: blink 2s infinite; }
-@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+.hero-badge::before { content: '●'; font-size: 0.4rem; color: #a855f7; animation: blink 1.5s infinite; }
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.2;} }
+@keyframes badgePulse { 0%,100%{box-shadow:0 0 20px rgba(124,58,237,0.15);} 50%{box-shadow:0 0 35px rgba(124,58,237,0.35);} }
 
 .hero-title {
   font-family: 'Playfair Display', serif !important;
-  font-size: clamp(1.8rem, 6vw, 3.8rem) !important;
+  font-size: clamp(2.4rem, 7vw, 4.8rem) !important;
   font-weight: 900 !important; color: #fff !important;
-  line-height: 1.1 !important; margin-bottom: 0.75rem !important;
+  line-height: 1.08 !important; margin-bottom: 1rem !important;
   letter-spacing: -0.03em;
+  text-align: center;
+  text-shadow: 0 2px 40px rgba(124,58,237,0.25);
 }
 .hero-title em, .gradient-text {
   font-style: italic;
-  background: linear-gradient(135deg, var(--violet), var(--violet2), var(--cyan));
+  background: linear-gradient(135deg, #a855f7, #7c3aed, #22d3ee);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 20px rgba(124,58,237,0.4));
 }
-.hero-sub, .hero-subtitle { font-size: 1rem; color: var(--t2); line-height: 1.75; max-width: 560px; margin: 0 auto 2rem; }
+
+/* Feature pills row */
+.hero-features {
+  display: flex; flex-wrap: wrap; gap: 0.6rem;
+  justify-content: center; align-items: center;
+  margin: 0 auto 1rem; max-width: 680px;
+}
+.hero-pill {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 50px; padding: 0.35rem 0.85rem;
+  font-size: 0.78rem; color: var(--t2); font-weight: 500;
+  transition: all 0.2s;
+}
+.hero-pill:hover { background: rgba(124,58,237,0.12); border-color: rgba(124,58,237,0.4); color: #e2e8f0; }
+.hero-pill .pill-icon { font-size: 0.9rem; }
+
+.hero-sub, .hero-subtitle { font-size: 1rem; color: var(--t2); line-height: 1.75; max-width: 560px; margin: 0 auto 2rem; text-align:center; }
 
 /* ══ STAT STRIP ══ */
 .stat-strip {
-  display: grid; grid-template-columns: repeat(5, 1fr);
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--rl); overflow: hidden; margin: 1.75rem 0; box-shadow: var(--shadow-card);
+  display: grid; grid-template-columns: repeat(6, 1fr);
+  background: linear-gradient(135deg, rgba(124,58,237,0.06), rgba(13,17,23,0.95));
+  border: 1px solid rgba(124,58,237,0.2);
+  border-radius: var(--rl); overflow: hidden; margin: 1.75rem auto;
+  max-width: 900px;
+  box-shadow: 0 4px 30px rgba(124,58,237,0.1), inset 0 1px 0 rgba(255,255,255,0.04);
 }
-@media (max-width: 600px) { .stat-strip { grid-template-columns: repeat(3, 1fr); } }
-.stat-cell { padding: 1.25rem 0.75rem; text-align: center; border-right: 1px solid var(--border); transition: background 0.2s; }
+@media (max-width: 700px) { .stat-strip { grid-template-columns: repeat(3, 1fr); } }
+.stat-cell {
+  padding: 1.4rem 0.5rem; text-align: center;
+  border-right: 1px solid rgba(124,58,237,0.12);
+  transition: background 0.25s, transform 0.2s;
+  display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
+}
 .stat-cell:last-child { border-right: none; }
-.stat-cell:hover { background: var(--surface2); }
+.stat-cell:hover { background: rgba(124,58,237,0.1); }
+.stat-icon { font-size: 1.2rem; margin-bottom: 0.1rem; display: block; }
 .stat-val {
-  font-family: 'Playfair Display', serif; font-size: 1.9rem; font-weight: 800;
+  font-family: 'Playfair Display', serif; font-size: 1.75rem; font-weight: 800;
   display: block; line-height: 1;
-  background: linear-gradient(135deg, var(--violet2), var(--cyan));
+  background: linear-gradient(135deg, #a855f7, #22d3ee);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.2rem;
 }
-.stat-lbl { font-size: 0.62rem; color: var(--t4); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
+.stat-lbl { font-size: 0.6rem; color: var(--t4); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; }
 
 /* Stats banner (home page) */
 .stats-banner {
@@ -918,23 +974,56 @@ def page_home():
     user  = st.session_state.user
 
     # ── Hero ──────────────────────────────────────
-    st.markdown("""
+    st.markdown(f"""
     <div class="hero">
-      <div class="hero-badge">🏛️ UGC NET · Paper 1 · NYZTrade Education</div>
+      <div class="hero-badge">🏛️ UGC NET &nbsp;·&nbsp; Paper 1 &nbsp;·&nbsp; NYZTrade Education</div>
       <h1 class="hero-title">Master NET with<br><em>Intelligent Practice</em></h1>
-      <p class="hero-sub">PYQ year-wise · Full mock tests · AI-predicted questions · Live exam simulation · Student leaderboard</p>
+      <div class="hero-features">
+        <span class="hero-pill"><span class="pill-icon">📅</span> PYQ Year-wise Tests</span>
+        <span class="hero-pill"><span class="pill-icon">🧪</span> Mock &amp; Exam Simulation</span>
+        <span class="hero-pill"><span class="pill-icon">🏆</span> Live Leaderboard</span>
+        <span class="hero-pill"><span class="pill-icon">📊</span> Analytics Dashboard</span>
+        <span class="hero-pill"><span class="pill-icon">🔖</span> Bookmarks &amp; Review</span>
+        <span class="hero-pill"><span class="pill-icon">⚡</span> Instant Feedback</span>
+      </div>
     </div>""", unsafe_allow_html=True)
 
     # ── Stat strip ────────────────────────────────
     user_attempts = st.session_state.total_attempted
     user_accuracy = round(st.session_state.total_correct / user_attempts * 100) if user_attempts else 0
+    streak = st.session_state.get("streak", 0)
     st.markdown(f"""
     <div class="stat-strip">
-      <div class="stat-cell"><span class="stat-val">{total}+</span><span class="stat-lbl">Questions</span></div>
-      <div class="stat-cell"><span class="stat-val">{len(years)}</span><span class="stat-lbl">PYQ Years</span></div>
-      <div class="stat-cell"><span class="stat-val">10</span><span class="stat-lbl">Topics</span></div>
-      <div class="stat-cell"><span class="stat-val">{user_attempts}</span><span class="stat-lbl">Your Attempts</span></div>
-      <div class="stat-cell"><span class="stat-val">{user_accuracy}%</span><span class="stat-lbl">Accuracy</span></div>
+      <div class="stat-cell">
+        <span class="stat-icon">📚</span>
+        <span class="stat-val">{total}+</span>
+        <span class="stat-lbl">Questions</span>
+      </div>
+      <div class="stat-cell">
+        <span class="stat-icon">📅</span>
+        <span class="stat-val">{len(years)}</span>
+        <span class="stat-lbl">PYQ Years</span>
+      </div>
+      <div class="stat-cell">
+        <span class="stat-icon">🎯</span>
+        <span class="stat-val">10</span>
+        <span class="stat-lbl">Topics</span>
+      </div>
+      <div class="stat-cell">
+        <span class="stat-icon">✏️</span>
+        <span class="stat-val">{user_attempts}</span>
+        <span class="stat-lbl">Attempted</span>
+      </div>
+      <div class="stat-cell">
+        <span class="stat-icon">🎯</span>
+        <span class="stat-val">{user_accuracy}%</span>
+        <span class="stat-lbl">Accuracy</span>
+      </div>
+      <div class="stat-cell">
+        <span class="stat-icon">🔥</span>
+        <span class="stat-val">{streak}</span>
+        <span class="stat-lbl">Streak</span>
+      </div>
     </div>""", unsafe_allow_html=True)
 
     # ── Quick-start cards ─────────────────────────
