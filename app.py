@@ -1176,7 +1176,7 @@ def topbar():
     user = st.session_state.user
     uname = st.session_state.username or ""
 
-    pages_public  = [("🏛️","Home","home"),("📅","PYQ","pyq"),("📝","Practice","quiz"),("🧪","Mocks","mock"),("🏆","Leaderboard","leaderboard")]
+    pages_public  = [("🏛️","Home","home"),("📅","PYQ Yearwise","pyq"),("📝","Practice","quiz"),("🧪","Mock Tests","mock"),("🏆","Leaderboard","leaderboard")]
     pages_private = [("🤖","AI Predict","ai"),("📊","Analytics","analytics"),("🔖","Bookmarks","bookmarks")]
 
     nav_html = '<div class="topbar">'
@@ -1262,8 +1262,8 @@ def page_home():
     st.markdown('<div class="section-label">Quick Start <span class="pill">choose a mode</span></div>', unsafe_allow_html=True)
 
     cards = [
-        ("📅", "PYQ Practice",   "Year-wise previous year questions",  "pyq",   "var(--amber)",   "amber",   "2023 · 2022 · 2021"),
-        ("🧪", "Mock Tests",     "Full-length timed exam simulations",  "mock",  "var(--indigo)",  "indigo",  "50 Qs · 180 min"),
+        ("📅", "PYQ Yearwise",   "15-Q tests by year, season & topic",  "pyq",   "var(--amber)",   "amber",   "2023 · 2022 · 15 Qs each"),
+        ("🧪", "Mock Tests",     "15-Q sprints, full mocks & exam sim", "mock",  "var(--indigo)",  "indigo",  "⚡ 15-Q · 🎓 Exam Sim"),
         ("🤖", "AI Predicted",   "Smart questions for upcoming exams",  "ai",    "var(--teal)",    "teal",    "June 2025 focus"),
         ("⚡", "Quick Drill",    "15 questions, 15 min sprint",         "quick", "var(--emerald)", "emerald", "All topics mixed"),
     ]
@@ -1336,138 +1336,195 @@ def page_home():
 # ═══════════════════════════════════════════════
 # PYQ PAGE
 # ═══════════════════════════════════════════════
+def _pyq_card_btn(label, key, count, on_click_fn, tag_color="#e8a020"):
+    """Helper to render a mini PYQ launch card."""
+    disabled = count == 0
+    badge = f'<span style="font-size:0.65rem;background:{"rgba(16,185,129,0.15)" if count>0 else "rgba(78,98,133,0.2)"};color:{"var(--emerald)" if count>0 else "var(--t3)"};padding:0.1rem 0.5rem;border-radius:20px;font-family:Fira Code,monospace;">{count}q</span>'
+    st.markdown(f'<div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.25rem;">{badge}</div>', unsafe_allow_html=True)
+    if st.button(label, key=key, use_container_width=True,
+                 type="primary" if count > 0 else "secondary", disabled=disabled):
+        on_click_fn()
+
 def page_pyq():
     qb = QuestionBank()
     all_q = qb.get_all()
 
     st.markdown("""<div class="page-header">
-      <h1>📅 Previous Year Questions</h1>
-      <p>Practice questions from actual UGC NET exams — organized by year, season, topic, and difficulty. Each session: <strong>15 questions</strong>.</p>
+      <h1>📅 PYQ Yearwise Tests</h1>
+      <p>Previous Year Questions organized by year — <strong>15 questions per session</strong> · 18 minutes · Auto-scored · Ranked on leaderboard.</p>
     </div>""", unsafe_allow_html=True)
 
-    # ── Year cards — primary feature ─────────────
-    st.markdown('<div class="section-label">📅 Select Year <span class="pill">15 Qs per session · click to launch</span></div>', unsafe_allow_html=True)
     available_years = qb.get_years()
 
+    # ── Hero: Yearwise Test Grid ─────────────────
+    st.markdown('<div class="section-label">📅 Pick a Year <span class="pill">15 Qs · 18 min · click to launch</span></div>', unsafe_allow_html=True)
+
     if not available_years:
-        st.markdown("""<div class="card" style="text-align:center;padding:2.5rem;border-color:rgba(232,160,32,0.25);">
-          <div style="font-size:2.5rem;margin-bottom:0.75rem;">📂</div>
-          <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:1rem;color:var(--t2);">No PYQ data yet</div>
-          <div style="color:var(--t3);font-size:0.82rem;margin-top:0.4rem;">Upload PDF question papers via Developer mode to populate year-wise questions.</div>
+        st.markdown("""<div class="card" style="text-align:center;padding:3rem;border-color:rgba(232,160,32,0.25);">
+          <div style="font-size:3rem;margin-bottom:1rem;">📂</div>
+          <div style="font-family:'Playfair Display',serif;font-weight:800;font-size:1.1rem;color:var(--t2);">No PYQ data yet</div>
+          <div style="color:var(--t3);font-size:0.85rem;margin-top:0.5rem;max-width:320px;margin-left:auto;margin-right:auto;">Upload PDF question papers via Developer mode to populate year-wise questions. Questions will auto-appear here.</div>
         </div>""", unsafe_allow_html=True)
     else:
-        # Show year grid — up to 8 years, 4 per row
-        yr_rows = [available_years[i:i+4] for i in range(0, min(len(available_years), 8), 4)]
+        # ── Year cards — 3 per row, rich design ──
+        yr_rows = [available_years[i:i+3] for i in range(0, len(available_years), 3)]
         for row in yr_rows:
             yr_cols = st.columns(len(row))
-            for i, yr in enumerate(row):
-                yr_q    = [q for q in all_q if str(q.get("year",""))==str(yr)]
-                june_cnt = len([q for q in yr_q if q.get("season")=="June"])
-                dec_cnt  = len([q for q in yr_q if q.get("season")=="December"])
-                total_cnt= len(yr_q)
-                with yr_cols[i]:
-                    st.markdown(f"""<div class="year-card">
-                      <span class="year-num">{yr}</span>
-                      <div class="year-count">☀️ {june_cnt} &nbsp; ❄️ {dec_cnt}</div>
-                      <div style="font-size:0.65rem;color:var(--t3);margin-top:0.2rem;">{total_cnt} questions</div>
+            for col_i, yr in enumerate(row):
+                yr_q      = [q for q in all_q if str(q.get("year",""))==str(yr)]
+                june_cnt  = len([q for q in yr_q if q.get("season")=="June"])
+                dec_cnt   = len([q for q in yr_q if q.get("season")=="December"])
+                total_cnt = len(yr_q)
+                easy_c  = len([q for q in yr_q if q.get("difficulty")=="Easy"])
+                med_c   = len([q for q in yr_q if q.get("difficulty")=="Medium"])
+                hard_c  = len([q for q in yr_q if q.get("difficulty")=="Hard"])
+                avail_15 = total_cnt >= 15
+
+                with yr_cols[col_i]:
+                    st.markdown(f"""<div class="card" style="border-color:rgba(232,160,32,{'0.4' if avail_15 else '0.15'});margin-bottom:0.25rem;position:relative;overflow:hidden;">
+                      <div style="position:absolute;top:0;right:0;width:60px;height:60px;
+                        background:radial-gradient(circle at top right,rgba(232,160,32,0.12),transparent 70%);"></div>
+                      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">
+                        <span style="font-family:'Playfair Display',serif;font-weight:900;font-size:1.6rem;
+                          color:{'var(--amber)' if avail_15 else 'var(--t3)'};">{yr}</span>
+                        <span style="font-size:0.65rem;background:{'rgba(232,160,32,0.15)' if avail_15 else 'rgba(78,98,133,0.15)'};
+                          color:{'var(--amber2)' if avail_15 else 'var(--t3)'};padding:0.2rem 0.5rem;border-radius:20px;
+                          font-family:'Fira Code',monospace;">{total_cnt}q total</span>
+                      </div>
+                      <div style="display:flex;gap:0.5rem;margin-bottom:0.6rem;flex-wrap:wrap;">
+                        <span style="font-size:0.65rem;color:var(--t3);">☀️ {june_cnt}</span>
+                        <span style="font-size:0.65rem;color:var(--t3);">❄️ {dec_cnt}</span>
+                        <span style="font-size:0.65rem;color:var(--emerald);">E:{easy_c}</span>
+                        <span style="font-size:0.65rem;color:var(--amber);">M:{med_c}</span>
+                        <span style="font-size:0.65rem;color:var(--rose);">H:{hard_c}</span>
+                      </div>
                     </div>""", unsafe_allow_html=True)
-                    c_june, c_dec = st.columns(2)
-                    with c_june:
-                        if st.button(f"☀️ Jun", key=f"pyq_june_{yr}", use_container_width=True,
-                                     type="primary" if june_cnt>0 else "secondary", disabled=june_cnt==0):
+
+                    # 3 launch buttons per year
+                    b1, b2, b3 = st.columns(3)
+                    with b1:
+                        if st.button(f"☀️ Jun", key=f"pyq_j_{yr}", use_container_width=True,
+                                     type="primary" if june_cnt>=15 else "secondary", disabled=june_cnt==0):
                             qs = qb.get_filtered(years=[yr], seasons=["June"], n=15)
-                            _start_quiz(qs, "practice", f"PYQ {yr} June", 15*72); st.rerun()
-                    with c_dec:
-                        if st.button(f"❄️ Dec", key=f"pyq_dec_{yr}", use_container_width=True,
-                                     type="primary" if dec_cnt>0 else "secondary", disabled=dec_cnt==0):
+                            _start_quiz(qs, "practice", f"PYQ {yr} ☀️ June", 18*60); st.rerun()
+                    with b2:
+                        if st.button(f"❄️ Dec", key=f"pyq_d_{yr}", use_container_width=True,
+                                     type="primary" if dec_cnt>=15 else "secondary", disabled=dec_cnt==0):
                             qs = qb.get_filtered(years=[yr], seasons=["December"], n=15)
-                            _start_quiz(qs, "practice", f"PYQ {yr} Dec", 15*72); st.rerun()
-                    if st.button(f"🎯 All {yr}", key=f"pyq_yr_{yr}", use_container_width=True):
-                        qs = qb.get_filtered(years=[yr], n=15)
-                        _start_quiz(qs, "practice", f"PYQ {yr} (All)", 15*72); st.rerun()
+                            _start_quiz(qs, "practice", f"PYQ {yr} ❄️ Dec", 18*60); st.rerun()
+                    with b3:
+                        if st.button(f"🎯 All", key=f"pyq_a_{yr}", use_container_width=True,
+                                     type="primary" if avail_15 else "secondary", disabled=total_cnt==0):
+                            qs = qb.get_filtered(years=[yr], n=15)
+                            _start_quiz(qs, "practice", f"PYQ {yr} (All)", 18*60); st.rerun()
+
+                    st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Season Series cards ────────────────────────────────
-    st.markdown('<div class="section-label">📆 Season Series <span class="pill">combined across years</span></div>', unsafe_allow_html=True)
-    sc1, sc2 = st.columns(2)
+    # ── Season Series ──────────────────────────────────
+    st.markdown('<div class="section-label">📆 Season Series <span class="pill">15 Qs across all years</span></div>', unsafe_allow_html=True)
     june_total = len([q for q in all_q if q.get("season")=="June"])
     dec_total  = len([q for q in all_q if q.get("season")=="December"])
+
+    sc1, sc2 = st.columns(2)
     with sc1:
         st.markdown(f"""<div class="card" style="border-color:rgba(232,160,32,0.35);">
           <div class="card-accent-top" style="background:var(--amber);"></div>
-          <span style="font-size:1.8rem;">☀️</span>
-          <div class="card-title" style="margin-top:0.5rem;">June Series</div>
-          <div class="card-desc">All June-session PYQs combined · {june_total} questions</div>
-          <div class="card-meta"><span class="chip">15 Qs</span><span class="chip amber">18 min</span></div>
+          <div style="display:flex;align-items:center;gap:1rem;">
+            <span style="font-size:2.2rem;">☀️</span>
+            <div>
+              <div class="card-title">June Series</div>
+              <div class="card-desc">All June-session PYQs · {june_total} questions available</div>
+              <div class="card-meta" style="margin-top:0.4rem;"><span class="chip">15 Qs</span><span class="chip amber">18 min</span><span class="chip">Mixed</span></div>
+            </div>
+          </div>
         </div>""", unsafe_allow_html=True)
-        if st.button("Start June Series →", key="pyq_june_all", use_container_width=True, type="primary", disabled=june_total==0):
+        if st.button("☀️ Start June Series →", key="pyq_june_all", use_container_width=True, type="primary", disabled=june_total==0):
             qs = qb.get_filtered(seasons=["June"], n=15)
-            _start_quiz(qs, "practice", "June Series", 15*72); st.rerun()
+            _start_quiz(qs, "practice", "June PYQ Series", 18*60); st.rerun()
 
     with sc2:
         st.markdown(f"""<div class="card" style="border-color:rgba(15,184,201,0.35);">
           <div class="card-accent-top" style="background:var(--teal);"></div>
-          <span style="font-size:1.8rem;">❄️</span>
-          <div class="card-title" style="margin-top:0.5rem;">December Series</div>
-          <div class="card-desc">All December-session PYQs combined · {dec_total} questions</div>
-          <div class="card-meta"><span class="chip">15 Qs</span><span class="chip teal">18 min</span></div>
+          <div style="display:flex;align-items:center;gap:1rem;">
+            <span style="font-size:2.2rem;">❄️</span>
+            <div>
+              <div class="card-title">December Series</div>
+              <div class="card-desc">All December-session PYQs · {dec_total} questions available</div>
+              <div class="card-meta" style="margin-top:0.4rem;"><span class="chip">15 Qs</span><span class="chip teal">18 min</span><span class="chip">Mixed</span></div>
+            </div>
+          </div>
         </div>""", unsafe_allow_html=True)
-        if st.button("Start December Series →", key="pyq_dec_all", use_container_width=True, type="primary", disabled=dec_total==0):
+        if st.button("❄️ Start December Series →", key="pyq_dec_all", use_container_width=True, type="primary", disabled=dec_total==0):
             qs = qb.get_filtered(seasons=["December"], n=15)
-            _start_quiz(qs, "practice", "December Series", 15*72); st.rerun()
+            _start_quiz(qs, "practice", "December PYQ Series", 18*60); st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Topic-wise PYQ ─────────────────────────────────
+    st.markdown('<div class="section-label">📚 Topic-wise PYQ <span class="pill">15 Qs · filtered by topic</span></div>', unsafe_allow_html=True)
+    topic_list = qb.get_topics()
+    t_cols = st.columns(2)
+    for ti, topic in enumerate(topic_list):
+        t_cnt = len([q for q in all_q if q.get("topic")==topic and not q.get("predicted")])
+        with t_cols[ti % 2]:
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                st.markdown(f"""<div style="background:var(--surface2);border:1px solid var(--line2);border-radius:var(--r-sm);
+                  padding:0.5rem 0.75rem;margin-bottom:0.3rem;display:flex;align-items:center;justify-content:space-between;">
+                  <span style="font-size:0.82rem;font-weight:600;color:var(--t1);">{topic}</span>
+                  <span style="font-family:'Fira Code',monospace;font-size:0.7rem;color:var(--t3);">{t_cnt}q</span>
+                </div>""", unsafe_allow_html=True)
+            with c2:
+                if st.button("▶", key=f"pyq_t_{ti}", use_container_width=True, disabled=t_cnt==0):
+                    qs = qb.get_filtered(topics=[topic], n=15)
+                    _start_quiz(qs, "practice", f"PYQ · {topic}", 18*60); st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ── Custom filter session ─────────────────────
     st.markdown('<div class="section-label">🔎 Custom Filter Session</div>', unsafe_allow_html=True)
-    with st.expander("▸ Filters (year, season, topic, difficulty)", expanded=False):
+    with st.expander("▸ Advanced Filters (year + season + topic + difficulty)", expanded=False):
         fc1, fc2, fc3 = st.columns(3)
-        with fc1: sel_years   = st.multiselect("Year",     options=qb.get_years(),   default=[], placeholder="All years",   key="pyq_years")
-        with fc2: sel_seasons = st.multiselect("Season",   options=qb.get_seasons(), default=[], placeholder="All seasons", key="pyq_seasons")
-        with fc3: sel_topics  = st.multiselect("Topics",   options=qb.get_topics(),  default=[], placeholder="All topics",  key="pyq_topics")
-        fc4, fc5, fc6 = st.columns(3)
+        with fc1: sel_years   = st.multiselect("Year",   options=qb.get_years(),   default=[], placeholder="All years",   key="pyq_years")
+        with fc2: sel_seasons = st.multiselect("Season", options=qb.get_seasons(), default=[], placeholder="All seasons", key="pyq_seasons")
+        with fc3: sel_topics  = st.multiselect("Topics", options=qb.get_topics(),  default=[], placeholder="All topics",  key="pyq_topics")
+        fc4, fc5 = st.columns(2)
         with fc4: sel_diff = st.selectbox("Difficulty", ["Mixed","Easy","Medium","Hard"], key="pyq_diff")
-        with fc5: sel_n    = st.select_slider("Questions", [10,15,20,25,30,50], value=15, key="pyq_n")
-        with fc6:
-            timed   = st.toggle("⏱ Timed Mode", value=True, key="pyq_timed")
-            t_limit = sel_n * 72
+        with fc5: sel_n    = st.select_slider("Questions", [10,15,20,25,30], value=15, key="pyq_n")
 
         preview = qb.get_filtered(topics=sel_topics or None, difficulty=sel_diff,
                                    years=sel_years or None, seasons=sel_seasons or None, n=9999, shuffle=False)
-        st.markdown(f'<div style="color:var(--indigo2);font-weight:700;font-size:0.84rem;margin-bottom:0.5rem;">✅ {len(preview)} questions match · {min(sel_n,len(preview))} will be used</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="color:var(--indigo2);font-weight:700;font-size:0.84rem;margin-bottom:0.75rem;">✅ {len(preview)} match · {min(sel_n,len(preview))} will be used · {sel_n * 72 // 60} min timed</div>', unsafe_allow_html=True)
 
-        if st.button("🚀 Start Filtered Session", use_container_width=True, type="primary", key="pyq_start"):
+        if st.button("🚀 Start Filtered PYQ Session", use_container_width=True, type="primary", key="pyq_start"):
             qs = qb.get_filtered(topics=sel_topics or None, difficulty=sel_diff,
                                  years=sel_years or None, seasons=sel_seasons or None, n=sel_n)
             if not qs: st.error("No questions match your filters. Try broadening the selection.")
-            else:
-                _start_quiz(qs, "practice", f"PYQ Custom ({sel_diff})", t_limit if timed else 0); st.rerun()
+            else: _start_quiz(qs, "practice", f"PYQ Custom ({sel_diff})", sel_n * 72); st.rerun()
 
 
 # ═══════════════════════════════════════════════
 # MOCK TESTS PAGE
 # ═══════════════════════════════════════════════
 MOCK_BLUEPRINTS = [
+    # 15-Q Sprints (primary category — shown first)
+    {"id":"m_15_mix","name":"15-Q Sprint — Mixed","icon":"⚡","tag":"15-Q Mock","tag_c":"gold","total":15,"mins":18,"diff":"Mixed","topics":None,"seasons":None,"desc":"15 mixed questions · 18 min · All topics · Perfect revision session","exam_sim":False},
+    {"id":"m_15_b","name":"15-Q Sprint — Set B","icon":"⚡","tag":"15-Q Mock","tag_c":"gold","total":15,"mins":18,"diff":"Mixed","topics":None,"seasons":None,"desc":"Fresh shuffle · same 18-min format · compare with Set A"},
+    {"id":"m_15_hard","name":"15-Q Hard Challenge","icon":"🔥","tag":"15-Q Mock","tag_c":"red","total":15,"mins":18,"diff":"Hard","topics":None,"seasons":None,"desc":"Hard questions only · 18 min · Tests your exam readiness"},
+    {"id":"m_15_easy","name":"15-Q Warm-Up","icon":"🌱","tag":"15-Q Mock","tag_c":"green","total":15,"mins":18,"diff":"Easy","topics":None,"seasons":None,"desc":"Easy questions · great for beginners · confidence builder"},
+    {"id":"m_15_teach","name":"15-Q Teaching Focus","icon":"🧠","tag":"15-Q Mock","tag_c":"cyan","total":15,"mins":18,"diff":"Mixed","topics":["Teaching Aptitude"],"seasons":None,"desc":"Teaching Aptitude only · 15 Qs · 18 min targeted sprint"},
+    {"id":"m_15_res","name":"15-Q Research Focus","icon":"🔬","tag":"15-Q Mock","tag_c":"cyan","total":15,"mins":18,"diff":"Mixed","topics":["Research Aptitude"],"seasons":None,"desc":"Research Aptitude only · 15 Qs · 18 min targeted sprint"},
+    # Full Mock Tests
+    {"id":"m_full1","name":"Full Mock — Set 1","icon":"🎯","tag":"Full Mock","tag_c":"indigo","total":50,"mins":90,"diff":"Mixed","topics":None,"seasons":None,"desc":"50 questions · 90 min · All topics · Full bank shuffle","exam_sim":False},
+    {"id":"m_full2","name":"Full Mock — Set 2","icon":"🎯","tag":"Full Mock","tag_c":"indigo","total":50,"mins":90,"diff":"Mixed","topics":None,"seasons":None,"desc":"Fresh shuffle · same pattern · compare your score"},
     # Exam Simulation
     {"id":"m_exam1","name":"Exam Simulation — Set 1","icon":"🎓","tag":"Exam Simulation","tag_c":"violet","total":50,"mins":180,"diff":"Mixed","topics":None,"seasons":None,"desc":"Full UGC NET pattern · 50 Qs · 3 hrs · Live countdown · Auto-submit","exam_sim":True},
     {"id":"m_exam2","name":"Exam Simulation — Set 2","icon":"🎓","tag":"Exam Simulation","tag_c":"violet","total":50,"mins":180,"diff":"Mixed","topics":None,"seasons":None,"desc":"New shuffle · same exam conditions · ranked on leaderboard","exam_sim":True},
-    # Full Mock Tests
-    {"id":"m_full1","name":"Full Mock — Set 1","icon":"🎯","tag":"Full Mock","tag_c":"indigo","total":50,"mins":90,"diff":"Mixed","topics":None,"seasons":None,"desc":"50 questions · 90 min · All topics · Full bank shuffle","exam_sim":False},
-    {"id":"m_full2","name":"Full Mock — Set 2","icon":"🎯","tag":"Full Mock","tag_c":"indigo","total":50,"mins":90,"diff":"Mixed","topics":None,"seasons":None,"desc":"Fresh shuffle · same pattern · compare your score","exam_sim":False},
-    # 15-Q Sprints
-    {"id":"m_15_1","name":"15-Q Sprint — Set A","icon":"⚡","tag":"15-Q Sprint","tag_c":"gold","total":15,"mins":18,"diff":"Mixed","topics":None,"seasons":None,"desc":"15 questions · 18 min · Perfect for quick revision","exam_sim":False},
-    {"id":"m_15_2","name":"15-Q Sprint — Set B","icon":"⚡","tag":"15-Q Sprint","tag_c":"gold","total":15,"mins":18,"diff":"Mixed","topics":None,"seasons":None,"desc":"Second sprint set · different question selection","exam_sim":False},
-    {"id":"m_15_3","name":"15-Q Hard Challenge","icon":"🔥","tag":"15-Q Sprint","tag_c":"red","total":15,"mins":18,"diff":"Hard","topics":None,"seasons":None,"desc":"15 hard questions only · tests your limits · 18 min","exam_sim":False},
-    {"id":"m_15_easy","name":"15-Q Warm-Up","icon":"🌱","tag":"15-Q Sprint","tag_c":"green","total":15,"mins":18,"diff":"Easy","topics":None,"seasons":None,"desc":"Easy questions · great for beginners and warm-up","exam_sim":False},
-    # Topic Sprints
-    {"id":"m_teach","name":"Teaching Sprint","icon":"🧠","tag":"Topic Sprint","tag_c":"cyan","total":25,"mins":40,"diff":"Mixed","topics":["Teaching Aptitude"],"seasons":None,"desc":"25 questions · Teaching Aptitude only · 40 min","exam_sim":False},
-    {"id":"m_res","name":"Research Sprint","icon":"🔬","tag":"Topic Sprint","tag_c":"cyan","total":25,"mins":40,"diff":"Mixed","topics":["Research Aptitude"],"seasons":None,"desc":"25 questions · Research Aptitude only · 40 min","exam_sim":False},
-    {"id":"m_ict","name":"ICT + Reasoning","icon":"💻","tag":"Topic Sprint","tag_c":"cyan","total":20,"mins":30,"diff":"Mixed","topics":["ICT","Reasoning"],"seasons":None,"desc":"ICT and Reasoning combined · 20 Qs · 30 min","exam_sim":False},
-    {"id":"m_env","name":"Environment Sprint","icon":"🌿","tag":"Topic Sprint","tag_c":"cyan","total":20,"mins":30,"diff":"Mixed","topics":["Environment & Ecology"],"seasons":None,"desc":"Environment & Ecology only · 20 Qs · 30 min","exam_sim":False},
     # Season PYQ Mocks
-    {"id":"m_june","name":"June PYQ Series","icon":"☀️","tag":"Season Mock","tag_c":"gold","total":50,"mins":90,"diff":"Mixed","topics":None,"seasons":["June"],"desc":"All June-session PYQs · 50 Qs · 90 min","exam_sim":False},
-    {"id":"m_dec","name":"December PYQ Series","icon":"❄️","tag":"Season Mock","tag_c":"gold","total":50,"mins":90,"diff":"Mixed","topics":None,"seasons":["December"],"desc":"All December-session PYQs · 50 Qs · 90 min","exam_sim":False},
+    {"id":"m_june","name":"June PYQ Mock","icon":"☀️","tag":"Season Mock","tag_c":"gold","total":15,"mins":18,"diff":"Mixed","topics":None,"seasons":["June"],"desc":"15 June-session PYQs · 18 min · real exam questions"},
+    {"id":"m_dec","name":"December PYQ Mock","icon":"❄️","tag":"Season Mock","tag_c":"gold","total":15,"mins":18,"diff":"Mixed","topics":None,"seasons":["December"],"desc":"15 December-session PYQs · 18 min · real exam questions"},
 ]
 
 def page_mock():
@@ -1475,84 +1532,113 @@ def page_mock():
 
     st.markdown("""<div class="page-header">
       <h1>🧪 Mock Tests</h1>
-      <p>Structured tests for every need — Exam Simulation · Full Mocks · 15-Q Sprints · Topic Sprints · Season PYQs. All auto-scored and ranked.</p>
+      <p>Structured tests for every level — <strong>15-Q Sprints</strong> · Full Mocks · Exam Simulation · Season PYQs. All auto-scored and ranked.</p>
     </div>""", unsafe_allow_html=True)
 
-    # ── Exam Simulation banner ─────────────────────
-    sim_mocks = [m for m in MOCK_BLUEPRINTS if m.get("exam_sim")]
-    st.markdown('<div class="section-label">🎓 Exam Simulation <span class="pill">UGC NET real conditions · 50 Qs · 3 hrs · auto-submit</span></div>', unsafe_allow_html=True)
-    sim_cols = st.columns(len(sim_mocks))
-    for i, m in enumerate(sim_mocks):
-        avail = qb.get_filtered(topics=m["topics"], difficulty=m["diff"], seasons=m["seasons"], n=9999, shuffle=False)
-        cnt = len(avail); can = cnt > 0; used = min(m["total"], cnt)
+    # ── 15-Q Sprints — PRIMARY section ────────────
+    st.markdown('<div class="section-label">⚡ 15-Question Mock Tests <span class="pill">18 min · quick & targeted · most popular</span></div>', unsafe_allow_html=True)
+    sprint_mocks = [m for m in MOCK_BLUEPRINTS if m["tag"] == "15-Q Mock"]
+    s_cols = st.columns(3)
+    for si, m in enumerate(sprint_mocks):
+        avail = qb.get_filtered(topics=m.get("topics"), difficulty=m["diff"], seasons=m.get("seasons"), n=9999, shuffle=False)
+        cnt = len(avail); used = min(m["total"], cnt); can = cnt >= 10
+        diff_color = {"Mixed":"var(--indigo2)","Easy":"var(--emerald)","Medium":"var(--amber)","Hard":"var(--rose)"}.get(m["diff"],"var(--t2)")
         avail_color = "var(--emerald)" if can else "var(--rose)"
+        with s_cols[si % 3]:
+            st.markdown(f"""<div class="card" style="border-color:{'rgba(232,160,32,0.4)' if m['diff']=='Mixed' else ('rgba(16,185,129,0.3)' if m['diff']=='Easy' else 'rgba(244,63,94,0.3)')};">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;">
+                <span style="font-size:1.8rem;">{m['icon']}</span>
+                <span style="font-size:0.63rem;color:{avail_color};font-weight:700;">{'✓ ' + str(cnt) + ' avail' if can else '⚠ Upload more'}</span>
+              </div>
+              <div class="card-title" style="font-size:0.88rem;">{m['name']}</div>
+              <div class="card-desc" style="font-size:0.76rem;">{m['desc']}</div>
+              <div class="card-meta" style="margin-top:0.5rem;">
+                <span class="chip" style="color:{diff_color};">⚡ {used} Qs</span>
+                <span class="chip amber">⏱ 18 min</span>
+              </div>
+            </div>""", unsafe_allow_html=True)
+            if st.button(f"▶ Start", key=f"mock_{m['id']}", use_container_width=True,
+                         type="primary" if can else "secondary", disabled=not can):
+                qs = qb.get_filtered(topics=m.get("topics"), difficulty=m["diff"], seasons=m.get("seasons"), n=m["total"])
+                _start_quiz(qs, "exam", m["name"], m["mins"]*60); st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Exam Simulation ─────────────────────────────
+    st.markdown('<div class="section-label">🎓 Exam Simulation <span class="pill">UGC NET real conditions · 50 Qs · 3 hrs · auto-submit · ranked</span></div>', unsafe_allow_html=True)
+    sim_mocks = [m for m in MOCK_BLUEPRINTS if m.get("exam_sim")]
+    sim_cols = st.columns(2)
+    for i, m in enumerate(sim_mocks):
+        avail = qb.get_filtered(difficulty=m["diff"], n=9999, shuffle=False)
+        cnt = len(avail); can = cnt > 0; used = min(m["total"], cnt)
         with sim_cols[i]:
             st.markdown(f"""<div class="card" style="border-color:rgba(99,102,241,0.5);background:linear-gradient(135deg,rgba(99,102,241,0.07),rgba(15,184,201,0.04));">
               <div class="card-accent-top" style="background:linear-gradient(90deg,var(--indigo),var(--teal));"></div>
               <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;">
-                <span style="font-size:2rem;">{m["icon"]}</span>
-                <span style="font-size:0.68rem;color:{avail_color};font-weight:700;">✓ {cnt} Qs available</span>
+                <span style="font-size:1.8rem;">{m['icon']}</span>
+                <span style="font-size:0.65rem;color:var(--indigo2);font-weight:700;">🔒 Exam Mode</span>
               </div>
-              <div class="card-title" style="color:var(--indigo2);">{m["name"]}</div>
-              <div class="card-desc">{m["desc"]}</div>
+              <div class="card-title" style="color:var(--indigo2);">{m['name']}</div>
+              <div class="card-desc">{m['desc']}</div>
               <div class="card-meta">
-                <span class="chip" style="color:var(--indigo2);border-color:rgba(99,102,241,0.3);">📝 {used} Qs</span>
+                <span class="chip" style="color:var(--indigo2);">📝 {used} Qs</span>
                 <span class="chip amber">⏱ 180 min</span>
-                <span class="chip" style="color:var(--rose);border-color:rgba(244,63,94,0.3);">🔒 No pause</span>
+                <span class="chip" style="color:var(--rose);">🏆 Ranked</span>
               </div>
             </div>""", unsafe_allow_html=True)
-            if st.button(f"🎓 Start {m['name'][:28]}", key=f"mock_{m['id']}", use_container_width=True,
+            if st.button(f"🎓 Launch Exam Simulation", key=f"mock_{m['id']}", use_container_width=True,
                          type="primary" if can else "secondary", disabled=not can):
-                qs = qb.get_filtered(topics=m["topics"], difficulty=m["diff"], seasons=m["seasons"], n=m["total"])
+                qs = qb.get_filtered(n=m["total"])
                 _start_quiz(qs, "exam_sim", m["name"], m["mins"]*60); st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── All other mock groups ──────────────────────
-    tag_order  = ["Full Mock", "15-Q Sprint", "Topic Sprint", "Season Mock"]
-    tag_colors = {"Full Mock":"var(--indigo)","15-Q Sprint":"var(--amber)","Topic Sprint":"var(--teal)","Season Mock":"var(--amber2)"}
+    # ── Full Mocks + Season Mocks ──────────────────
+    st.markdown('<div class="section-label">🎯 Full Mock Tests <span class="pill">50 Qs · 90 min</span></div>', unsafe_allow_html=True)
+    full_mocks  = [m for m in MOCK_BLUEPRINTS if m["tag"] == "Full Mock"]
+    f_cols = st.columns(2)
+    for fi, m in enumerate(full_mocks):
+        avail = qb.get_filtered(n=9999, shuffle=False)
+        cnt = len(avail); used = min(m["total"], cnt); can = cnt > 0
+        with f_cols[fi]:
+            st.markdown(f"""<div class="card" style="border-color:rgba(99,102,241,0.3);">
+              <div class="card-accent-top" style="background:var(--indigo);"></div>
+              <div style="font-size:1.6rem;margin-bottom:0.4rem;">{m['icon']}</div>
+              <div class="card-title">{m['name']}</div>
+              <div class="card-desc">{m['desc']}</div>
+              <div class="card-meta"><span class="chip">📝 {used} Qs</span><span class="chip">⏱ 90 min</span></div>
+            </div>""", unsafe_allow_html=True)
+            if st.button(f"▶ Start {m['name']}", key=f"mock_{m['id']}", use_container_width=True,
+                         type="primary" if can else "secondary", disabled=not can):
+                qs = qb.get_filtered(n=m["total"])
+                _start_quiz(qs, "exam", m["name"], m["mins"]*60); st.rerun()
 
-    tags = {}
-    for m in MOCK_BLUEPRINTS:
-        if not m.get("exam_sim"):
-            tags.setdefault(m["tag"], []).append(m)
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    for tag in tag_order:
-        mocks = tags.get(tag, [])
-        if not mocks: continue
-        chip_color = tag_colors.get(tag, "var(--teal)")
-        st.markdown(f'<div class="section-label">{tag} <span class="pill">{len(mocks)} tests</span></div>', unsafe_allow_html=True)
-
-        cols = st.columns(min(len(mocks), 2) if len(mocks) <= 4 else 3)
-        for i, m in enumerate(mocks):
-            avail = qb.get_filtered(topics=m["topics"], difficulty=m["diff"], seasons=m["seasons"], n=9999, shuffle=False)
-            cnt   = len(avail); used = min(m["total"], cnt); can = cnt > 0
-            avail_color = "var(--emerald)" if can else "var(--rose)"
-            avail_label = f"✓ {cnt} available" if can else "⚠ No questions"
-            with cols[i % len(cols)]:
-                st.markdown(f"""<div class="card">
-                  <div class="card-accent-top" style="background:{chip_color};"></div>
-                  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;">
-                    <span style="font-size:1.5rem;">{m["icon"]}</span>
-                    <span style="font-size:0.65rem;color:{avail_color};font-weight:700;">{avail_label}</span>
-                  </div>
-                  <div class="card-title" style="font-size:0.9rem;">{m["name"]}</div>
-                  <div class="card-desc" style="font-size:0.77rem;">{m["desc"]}</div>
-                  <div class="card-meta">
-                    <span class="chip">📝 {used} Qs</span>
-                    <span class="chip">⏱ {m["mins"]}m</span>
-                    <span class="chip teal">{m["diff"]}</span>
-                  </div>
-                </div>""", unsafe_allow_html=True)
-                if st.button(f"Start →", key=f"mock_{m['id']}", use_container_width=True,
-                             type="primary" if can else "secondary", disabled=not can):
-                    qs = qb.get_filtered(topics=m["topics"], difficulty=m["diff"], seasons=m["seasons"], n=m["total"])
-                    _start_quiz(qs, "exam", m["name"], m["mins"]*60); st.rerun()
+    # ── Season Mocks ─────────────────────────────────
+    st.markdown('<div class="section-label">📅 Season PYQ Mocks <span class="pill">15 Qs from real exams</span></div>', unsafe_allow_html=True)
+    sea_mocks = [m for m in MOCK_BLUEPRINTS if m["tag"] == "Season Mock"]
+    sm_cols = st.columns(2)
+    for si2, m in enumerate(sea_mocks):
+        avail = qb.get_filtered(seasons=m.get("seasons"), n=9999, shuffle=False)
+        cnt = len(avail); used = min(m["total"], cnt); can = cnt > 0
+        border_c = "rgba(232,160,32,0.4)" if "June" in m["name"] else "rgba(15,184,201,0.4)"
+        with sm_cols[si2]:
+            st.markdown(f"""<div class="card" style="border-color:{border_c};">
+              <div style="font-size:1.6rem;margin-bottom:0.4rem;">{m['icon']}</div>
+              <div class="card-title">{m['name']}</div>
+              <div class="card-desc">{m['desc']} · {cnt} questions available</div>
+              <div class="card-meta"><span class="chip">📝 {used} Qs</span><span class="chip amber">⏱ 18 min</span></div>
+            </div>""", unsafe_allow_html=True)
+            if st.button(f"▶ Start {m['name']}", key=f"mock_{m['id']}", use_container_width=True,
+                         type="primary" if can else "secondary", disabled=not can):
+                qs = qb.get_filtered(seasons=m.get("seasons"), n=m["total"])
+                _start_quiz(qs, "exam", m["name"], m["mins"]*60); st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ── Custom Mock Builder ────────────────────────
-    st.markdown('<div class="section-label">🔧 Custom Mock Builder <span class="pill">build your own</span></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">🔧 Custom Mock Builder <span class="pill">design your own test</span></div>', unsafe_allow_html=True)
     with st.expander("▸ Configure Custom Mock", expanded=False):
         r1c1, r1c2, r1c3 = st.columns(3)
         with r1c1: cy = st.multiselect("Year(s)",   qb.get_years(),   default=[], key="cb_years",   placeholder="All")
@@ -1580,45 +1666,87 @@ def page_ai():
 
     st.markdown("""<div class="page-header">
       <h1>🤖 AI Predicted Questions</h1>
-      <p>Questions curated by AI analysis of exam trends, NEP 2020 reforms, and topic frequency — targeted at upcoming exams.</p>
+      <p>Curated by AI analysis of exam trends, NEP 2020 reforms, and topic frequency — targeted at upcoming UGC NET exams.</p>
     </div>""", unsafe_allow_html=True)
 
     ai_qs = [q for q in qb.get_all() if q.get("predicted")]
+    reg_qs_total = len([q for q in qb.get_all() if not q.get("predicted")])
 
-    st.markdown(f"""<div class="card" style="border-color:rgba(15,184,201,0.3);margin-bottom:1.5rem;">
-      <div class="card-accent-top" style="background:linear-gradient(90deg,var(--teal),var(--indigo));"></div>
-      <div style="display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;">
-        <div style="font-size:2.8rem;line-height:1;">🤖</div>
-        <div>
-          <div style="font-family:'Playfair Display',serif;font-weight:800;font-size:1.15rem;color:var(--teal2);">{len(ai_qs)} AI-Predicted Questions</div>
-          <div style="color:var(--t2);font-size:0.85rem;margin-top:0.3rem;">Based on trend analysis · June 2025 focus · NEP 2020 aligned</div>
-        </div>
-      </div>
-    </div>""", unsafe_allow_html=True)
-
-    diff_colors = {"Easy":"var(--emerald)","Medium":"var(--amber)","Hard":"var(--rose)"}
-    for q in ai_qs:
-        dc = diff_colors.get(q.get("difficulty",""), "var(--t2)")
-        st.markdown(f"""<div class="card" style="margin-bottom:0.6rem;">
-          <div class="card-meta" style="margin-bottom:0.6rem;">
-            <span class="chip teal">{q.get("topic","—")}</span>
-            <span class="chip" style="color:{dc};border-color:{dc}20;">{q.get("difficulty","—")}</span>
-            <span class="chip amber">🤖 AI Pick</span>
-          </div>
-          <div style="font-family:'Playfair Display',serif;font-weight:700;color:var(--t1);font-size:0.95rem;line-height:1.65;">{q["question"]}</div>
+    # ── Stats banner ────────────────────────────────
+    s1, s2, s3 = st.columns(3)
+    with s1:
+        st.markdown(f"""<div class="card" style="text-align:center;padding:1.1rem;border-color:rgba(15,184,201,0.35);border-top:3px solid var(--teal);">
+          <div style="font-family:'Fira Code',monospace;font-size:1.8rem;font-weight:800;color:var(--teal2);">{len(ai_qs)}</div>
+          <div style="font-size:0.68rem;color:var(--t3);text-transform:uppercase;margin-top:0.2rem;">AI Predictions</div>
+        </div>""", unsafe_allow_html=True)
+    with s2:
+        st.markdown("""<div class="card" style="text-align:center;padding:1.1rem;border-color:rgba(232,160,32,0.35);border-top:3px solid var(--amber);">
+          <div style="font-family:'Fira Code',monospace;font-size:1.8rem;font-weight:800;color:var(--amber2);">June 2025</div>
+          <div style="font-size:0.68rem;color:var(--t3);text-transform:uppercase;margin-top:0.2rem;">Target Exam</div>
+        </div>""", unsafe_allow_html=True)
+    with s3:
+        st.markdown("""<div class="card" style="text-align:center;padding:1.1rem;border-color:rgba(99,102,241,0.35);border-top:3px solid var(--indigo);">
+          <div style="font-family:'Fira Code',monospace;font-size:1.8rem;font-weight:800;color:var(--indigo2);">NEP 2020</div>
+          <div style="font-size:0.68rem;color:var(--t3);text-transform:uppercase;margin-top:0.2rem;">Aligned Reforms</div>
         </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("🚀 Practice All AI Questions", use_container_width=True, type="primary", key="ai_all"):
-            if ai_qs: _start_quiz(ai_qs, "practice", "AI Predicted Questions", len(ai_qs)*90); st.rerun()
-            else: st.error("No AI predicted questions in bank yet.")
-    with c2:
-        if st.button("🧪 AI + PYQ Mix Mock", use_container_width=True, key="ai_mock"):
-            reg_qs = qb.get_filtered(n=15, shuffle=True)
-            mixed  = (ai_qs + reg_qs)[:20]; random.shuffle(mixed)
-            _start_quiz(mixed, "exam", "AI Predicted Mix Mock", 20*90); st.rerun()
+
+    # ── Action buttons ──────────────────────────────
+    st.markdown('<div class="section-label">🚀 Practice Modes</div>', unsafe_allow_html=True)
+    ac1, ac2, ac3 = st.columns(3)
+    with ac1:
+        st.markdown("""<div class="card" style="border-color:rgba(15,184,201,0.4);text-align:center;padding:1.2rem;">
+          <div style="font-size:2rem;margin-bottom:0.5rem;">🤖</div>
+          <div style="font-weight:700;color:var(--teal2);font-size:0.9rem;margin-bottom:0.3rem;">AI Questions Only</div>
+          <div style="font-size:0.75rem;color:var(--t3);">Practice all AI-predicted questions · 18 min</div>
+        </div>""", unsafe_allow_html=True)
+        if st.button("▶ Start AI Practice", key="ai_all", use_container_width=True, type="primary"):
+            if ai_qs: _start_quiz(ai_qs, "practice", "AI Predicted Questions", len(ai_qs)*90)
+            else: st.error("No AI questions in bank yet.")
+            st.rerun()
+    with ac2:
+        st.markdown("""<div class="card" style="border-color:rgba(99,102,241,0.4);text-align:center;padding:1.2rem;">
+          <div style="font-size:2rem;margin-bottom:0.5rem;">🔀</div>
+          <div style="font-weight:700;color:var(--indigo2);font-size:0.9rem;margin-bottom:0.3rem;">AI + PYQ Mix</div>
+          <div style="font-size:0.75rem;color:var(--t3);">AI picks blended with real PYQs · 20 Qs</div>
+        </div>""", unsafe_allow_html=True)
+        if st.button("▶ Start Mix Mock", key="ai_mock", use_container_width=True):
+            reg = qb.get_filtered(n=15, shuffle=True)
+            mixed = (ai_qs + reg)[:20]; random.shuffle(mixed)
+            _start_quiz(mixed, "exam", "AI + PYQ Mix Mock", 20*90); st.rerun()
+    with ac3:
+        st.markdown("""<div class="card" style="border-color:rgba(232,160,32,0.4);text-align:center;padding:1.2rem;">
+          <div style="font-size:2rem;margin-bottom:0.5rem;">🎯</div>
+          <div style="font-weight:700;color:var(--amber2);font-size:0.9rem;margin-bottom:0.3rem;">15-Q AI Mock</div>
+          <div style="font-size:0.75rem;color:var(--t3);">AI picks · 15 Qs · 18 min timed sprint</div>
+        </div>""", unsafe_allow_html=True)
+        if st.button("▶ Start 15-Q AI Mock", key="ai_15", use_container_width=True):
+            qs15 = ai_qs[:] ; random.shuffle(qs15)
+            if not qs15: qs15 = qb.get_filtered(n=15)
+            _start_quiz(qs15[:15], "exam", "AI 15-Q Mock", 18*60); st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── AI questions preview list ────────────────────
+    st.markdown('<div class="section-label">🔍 AI-Predicted Questions Preview</div>', unsafe_allow_html=True)
+    diff_colors = {"Easy":"var(--emerald)","Medium":"var(--amber)","Hard":"var(--rose)"}
+    topic_icons = {"Teaching Aptitude":"🧠","Research Aptitude":"🔬","ICT":"💻","Environment & Ecology":"🌿",
+                   "Higher Education":"🎓","Communication":"📡","Reasoning":"🧩","Data Interpretation":"📊",
+                   "Indian Constitution & Governance":"⚖️","Reading Comprehension":"📖"}
+    for qi, q in enumerate(ai_qs):
+        dc = diff_colors.get(q.get("difficulty",""), "var(--t2)")
+        icon = topic_icons.get(q.get("topic",""), "📌")
+        st.markdown(f"""<div class="card" style="margin-bottom:0.5rem;border-color:rgba(15,184,201,0.2);">
+          <div class="card-meta" style="margin-bottom:0.5rem;">
+            <span class="chip teal">{icon} {q.get('topic','—')}</span>
+            <span class="chip" style="color:{dc};">{q.get('difficulty','—')}</span>
+            <span class="chip amber">🤖 AI Pick</span>
+            <span style="font-size:0.65rem;color:var(--t3);margin-left:auto;">Target: {q.get('year','')} {q.get('season','')}</span>
+          </div>
+          <div style="font-family:'Playfair Display',serif;font-weight:700;color:var(--t1);font-size:0.93rem;line-height:1.7;">{q['question']}</div>
+        </div>""", unsafe_allow_html=True)
+
 
 
 # ═══════════════════════════════════════════════
@@ -2256,11 +2384,27 @@ def page_login():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Auto-create demo account if it doesn't exist
+    # Auto-create demo accounts for leaderboard demo
     try:
         users = load_users()
-        if "demo" not in users:
-            register_user("demo", "demo123", "Demo Student")
+        demo_accounts = [
+            ("demo",    "demo123",  "Demo Student"),
+            ("arjun",   "test123",  "Arjun Kumar"),
+            ("priya",   "test123",  "Priya Nair"),
+            ("rahul",   "test123",  "Rahul Sharma"),
+            ("anjali",  "test123",  "Anjali Menon"),
+        ]
+        scores = load_scores()
+        existing_score_users = {s.get("username") for s in scores}
+        for un_, pw_, nm_ in demo_accounts:
+            if un_ not in users:
+                register_user(un_, pw_, nm_)
+            # Seed demo scores for leaderboard
+            if un_ != "demo" and un_ not in existing_score_users:
+                import random as _r
+                sc_ = _r.randint(8, 14)
+                save_score(un_, nm_, sc_, 15,
+                           round(sc_/15*100), "exam", 900)
     except: pass
 
 
