@@ -1,4447 +1,2951 @@
-# ============================================================================
-# NYZTrade UNIFIED GEX/DEX Dashboard - INDEX + STOCK OPTIONS
-# Features: Weekly/Monthly Options | VANNA & CHARM | Gamma Flip Zones
-#           Smart Caching | Volume Overlay | Volume Spike Detection
-#           Significant GEX Classification (Addition vs Unwind)
-# Supports: NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY + 30 F&O Stocks
-# ============================================================================
+"""
+╔══════════════════════════════════════════════════════════════════════╗
+║    NET QUIZ MASTER v3.0  ·  Complete Platform Redesign              ║
+║    NYZTrade Education  ·  UGC NET Paper 1                           ║
+╚══════════════════════════════════════════════════════════════════════╝
+"""
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from scipy.stats import norm
+import html, json, os, re, random, time, uuid, hashlib
 from datetime import datetime, timedelta
-import pytz
-import requests
-import time
-from dataclasses import dataclass
-from typing import Optional, Dict, List, Tuple
-import warnings
-import hashlib
-import json
-import os
-import pickle
-from pathlib import Path
-warnings.filterwarnings('ignore')
-
-# ============================================================================
-# PAGE CONFIG & STYLING
-# ============================================================================
+from itertools import product
+import pandas as pd
+import streamlit as st
 
 st.set_page_config(
-    page_title="NYZTrade Unified - GEX & VANNA Dashboard",
-    page_icon="📊",
+    page_title="NET Guru — UGC NET Paper 1",
+    page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-st.markdown("""
+# ═══════════════════════════════════════════════
+# CONSTANTS
+# ═══════════════════════════════════════════════
+QUESTION_BANK_FILE = "question_bank.json"
+USERS_FILE         = "users.json"
+SCORES_FILE        = "scores.json"
+DEVELOPER_PIN      = "NYZ2025"
+
+TOPICS = [
+    "Teaching Aptitude","Research Aptitude","Reading Comprehension",
+    "Communication","Reasoning","ICT","Environment & Ecology",
+    "Higher Education","Indian Constitution & Governance","Data Interpretation"
+]
+
+PYQ_YEARS = list(range(2024, 2015, -1))  # 2024 → 2016
+SEASONS   = ["June", "December"]
+
+# ═══════════════════════════════════════════════
+# CSS
+# ═══════════════════════════════════════════════
+def inject_styles():
+    # Inject viewport meta for proper mobile scaling
+    st.markdown('<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">', unsafe_allow_html=True)
+    st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-    header[data-testid="stHeader"] a[href*="github"] { display: none !important; }
-    button[kind="header"][data-testid="baseButton-header"] svg { display: none !important; }
-    a[aria-label*="GitHub"], a[aria-label*="github"], a[href*="github.com"] { display: none !important; }
+/* ══════════════════════════════════════════════════════
+   DESIGN TOKENS — Dark Academy (DM + Violet)
+══════════════════════════════════════════════════════ */
+* { box-sizing: border-box; }
+:root {
+  --bg:        #07090f;
+  --bg2:       #0d1117;
+  --bg-card:   #131929;
+  --surface:   #131929;
+  --surface2:  #1a2235;
+  --surface3:  #1e2a40;
+  --border:    #1e2d45;
+  --border2:   #3b4f6e;
+  --line:      #1e2d45;
+  --line2:     #2d3f5e;
+  --line3:     #3b4f6e;
+  --violet:    #7c3aed;
+  --violet2:   #a855f7;
+  --violet-glow: rgba(124,58,237,0.15);
+  --cyan:      #22d3ee;
+  --cyan2:     #67e8f9;
+  --gold:      #fbbf24;
+  --gold2:     #fde68a;
+  --amber:     #fbbf24;
+  --amber2:    #fde68a;
+  --green:     #10b981;
+  --red:       #f43f5e;
+  --rose:      #f43f5e;
+  --indigo:    #6366f1;
+  --indigo2:   #818cf8;
+  --emerald:   #10b981;
+  --teal:      #22d3ee;
+  --teal2:     #67e8f9;
+  --t1: #ffffff;
+  --t2: #cbd5e1;
+  --t3: #94a3b8;
+  --t4: #64748b;
+  --text:  #ffffff;
+  --text2: #cbd5e1;
+  --text3: #94a3b8;
+  --r:    14px; --rl:   20px;
+  --r-sm:  8px; --r-md: 14px; --r-lg: 20px; --r-xl: 28px;
+  --shadow-card: 0 2px 24px rgba(0,0,0,0.5), 0 1px 4px rgba(0,0,0,0.3);
+}
 
-    :root {
-        --bg-primary: #0a0e17;
-        --bg-secondary: #111827;
-        --bg-card: #1a2332;
-        --bg-card-hover: #232f42;
-        --accent-green: #10b981;
-        --accent-red: #ef4444;
-        --accent-blue: #3b82f6;
-        --accent-purple: #8b5cf6;
-        --accent-yellow: #f59e0b;
-        --accent-cyan: #06b6d4;
-        --text-primary: #f1f5f9;
-        --text-secondary: #94a3b8;
-        --text-muted: #64748b;
-        --border-color: #2d3748;
-    }
+/* ══ APP BASE ══ */
+.stApp { background: var(--bg) !important; font-family: 'DM Sans', sans-serif !important; color: var(--t1) !important; -webkit-font-smoothing: antialiased; }
+#MainMenu, footer, header { visibility: hidden !important; }
+.stDeployButton { display: none !important; }
+[data-testid="stText"] { display: none !important; }
 
-    .stApp { background: linear-gradient(135deg, var(--bg-primary) 0%, #0f172a 50%, var(--bg-primary) 100%); }
+/* ══ MAIN CONTAINER ══ */
+.main .block-container { padding: 0.75rem 0.75rem 4rem !important; max-width: 100% !important; }
+@media (min-width: 768px) { .main .block-container { padding: 1.5rem 2rem 3rem !important; max-width: 1280px !important; } }
 
-    .main-header {
-        background: linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(139,92,246,0.1) 100%);
-        border: 1px solid var(--border-color);
-        border-radius: 16px;
-        padding: 24px 32px;
-        margin-bottom: 24px;
-        backdrop-filter: blur(10px);
-    }
-    .main-title {
-        font-family: 'Space Grotesk', sans-serif;
-        font-size: 2.5rem;
-        font-weight: 700;
-        background: linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin: 0;
-    }
-    .sub-title { font-family: 'JetBrains Mono', monospace; color: var(--text-secondary); font-size: 0.9rem; margin-top: 8px; }
+/* ══ SCROLLBAR ══ */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--violet); }
 
-    .metric-card {
-        background: var(--bg-card);
-        border: 1px solid var(--border-color);
-        border-radius: 12px;
-        padding: 20px;
-        transition: all 0.3s ease;
-    }
-    .metric-card:hover { background: var(--bg-card-hover); transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
-    .metric-card.positive { border-left: 4px solid var(--accent-green); }
-    .metric-card.negative { border-left: 4px solid var(--accent-red); }
-    .metric-card.neutral  { border-left: 4px solid var(--accent-yellow); }
+/* ══════════════════════════════════════════════════════
+   SIDEBAR
+══════════════════════════════════════════════════════ */
+[data-testid="stSidebar"] {
+  background: linear-gradient(180deg, #0d1117, #0a0e1a) !important;
+  border-right: 1px solid var(--border) !important;
+  min-width: 240px !important;
+}
+.sidebar-brand {
+  display: flex; align-items: center; gap: 0.7rem; padding: 1rem;
+  background: linear-gradient(135deg, rgba(124,58,237,0.25), rgba(168,85,247,0.1));
+  border-radius: var(--r); border: 1px solid rgba(124,58,237,0.5);
+  margin-bottom: 0.5rem;
+}
+.brand-title { font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 700; color: #fff; }
+.brand-subtitle { font-size: 0.68rem; color: #a855f7; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; }
 
-    .metric-label  { font-family: 'JetBrains Mono', monospace; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
-    .metric-value  { font-family: 'Space Grotesk', sans-serif; font-size: 1.75rem; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
-    .metric-value.positive { color: var(--accent-green); }
-    .metric-value.negative { color: var(--accent-red); }
-    .metric-value.neutral  { color: var(--accent-yellow); }
-    .metric-delta  { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; margin-top: 8px; color: var(--text-secondary); }
+[data-testid="stSidebar"] .stButton button {
+  background: transparent !important; border: 1px solid transparent !important;
+  color: var(--t3) !important; text-align: left !important; font-size: 0.9rem !important;
+  padding: 0.6rem 0.8rem !important; border-radius: 10px !important;
+  width: 100% !important; font-weight: 500 !important; font-family: 'DM Sans', sans-serif !important;
+}
+[data-testid="stSidebar"] .stButton button * { color: inherit !important; }
+[data-testid="stSidebar"] .stButton button:hover {
+  background: rgba(124,58,237,0.18) !important; color: #fff !important;
+  border-color: rgba(124,58,237,0.5) !important;
+}
+[data-testid="stSidebar"] .stButton button[kind="primary"] {
+  background: linear-gradient(135deg, rgba(124,58,237,0.35), rgba(168,85,247,0.2)) !important;
+  border-color: var(--violet) !important; color: #fff !important;
+}
+[data-testid="stSidebar"] .stButton button[kind="primary"] * { color: #fff !important; }
 
-    .live-indicator {
-        display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px;
-        background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
-        border-radius: 20px; animation: pulse 2s ease-in-out infinite;
-    }
-    .live-dot { width: 8px; height: 8px; background: var(--accent-red); border-radius: 50%; animation: blink 1.5s ease-in-out infinite; }
+.sidebar-stats {
+  display: flex; justify-content: space-around; padding: 0.8rem;
+  background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(34,211,238,0.05));
+  border-radius: var(--r); border: 1px solid rgba(124,58,237,0.3);
+}
+.stat-mini { text-align: center; }
+.stat-mini-val {
+  display: block; font-size: 1.2rem; font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  background: linear-gradient(135deg, #a855f7, #22d3ee);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.stat-mini-lbl { font-size: 0.6rem; color: var(--t4); text-transform: uppercase; letter-spacing: 0.06em; }
 
-    .index-badge {
-        display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px;
-        background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.4);
-        border-radius: 12px; color: #a78bfa; font-size: 0.75rem; font-weight: 600;
-    }
-    .stock-badge {
-        display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px;
-        background: rgba(6,182,212,0.2); border: 1px solid rgba(6,182,212,0.4);
-        border-radius: 12px; color: #22d3ee; font-size: 0.75rem; font-weight: 600;
-    }
-    .spike-legend {
-        padding: 10px 16px;
-        background: rgba(59,130,246,0.08);
-        border: 1px solid rgba(59,130,246,0.25);
-        border-radius: 10px;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.78rem;
-        color: #94a3b8;
-        line-height: 1.8;
-    }
+/* ══════════════════════════════════════════════════════
+   PAGE ANATOMY
+══════════════════════════════════════════════════════ */
+.page-wrap { padding-top: 0.5rem; }
+.page-header { margin-bottom: 1.75rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
+.page-header h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(1.5rem, 3vw, 2.2rem); font-weight: 800; color: var(--t1);
+  letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 0.4rem;
+  border-left: 5px solid var(--violet); padding-left: 0.9rem;
+}
+.page-header p { font-size: 0.9rem; color: var(--t2); line-height: 1.65; max-width: 680px; padding-left: 1rem; }
 
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.page-title {
+  font-family: 'Playfair Display', serif !important; font-size: 1.6rem !important;
+  font-weight: 800 !important; color: #fff !important; margin-bottom: 1rem !important;
+  border-left: 5px solid var(--violet); padding-left: 0.9rem;
+}
+
+.section-label {
+  display: flex; align-items: center; gap: 0.75rem;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--t3); margin: 1.75rem 0 1rem;
+}
+.section-label::before { content: ''; width: 3px; height: 14px; border-radius: 2px; background: var(--violet2); flex-shrink: 0; }
+.section-label::after  { content: ''; flex: 1; height: 1px; background: var(--border); }
+.section-label .pill {
+  background: var(--surface2); border: 1px solid var(--border2);
+  color: var(--t3); font-size: 0.6rem; padding: 0.15rem 0.5rem;
+  border-radius: 20px; font-weight: 600; text-transform: uppercase;
+}
+
+/* ══════════════════════════════════════════════════════
+   HERO SECTION
+══════════════════════════════════════════════════════ */
+.hero, .hero-section {
+  text-align: center;
+  padding: 3.5rem 1rem 2rem;
+  position: relative;
+  overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+@media (min-width: 768px) { .hero, .hero-section { padding: 5rem 2rem 3rem; } }
+
+/* multi-layer ambient glow background */
+.hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(124,58,237,0.18), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 20% 80%, rgba(168,85,247,0.10), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(34,211,238,0.08), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+/* animated top glow line */
+.hero::after {
+  content: '';
+  position: absolute; top: 0; left: 10%; right: 10%; height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(124,58,237,0.8), rgba(34,211,238,0.8), transparent);
+  border-radius: 50%;
+  animation: heroLine 3s ease-in-out infinite alternate;
+  z-index: 0;
+}
+@keyframes heroLine { from{opacity:0.4;left:20%;right:20%;} to{opacity:1;left:5%;right:5%;} }
+
+.hero > * { position: relative; z-index: 1; }
+
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  background: linear-gradient(135deg, rgba(124,58,237,0.25), rgba(168,85,247,0.12));
+  border: 1px solid rgba(168,85,247,0.55); color: #c084fc;
+  padding: 0.4rem 1.2rem; border-radius: 50px;
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; margin-bottom: 1.5rem;
+  box-shadow: 0 0 20px rgba(124,58,237,0.15);
+  animation: badgePulse 3s ease-in-out infinite;
+}
+.hero-badge::before { content: '●'; font-size: 0.4rem; color: #a855f7; animation: blink 1.5s infinite; }
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.2;} }
+@keyframes badgePulse { 0%,100%{box-shadow:0 0 20px rgba(124,58,237,0.15);} 50%{box-shadow:0 0 35px rgba(124,58,237,0.35);} }
+
+.hero-title {
+  font-family: 'Playfair Display', serif !important;
+  font-size: clamp(2.4rem, 7vw, 4.8rem) !important;
+  font-weight: 900 !important; color: #fff !important;
+  line-height: 1.08 !important; margin-bottom: 1rem !important;
+  letter-spacing: -0.03em;
+  text-align: center;
+  text-shadow: 0 2px 40px rgba(124,58,237,0.25);
+}
+.hero-title em, .gradient-text {
+  font-style: italic;
+  background: linear-gradient(135deg, #a855f7, #7c3aed, #22d3ee);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 20px rgba(124,58,237,0.4));
+}
+
+/* Feature pills row */
+.hero-features {
+  display: flex; flex-wrap: wrap; gap: 0.6rem;
+  justify-content: center; align-items: center;
+  margin: 0 auto 1rem; max-width: 680px;
+}
+.hero-pill {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 50px; padding: 0.35rem 0.85rem;
+  font-size: 0.78rem; color: var(--t2); font-weight: 500;
+  transition: all 0.2s;
+}
+.hero-pill:hover { background: rgba(124,58,237,0.12); border-color: rgba(124,58,237,0.4); color: #e2e8f0; }
+.hero-pill .pill-icon { font-size: 0.9rem; }
+
+.hero-sub, .hero-subtitle { font-size: 1rem; color: var(--t2); line-height: 1.75; max-width: 560px; margin: 0 auto 2rem; text-align:center; }
+
+/* ══ STAT STRIP ══ */
+.stat-strip {
+  display: grid; grid-template-columns: repeat(6, 1fr);
+  background: linear-gradient(135deg, rgba(124,58,237,0.06), rgba(13,17,23,0.95));
+  border: 1px solid rgba(124,58,237,0.2);
+  border-radius: var(--rl); overflow: hidden; margin: 1.75rem auto;
+  max-width: 900px;
+  box-shadow: 0 4px 30px rgba(124,58,237,0.1), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+@media (max-width: 700px) { .stat-strip { grid-template-columns: repeat(3, 1fr); } }
+.stat-cell {
+  padding: 1.4rem 0.5rem; text-align: center;
+  border-right: 1px solid rgba(124,58,237,0.12);
+  transition: background 0.25s, transform 0.2s;
+  display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
+}
+.stat-cell:last-child { border-right: none; }
+.stat-cell:hover { background: rgba(124,58,237,0.1); }
+.stat-icon { font-size: 1.2rem; margin-bottom: 0.1rem; display: block; }
+.stat-val {
+  font-family: 'Playfair Display', serif; font-size: 1.75rem; font-weight: 800;
+  display: block; line-height: 1;
+  background: linear-gradient(135deg, #a855f7, #22d3ee);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  margin-bottom: 0.2rem;
+}
+.stat-lbl { font-size: 0.6rem; color: var(--t4); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; }
+
+/* Stats banner (home page) */
+.stats-banner {
+  display: flex; justify-content: space-around; flex-wrap: wrap; gap: 1rem;
+  padding: 1.5rem 1rem;
+  background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(34,211,238,0.06));
+  border: 1px solid rgba(124,58,237,0.35); border-radius: var(--rl); margin-top: 1.5rem;
+}
+.banner-stat { text-align: center; }
+.banner-val {
+  display: block; font-family: 'Playfair Display', serif; font-size: 2.2rem; font-weight: 800;
+  background: linear-gradient(135deg, #a855f7, #22d3ee);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.banner-lbl { font-size: 0.75rem; color: var(--t4); text-transform: uppercase; letter-spacing: 0.1em; }
+
+/* ══ TOPIC GRID ══ */
+.section-title { font-size: 1.2rem; font-weight: 800; color: #fff; margin: 1.2rem 0 0.75rem; }
+.topic-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+@media (min-width: 600px) { .topic-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 900px) { .topic-grid { grid-template-columns: repeat(5, 1fr); } }
+.topic-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r); padding: 1rem 0.75rem; text-align: center; transition: all 0.2s; }
+.topic-card:hover { border-color: var(--violet); transform: translateY(-3px); }
+.topic-icon { font-size: 1.6rem; margin-bottom: 0.4rem; display: block; }
+.topic-name { font-weight: 700; font-size: 0.82rem; color: #fff; margin-bottom: 0.25rem; }
+.topic-desc { font-size: 0.68rem; color: var(--t4); line-height: 1.4; }
+
+/* ══ FEATURE GRID ══ */
+.feature-grid { display: grid; grid-template-columns: 1fr; gap: 0.75rem; margin: 1rem 0; }
+@media (min-width: 600px) { .feature-grid { grid-template-columns: repeat(3, 1fr); } }
+.feature-card { background: linear-gradient(135deg, var(--bg-card), rgba(124,58,237,0.06)); border: 1px solid var(--border2); border-radius: var(--rl); padding: 1.2rem; }
+.feature-icon { font-size: 1.8rem; margin-bottom: 0.6rem; display: block; }
+.feature-title { font-weight: 800; font-size: 1rem; color: #fff; margin-bottom: 0.4rem; }
+.feature-desc { font-size: 0.83rem; color: var(--t3); line-height: 1.6; }
+
+/* ══════════════════════════════════════════════════════
+   CARDS
+══════════════════════════════════════════════════════ */
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--rl); padding: 1.5rem; position: relative; overflow: hidden;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-card);
+}
+.card:hover { border-color: var(--border2); transform: translateY(-3px); box-shadow: 0 8px 40px rgba(0,0,0,0.5); }
+.card-accent-top { position: absolute; top: 0; left: 0; right: 0; height: 2px; border-radius: var(--rl) var(--rl) 0 0; }
+.card-title { font-family: 'Playfair Display', serif; font-size: 1.05rem; font-weight: 700; color: var(--t1); margin-bottom: 0.5rem; letter-spacing: -0.01em; }
+.card-desc { font-size: 0.83rem; color: var(--t2); line-height: 1.65; }
+.card-meta { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.9rem; }
+.config-card { background: var(--bg-card); border: 1px solid var(--border2); border-radius: var(--rl); padding: 1.2rem; margin-bottom: 1rem; }
+
+/* ══ CHIPS ══ */
+.chip { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; padding: 0.2rem 0.55rem; border-radius: 4px; background: var(--surface3); color: var(--t3); border: 1px solid var(--border2); }
+.chip.amber  { background: rgba(251,191,36,0.12);  color: var(--gold);   border-color: rgba(251,191,36,0.3); }
+.chip.teal   { background: rgba(34,211,238,0.1);   color: var(--cyan2);  border-color: rgba(34,211,238,0.25); }
+.chip.emerald{ background: rgba(16,185,129,0.1);   color: #34d399;       border-color: rgba(16,185,129,0.25); }
+.chip.rose   { background: rgba(244,63,94,0.1);    color: #fb7185;       border-color: rgba(244,63,94,0.25); }
+.chip.indigo { background: rgba(99,102,241,0.12);  color: #818cf8;       border-color: rgba(99,102,241,0.25); }
+.chip.violet { background: rgba(124,58,237,0.15);  color: #c084fc;       border-color: rgba(124,58,237,0.3); }
+
+/* ══ PYQ YEAR CARDS ══ */
+.year-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r-md); padding: 1rem 0.6rem; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
+.year-card::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--violet), var(--cyan)); transform: scaleX(0); transform-origin: left; transition: transform 0.25s ease; }
+.year-card:hover { border-color: var(--violet); background: rgba(124,58,237,0.08); }
+.year-card:hover::after { transform: scaleX(1); }
+.year-num { font-family: 'Playfair Display', serif; font-size: 1.2rem; font-weight: 800; color: var(--violet2); display: block; letter-spacing: -0.02em; }
+.year-count { font-size: 0.62rem; color: var(--t3); margin-top: 0.25rem; line-height: 1.6; }
+
+/* ══════════════════════════════════════════════════════
+   QUIZ ENGINE
+══════════════════════════════════════════════════════ */
+.quiz-header { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.q-counter { color: var(--t2); font-size: 0.88rem; font-weight: 600; }
+.q-topic-badge { background: rgba(124,58,237,0.25); color: #c084fc; border: 1px solid rgba(168,85,247,0.6); padding: 0.2rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+.q-diff-badge { padding: 0.2rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+.diff-easy   { background: rgba(16,185,129,0.2);  color: #34d399; border: 1px solid rgba(16,185,129,0.5); }
+.diff-medium { background: rgba(251,191,36,0.2);  color: #fbbf24; border: 1px solid rgba(251,191,36,0.5); }
+.diff-hard   { background: rgba(244,63,94,0.2);   color: #fb7185; border: 1px solid rgba(244,63,94,0.5); }
+
+/* Timer */
+.timer-box { background: linear-gradient(135deg, rgba(34,211,238,0.15), rgba(124,58,237,0.1)); border: 1px solid rgba(34,211,238,0.4); border-radius: 10px; padding: 0.4rem 0.8rem; font-family: 'JetBrains Mono', monospace; font-size: 1rem; color: #22d3ee; font-weight: 700; }
+.timer-display { font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; font-weight: 600; padding: 0.35rem 1rem; border-radius: var(--r-sm); border: 1px solid; min-width: 5.5rem; text-align: center; letter-spacing: 0.05em; }
+.timer-ok   { color: var(--cyan);  border-color: rgba(34,211,238,0.3);  background: rgba(34,211,238,0.07); }
+.timer-warn { color: var(--gold);  border-color: rgba(251,191,36,0.3);  background: rgba(251,191,36,0.07); }
+.timer-crit { color: var(--red);   border-color: rgba(244,63,94,0.35);  background: rgba(244,63,94,0.08); animation: pulse-crit 0.8s ease-in-out infinite; }
+@keyframes pulse-crit { 0%,100%{opacity:1;} 50%{opacity:0.65; box-shadow:0 0 12px rgba(244,63,94,0.4);} }
+
+/* Progress */
+.progress-track { height: 3px; background: var(--border); border-radius: 10px; margin-bottom: 1.25rem; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 10px; background: linear-gradient(90deg, var(--violet), var(--cyan)); transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+
+/* Progress bar */
+.stProgress > div > div > div > div { background: linear-gradient(90deg, var(--violet), var(--violet2), var(--cyan)) !important; border-radius: 10px !important; }
+
+/* Question card */
+.question-card, .question-wrap {
+  background: linear-gradient(135deg, #131929, #0f1724);
+  border: 1px solid var(--border2); border-radius: var(--rl);
+  padding: 1.4rem 1.2rem; margin: 0.75rem 0 1rem;
+  position: relative; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+}
+@media (min-width: 768px) { .question-card, .question-wrap { padding: 2rem 2.2rem; } }
+.question-card::before, .question-wrap::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  background: linear-gradient(90deg, var(--violet), var(--violet2), var(--cyan));
+}
+.question-card::after {
+  content: ''; position: absolute; top: 0; left: 0; bottom: 0; width: 4px;
+  background: linear-gradient(180deg, var(--violet), var(--cyan));
+}
+.question-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.q-num-pill { background: linear-gradient(135deg, var(--violet), var(--violet2)); color: #fff; font-size: 0.78rem; font-weight: 800; padding: 0.3rem 0.9rem; border-radius: 20px; font-family: 'JetBrains Mono', monospace; box-shadow: 0 0 12px rgba(124,58,237,0.4); }
+.q-num { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 600; color: var(--violet2); letter-spacing: 0.1em; margin-bottom: 1.1rem; text-transform: uppercase; }
+.question-text, .q-text { font-family: 'Playfair Display', serif; font-size: clamp(1rem, 3vw, 1.35rem); font-weight: 700; color: #fff; line-height: 1.75; letter-spacing: -0.01em; }
+.bookmark-indicator { color: var(--gold); font-size: 1.1rem; }
+.q-tags { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 1rem; }
+
+/* Options */
+.opt-selected {
+  background: linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.18));
+  border: 2px solid var(--violet2); border-radius: 12px; padding: 0.9rem 1.2rem; margin: 0.4rem 0;
+  color: #f0e6ff !important; font-size: 0.97rem; font-weight: 700;
+  box-shadow: 0 0 16px rgba(168,85,247,0.25); line-height: 1.5;
+}
+.opt-dot-sel { color: #c084fc; margin-right: 0.4rem; }
+
+.option-btn { display: block; padding: 0.9rem 1.2rem; border-radius: 12px; margin: 0.4rem 0; font-size: 0.95rem; font-weight: 600; cursor: default; border: 2px solid; line-height: 1.5; }
+.correct-opt { background: rgba(16,185,129,0.15); border-color: var(--green); color: #34d399; box-shadow: 0 0 16px rgba(16,185,129,0.2); }
+.wrong-opt   { background: rgba(244,63,94,0.12);  border-color: var(--red);   color: #fb7185; }
+.neutral-opt { background: rgba(30,45,69,0.6);    border-color: var(--border2); color: var(--t3); }
+
+/* Keep old class aliases */
+.opt-correct { background: rgba(16,185,129,0.15) !important; border-color: var(--green) !important; color: #34d399 !important; }
+.opt-wrong   { background: rgba(244,63,94,0.12)  !important; border-color: var(--red)   !important; color: #fb7185 !important; }
+.opt-neutral { background: rgba(30,45,69,0.6)    !important; border-color: var(--border2) !important; color: var(--t3) !important; }
+
+.opt-btn {
+  display: block; width: 100%; text-align: left;
+  padding: 0.9rem 1.2rem; background: var(--bg2);
+  border: 1.5px solid var(--border); border-radius: 12px;
+  color: var(--t1) !important; font-size: 0.93rem; font-weight: 500;
+  cursor: pointer; transition: all 0.15s ease; line-height: 1.55; font-family: 'DM Sans', sans-serif;
+}
+.opt-btn:hover { border-color: var(--violet2); background: rgba(124,58,237,0.07) !important; }
+.opt-btn::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 12px 0 0 12px; background: transparent; transition: background 0.15s; }
+.opt-btn:hover::before { background: var(--violet); }
+
+/* Explanation */
+.explanation-box, .explanation {
+  background: linear-gradient(135deg, rgba(124,58,237,0.12), rgba(34,211,238,0.06));
+  border: 1px solid rgba(124,58,237,0.4); border-left: 3px solid var(--violet);
+  border-radius: var(--r); padding: 1.1rem; margin-top: 1rem;
+}
+.exp-title, .exp-head { font-weight: 800; color: #c084fc; margin-bottom: 0.4rem; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem; }
+.exp-text, .exp-body { color: var(--t2); font-size: 0.9rem; line-height: 1.7; }
+
+/* ══════════════════════════════════════════════════════
+   EXAM NAVIGATOR PANEL
+══════════════════════════════════════════════════════ */
+.exam-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 1.25rem; position: sticky; top: 4.5rem; box-shadow: var(--shadow-card); }
+.exam-panel-title { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--t3); margin-bottom: 0.85rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border); }
+.exam-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(2.3rem, 1fr)); gap: 0.3rem; max-height: 16rem; overflow-y: auto; margin-bottom: 0.75rem; }
+.exam-q-btn { aspect-ratio: 1; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--bg2); color: var(--t3); font-size: 0.68rem; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.12s; font-family: 'JetBrains Mono', monospace; }
+.exam-q-btn:hover { border-color: var(--violet2); color: var(--violet2); }
+.exam-q-btn.answered { background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.4); color: var(--green); }
+.exam-q-btn.current  { background: var(--violet); border-color: var(--violet); color: #fff; box-shadow: 0 0 12px rgba(124,58,237,0.4); }
+.exam-q-btn.skipped  { background: rgba(251,191,36,0.12); border-color: rgba(251,191,36,0.35); color: var(--gold); }
+.exam-legend { display: flex; gap: 0.85rem; flex-wrap: wrap; font-size: 0.64rem; color: var(--t3); margin-top: 0.6rem; }
+.legend-dot { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 3px; }
+
+/* ══════════════════════════════════════════════════════
+   RESULTS PAGE
+══════════════════════════════════════════════════════ */
+.result-hero, .results-hero {
+  text-align: center; padding: 2.5rem 1.5rem 2rem;
+  background: linear-gradient(135deg, #131929, rgba(124,58,237,0.08));
+  border-radius: var(--rl); border: 1px solid var(--border2); margin-bottom: 1.75rem;
+  position: relative; overflow: hidden;
+}
+.result-hero::before, .results-hero::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--violet), var(--cyan), var(--gold)); }
+.grade-letter, .results-grade { font-family: 'Playfair Display', serif; font-size: 4rem; font-weight: 900; line-height: 1; display: block; margin-bottom: 0.5rem; filter: drop-shadow(0 0 20px currentColor); }
+.result-score, .results-score { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 600; color: var(--t1); letter-spacing: -0.02em; }
+.result-pct, .results-pct { font-size: 1rem; color: var(--t2); margin: 0.4rem 0; }
+.result-msg, .results-msg { font-family: 'Playfair Display', serif; font-size: 1rem; color: var(--gold); font-style: italic; margin-top: 0.5rem; }
+
+.stat-card-mini, .result-stat-card {
+  background: var(--bg-card); border: 1px solid var(--border2); border-radius: var(--r-md);
+  padding: 1rem 0.75rem; text-align: center; border-top-width: 3px; transition: transform 0.2s;
+}
+.stat-card-mini:hover, .result-stat-card:hover { transform: translateY(-2px); }
+.stat-card-mini .val, .rs-val { font-family: 'JetBrains Mono', monospace; font-size: 1.65rem; font-weight: 700; display: block; line-height: 1.1; margin-bottom: 0.25rem; }
+.stat-card-mini .lbl, .rs-lbl { font-size: 0.64rem; color: var(--t3); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; }
+
+/* ══════════════════════════════════════════════════════
+   LEADERBOARD
+══════════════════════════════════════════════════════ */
+.lb-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.85rem 1.1rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r-md); margin-bottom: 0.4rem; transition: all 0.15s; }
+.lb-row:hover { border-color: var(--border2); transform: translateX(3px); }
+.lb-row.me { border-color: rgba(251,191,36,0.5) !important; background: linear-gradient(90deg, rgba(251,191,36,0.06), transparent) !important; }
+.lb-rank { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 800; min-width: 2rem; text-align: center; }
+.lb-rank.gold   { color: var(--gold); }
+.lb-rank.silver { color: #9fb3cc; }
+.lb-rank.bronze { color: #b87333; }
+.lb-rank.rest   { color: var(--t4); font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
+.lb-avatar { width: 2.4rem; height: 2.4rem; border-radius: 50%; flex-shrink: 0; background: linear-gradient(135deg, var(--violet), var(--cyan)); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.78rem; color: #fff; box-shadow: 0 0 0 2px rgba(124,58,237,0.2); }
+.lb-name { font-weight: 600; font-size: 0.9rem; color: var(--t1); }
+.lb-detail { font-size: 0.68rem; color: var(--t3); margin-top: 0.15rem; }
+.lb-score { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; color: var(--cyan2); text-align: right; }
+.podium-card { background: var(--bg-card); border: 1px solid var(--border2); border-radius: var(--r-lg); padding: 1.5rem 1rem; text-align: center; transition: transform 0.2s; }
+.podium-card:hover { transform: translateY(-4px); }
+.podium-card.first { border-color: rgba(251,191,36,0.4); background: linear-gradient(180deg, rgba(251,191,36,0.06), transparent); }
+
+/* ══════════════════════════════════════════════════════
+   LOGIN PAGE
+══════════════════════════════════════════════════════ */
+.login-wrap { max-width: 440px; margin: 3rem auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--rl); padding: 3rem 2.5rem; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5); position: relative; overflow: hidden; }
+.login-wrap::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--violet), var(--cyan)); }
+.login-logo { font-size: 3rem; margin-bottom: 1rem; display: block; filter: drop-shadow(0 4px 12px rgba(124,58,237,0.3)); }
+.login-title { font-family: 'Playfair Display', serif; font-size: 1.8rem; font-weight: 800; color: var(--t1); margin-bottom: 0.4rem; letter-spacing: -0.02em; }
+.login-sub { font-size: 0.85rem; color: var(--t2); margin-bottom: 2rem; line-height: 1.6; }
+
+/* ══════════════════════════════════════════════════════
+   ANALYTICS
+══════════════════════════════════════════════════════ */
+.analytics-card { background: var(--bg-card); border: 1px solid var(--border2); border-radius: var(--r); padding: 1.1rem 1.3rem; margin-bottom: 1rem; }
+.ac-title { font-size: 0.78rem; color: var(--t4); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.3rem; font-weight: 600; }
+.ac-val { font-size: 2rem; font-weight: 800; font-family: 'JetBrains Mono', monospace; display: block; }
+.ac-sub { font-size: 0.8rem; color: var(--t3); }
+
+/* ══ PDF UPLOAD ══ */
+.pdf-intro { background: linear-gradient(135deg, rgba(34,211,238,0.1), rgba(124,58,237,0.07)); border: 1px solid rgba(34,211,238,0.35); border-radius: var(--r); padding: 1rem 1.3rem; color: var(--t2); font-size: 0.9rem; margin-bottom: 1.2rem; line-height: 1.7; }
+.step-list { display: flex; flex-direction: column; gap: 0.7rem; }
+.step-item { display: flex; align-items: center; gap: 0.7rem; font-size: 0.85rem; color: var(--t3); }
+.step-num { width: 26px; height: 26px; background: linear-gradient(135deg, var(--violet), var(--cyan)); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 800; flex-shrink: 0; }
+
+/* ══ EMPTY STATE ══ */
+.empty-state { text-align: center; padding: 4rem 2rem; color: var(--t3); }
+.empty-state .icon, .empty-icon { font-size: 2.5rem; display: block; margin-bottom: 1rem; opacity: 0.5; }
+.empty-state h3, .empty-title { font-family: 'Playfair Display', serif; color: var(--t2); margin-bottom: 0.4rem; font-size: 1.2rem; font-weight: 700; }
+.empty-desc { color: var(--t4); font-size: 0.88rem; }
+
+/* ══════════════════════════════════════════════════════
+   STREAMLIT WIDGET OVERRIDES — MAKE TEXT VISIBLE
+══════════════════════════════════════════════════════ */
+button { color: #e2e8f0 !important; font-family: 'DM Sans', sans-serif !important; }
+button > div { color: inherit !important; }
+button > div > p { color: inherit !important; font-size: inherit !important; }
+button p, button span { color: inherit !important; }
+
+.stButton > button { border-radius: 10px !important; font-weight: 600 !important; font-size: 0.9rem !important; transition: all 0.2s !important; font-family: 'DM Sans', sans-serif !important; }
+.stButton > button[kind="secondary"], [data-testid="baseButton-secondary"] { background: var(--bg-card) !important; color: #e2e8f0 !important; border: 2px solid var(--border2) !important; }
+.stButton > button[kind="primary"], [data-testid="baseButton-primary"] { background: linear-gradient(135deg, var(--violet), var(--violet2)) !important; color: #ffffff !important; border: none !important; box-shadow: 0 4px 20px rgba(124,58,237,0.4) !important; }
+.stButton > button[kind="primary"] *, [data-testid="baseButton-primary"] * { color: #fff !important; }
+.stButton > button[kind="primary"]:hover, [data-testid="baseButton-primary"]:hover { box-shadow: 0 6px 28px rgba(124,58,237,0.55) !important; transform: translateY(-2px) !important; }
+.stButton > button[kind="secondary"]:hover, [data-testid="baseButton-secondary"]:hover { background: var(--surface2) !important; border-color: var(--border2) !important; }
+
+div[data-testid="stForm"] { border: none !important; padding: 0 !important; background: transparent !important; margin: 0 !important; }
+div[data-testid="stForm"] button { color: #e2e8f0 !important; }
+div[data-testid="stForm"] button > div { color: inherit !important; }
+div[data-testid="stForm"] button > div > p { color: inherit !important; }
+div[data-testid="stForm"] button[kind="primaryFormSubmit"] { background: linear-gradient(135deg, var(--violet), var(--violet2)) !important; color: #fff !important; border: none !important; box-shadow: 0 4px 20px rgba(124,58,237,0.4) !important; }
+
+.stRadio label { color: var(--t2) !important; }
+.stRadio label p, .stRadio label span { color: inherit !important; }
+.stCheckbox label { color: var(--t2) !important; font-weight: 500 !important; }
+.stCheckbox label span { color: #fff !important; }
+.stSelectbox label, .stMultiSelect label, .stSlider label, .stRadio label,
+.stCheckbox label, .stTextInput label, .stTextArea label,
+.stToggle label, .stSelectSlider label, .stNumberInput label { color: var(--t3) !important; font-weight: 600 !important; font-size: 0.82rem !important; }
+div[data-baseweb="select"] { background: var(--bg-card) !important; border-color: var(--border2) !important; border-radius: 10px !important; }
+div[data-baseweb="select"] * { color: var(--t1) !important; }
+.stTextInput input, .stTextArea textarea { background: var(--bg-card) !important; border-color: var(--border2) !important; color: #fff !important; border-radius: 10px !important; font-family: 'DM Sans', sans-serif !important; }
+.stTextInput input:focus, .stTextArea textarea:focus { border-color: var(--violet) !important; box-shadow: 0 0 0 3px rgba(124,58,237,0.15) !important; }
+.stInfo    { background: rgba(124,58,237,0.12) !important; border-color: rgba(124,58,237,0.5) !important; color: var(--t2) !important; border-radius: 10px !important; }
+.stSuccess { background: rgba(16,185,129,0.12) !important; border-color: rgba(16,185,129,0.5) !important; color: #6ee7b7 !important; border-radius: 10px !important; }
+.stError   { background: rgba(244,63,94,0.12)  !important; border-color: rgba(244,63,94,0.5)  !important; color: #fda4af !important; border-radius: 10px !important; }
+.stWarning { background: rgba(251,191,36,0.12) !important; border-color: rgba(251,191,36,0.5) !important; color: #fde68a !important; border-radius: 10px !important; }
+.streamlit-expanderHeader { background: var(--bg-card) !important; border-color: var(--border2) !important; color: #fff !important; border-radius: var(--r) !important; }
+[data-testid="stFileUploader"] { background: var(--bg-card) !important; border: 2px dashed var(--border2) !important; border-radius: var(--r) !important; }
+.stTabs [data-baseweb="tab-list"] { background: var(--bg-card) !important; border-radius: 10px !important; gap: 0 !important; padding: 3px !important; border: 1px solid var(--border) !important; }
+.stTabs [data-baseweb="tab"] { border-radius: 8px !important; color: var(--t2) !important; font-weight: 600 !important; }
+.stTabs [aria-selected="true"] { background: var(--bg2) !important; color: #fff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important; }
+.stTabs [data-baseweb="tab-border"] { display: none !important; }
+.stRadio [role="radio"] { accent-color: var(--violet) !important; }
+.stToggle input:checked + div { background: var(--violet) !important; }
+[data-baseweb="tag"] { background: rgba(124,58,237,0.15) !important; border-color: rgba(124,58,237,0.3) !important; }
+[data-baseweb="tag"] span { color: #c084fc !important; }
+[data-testid="stSidebar"] button { color: var(--t3) !important; }
+[data-testid="stSidebar"] button[kind="primary"] { color: #fff !important; }
+div[data-testid="metric-container"] { background: var(--bg-card) !important; border: 1px solid var(--border2) !important; border-radius: var(--r) !important; padding: 1rem !important; }
+hr { border: none !important; border-top: 1px solid var(--border) !important; margin: 1.5rem 0 !important; }
+.divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+.text-muted { color: var(--t2); font-size: 0.85rem; }
+.text-tiny  { color: var(--t3); font-size: 0.72rem; }
+
+
+/* ══════════════════════════════════════════════════════
+   MOBILE-NATIVE RESPONSIVE OVERRIDES  (≤ 600px)
+══════════════════════════════════════════════════════ */
+
+/* ── Base layout ── */
+@media (max-width: 600px) {
+  /* Full-bleed content, no wasted margin */
+  .main .block-container { padding: 0.5rem 0.5rem 5rem !important; }
+
+  /* Streamlit column stacking */
+  [data-testid="column"] { min-width: 100% !important; }
+
+  /* Sidebar: auto-collapse on mobile */
+  [data-testid="stSidebar"] { min-width: 200px !important; max-width: 78vw !important; }
+
+  /* ── Hero ── */
+  .hero, .hero-section { padding: 2rem 0.75rem 1.5rem !important; }
+  .hero-title { font-size: clamp(1.7rem, 8vw, 2.6rem) !important; }
+  .hero-badge { font-size: 0.65rem !important; padding: 0.3rem 0.75rem !important; }
+  .hero-features { gap: 0.4rem !important; }
+  .hero-pill { font-size: 0.7rem !important; padding: 0.28rem 0.65rem !important; }
+
+  /* ── Stat strip: 3 columns, hide last 3 less-critical cells ── */
+  .stat-strip { grid-template-columns: repeat(3, 1fr) !important; max-width: 100% !important; }
+  .stat-strip .stat-cell:nth-child(n+4) { display: none !important; }
+  .stat-val { font-size: 1.4rem !important; }
+  .stat-icon { font-size: 1rem !important; }
+
+  /* ── Section labels ── */
+  .section-label { font-size: 0.8rem !important; }
+
+  /* ── Cards: single column ── */
+  .card { padding: 1rem !important; }
+  .card-title { font-size: 0.95rem !important; }
+  .card-desc  { font-size: 0.75rem !important; }
+
+  /* ── Year cards ── */
+  .year-num { font-size: 1.1rem !important; }
+  .year-count { font-size: 0.6rem !important; }
+
+  /* ── Quiz / question card ── */
+  .question-wrap, .question-card { padding: 1rem 0.85rem !important; }
+  .q-num { font-size: 0.6rem !important; }
+  .q-text, .question-text { font-size: clamp(0.9rem, 4vw, 1.1rem) !important; line-height: 1.65 !important; }
+  .q-tags { gap: 0.3rem !important; }
+  .meta-chip { font-size: 0.6rem !important; padding: 0.15rem 0.5rem !important; }
+
+  /* ── Options ── */
+  .opt-selected, .option-btn, .correct-opt, .wrong-opt, .neutral-opt {
+    font-size: 0.85rem !important; padding: 0.75rem 0.9rem !important;
+    border-radius: 10px !important;
+  }
+
+  /* ── Timer ── */
+  .timer-display { font-size: 0.9rem !important; padding: 0.3rem 0.7rem !important; min-width: 4rem !important; }
+
+  /* ── Explanation box ── */
+  .explanation-box { padding: 0.85rem !important; font-size: 0.8rem !important; }
+  .exp-title { font-size: 0.75rem !important; }
+
+  /* ── Page headers ── */
+  .page-header h1 { font-size: 1.3rem !important; }
+  .page-header p  { font-size: 0.8rem !important; }
+
+  /* ── Leaderboard ── */
+  .lb-row { padding: 0.65rem 0.75rem !important; gap: 0.5rem !important; }
+  .lb-name { font-size: 0.8rem !important; }
+  .lb-detail { font-size: 0.65rem !important; }
+  .lb-score { font-size: 0.95rem !important; }
+  .lb-avatar { width: 1.8rem !important; height: 1.8rem !important; font-size: 0.65rem !important; }
+
+  /* ── Login card ── */
+  .login-wrap { margin: 1rem auto !important; padding: 1.5rem 1.25rem !important; }
+
+  /* ── Results card ── */
+  .result-hero, .results-hero { padding: 1.5rem 1rem !important; }
+  .result-score { font-size: clamp(2rem, 12vw, 3.5rem) !important; }
+
+  /* ── PYQ year row buttons (3-col → flex wrap) ── */
+  .pyq-launch-row { flex-direction: column !important; gap: 0.35rem !important; }
+
+  /* ── Exam navigator panel: hide on very small screens ── */
+  .exam-panel { display: none !important; }
+
+  /* ── Buttons: better tap targets ── */
+  .stButton button { min-height: 44px !important; font-size: 0.88rem !important; }
+
+  /* ── Bottom nav spacing for thumb reachability ── */
+  .stButton:last-child { margin-bottom: 1rem !important; }
+
+  /* ── Scrollable tab overflow ── */
+  .stTabs [data-baseweb="tab-list"] { overflow-x: auto !important; flex-wrap: nowrap !important; }
+}
+
+/* ── Tablet tweaks (601px – 900px) ── */
+@media (min-width: 601px) and (max-width: 900px) {
+  .main .block-container { padding: 1rem 1.25rem 3rem !important; }
+  .hero-title { font-size: clamp(2rem, 5vw, 3rem) !important; }
+  .stat-strip { grid-template-columns: repeat(4, 1fr) !important; }
+  .stat-strip .stat-cell:nth-child(n+5) { display: none !important; }
+  .card-title { font-size: 1rem !important; }
+  .stButton button { min-height: 42px !important; }
+}
+
 </style>
+
+<script>
+(function forceButtonColors(){
+    function fix(){
+        document.querySelectorAll('button').forEach(function(b){
+            b.querySelectorAll('p,span,div').forEach(function(el){
+                el.style.setProperty('color','inherit','important');
+            });
+        });
+    }
+    fix();
+    new MutationObserver(fix).observe(document.body,{childList:true,subtree:true});
+})();
+</script>
 """, unsafe_allow_html=True)
 
-# ============================================================================
-# CONFIGURATION
-# ============================================================================
 
-@dataclass
-class DhanConfig:
-    client_id: str = "1100480354"
-    access_token: str = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJkaGFuIiwicGFydG5lcklkIjoiIiwiZXhwIjoxNzczMTIzMzQ3LCJhcHBfaWQiOiJhYjYxZmJmOSIsImlhdCI6MTc3MzAzNjk0NywidG9rZW5Db25zdW1lclR5cGUiOiJBUFAiLCJ3ZWJob29rVXJsIjoiIiwiZGhhbkNsaWVudElkIjoiMTEwMDQ4MDM1NCJ9.zWyVEoFpOamylRTTd_pXhiTHCcu7LEnQ412tGpoxuUfcsYijGKG-2ZHp4q1jYhZVhNIn17X8CXREmkefeKnBCg"
+# ═══════════════════════════════════════════════
+# QUESTION BANK
+# ═══════════════════════════════════════════════
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║              UGC NET PAPER 1 — QUESTION BANK                        ║
+# ║  Organised by topic. To add questions, paste new dicts into the     ║
+# ║  matching Q_<TOPIC> list below, then save. That's it!               ║
+# ║                                                                      ║
+# ║  TEMPLATE (copy-paste and fill):                                     ║
+# ║  {"id":"ta009","topic":"Teaching Aptitude",                          ║
+# ║   "difficulty":"Easy|Medium|Hard",                                   ║
+# ║   "year":2024,"season":"June|December",                              ║
+# ║   "question":"Your question?",                                       ║
+# ║   "options":["A","B","C","D"],                                       ║
+# ║   "correct_answer":"A",                                              ║
+# ║   "explanation":"Why A is correct."},                                ║
+# ╚══════════════════════════════════════════════════════════════════════╝
 
-DHAN_INDEX_SECURITY_IDS = {
-    "NIFTY": 13, "BANKNIFTY": 25, "FINNIFTY": 27, "MIDCPNIFTY": 442
-}
-DHAN_STOCK_SECURITY_IDS = {
-    "RELIANCE": 2885, "TCS": 11536, "HDFCBANK": 1333, "INFY": 1594,
-    "ICICIBANK": 4963, "SBIN": 3045, "BHARTIARTL": 1195, "ITC": 1660,
-    "KOTAKBANK": 1922, "LT": 2980, "AXISBANK": 5900, "HINDUNILVR": 1394,
-    "WIPRO": 3787, "MARUTI": 10999, "BAJFINANCE": 317, "HCLTECH": 7229,
-    "ASIANPAINT": 157, "TITAN": 3506, "ULTRACEMCO": 11532, "SUNPHARMA": 3351,
-    "TATAMOTORS": 3456, "TATASTEEL": 3499, "TECHM": 13538, "POWERGRID": 2752,
-    "NTPC": 11630, "ONGC": 2475, "M&M": 2031, "BAJAJFINSV": 16675,
-    "ADANIPORTS": 3718, "COALINDIA": 20374,
-}
+# ── 1. TEACHING APTITUDE ─────────────────────────────────────────────
+Q_TEACHING_APTITUDE = [
+    {"id":"ta001","topic":"Teaching Aptitude","difficulty":"Medium","year":2023,"season":"June","question":"Which level of teaching focuses on the development of thinking power and reasoning in students?","options":["Memory level","Understanding level","Reflective level","None of these"],"correct_answer":"Reflective level","explanation":"Reflective level teaching by Morrison focuses on critical thinking, problem-solving, and independent reasoning."},
+    {"id":"ta002","topic":"Teaching Aptitude","difficulty":"Easy","year":2022,"season":"December","question":"Which of the following is NOT a characteristic of effective teaching?","options":["Clarity of goals","Flexibility","Dogmatic approach","Student-centered learning"],"correct_answer":"Dogmatic approach","explanation":"Effective teaching is flexible and student-centered; a dogmatic approach hinders learning."},
+    {"id":"ta003","topic":"Teaching Aptitude","difficulty":"Hard","year":2023,"season":"December","question":"In the context of Bloom's Taxonomy (revised), which cognitive level represents the highest order of thinking?","options":["Evaluation","Synthesis","Creating","Analysis"],"correct_answer":"Creating","explanation":"The revised Bloom's Taxonomy places 'Creating' at the apex — generating new ideas, products, or ways of viewing things."},
+    {"id":"ta004","topic":"Teaching Aptitude","difficulty":"Medium","year":2021,"season":"June","question":"Which teaching method is most appropriate for large classrooms with heterogeneous groups?","options":["Project Method","Lecture Method","Inquiry Method","Seminar Method"],"correct_answer":"Lecture Method","explanation":"The lecture method is most practical for large, heterogeneous groups."},
+    {"id":"ta005","topic":"Teaching Aptitude","difficulty":"Medium","year":2020,"season":"June","question":"The concept of 'Micro-Teaching' was first developed at:","options":["Harvard University","Stanford University","Yale University","MIT"],"correct_answer":"Stanford University","explanation":"Micro-teaching was developed by Dwight W. Allen at Stanford University in 1963."},
+    {"id":"ta006","topic":"Teaching Aptitude","difficulty":"Easy","year":2019,"season":"June","question":"Which of the following best describes 'formative evaluation'?","options":["Evaluation at the end of the course","Evaluation to assign final grades","Ongoing evaluation during instruction","Evaluation before the course begins"],"correct_answer":"Ongoing evaluation during instruction","explanation":"Formative evaluation is continuous assessment conducted during the instructional process."},
+    {"id":"ta007","topic":"Teaching Aptitude","difficulty":"Hard","year":2018,"season":"December","question":"Which theory proposes that students have different 'learning styles'?","options":["Constructivism","VAK/VARK Model","Behaviorism","Gestalt Theory"],"correct_answer":"VAK/VARK Model","explanation":"The VARK model categorizes learners by Visual, Auditory, Read/Write, and Kinesthetic modes."},
+    {"id":"ta008","topic":"Teaching Aptitude","difficulty":"Medium","year":2022,"season":"June","question":"The 'Socratic Method' of teaching primarily involves:","options":["Lecture and demonstration","Asking probing questions","Group projects","Use of audio-visual aids"],"correct_answer":"Asking probing questions","explanation":"The Socratic method uses disciplined questioning to stimulate critical thinking."},
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Teaching Aptitude QUESTIONS BELOW ↓  (paste here, save, done)
+    # ════════════════════════════════════════════════════════════════════
+    # SAMPLE — copy format, fill your own content, delete these when done:
+    {"id":"ta009","topic":"Teaching Aptitude","difficulty":"Medium","year":2024,"season":"June",
+     "question":"Which of the following is an example of intrinsic motivation in students?",
+     "options":["Fear of punishment","Desire for rewards","Curiosity and love of learning","Peer pressure"],
+     "correct_answer":"Curiosity and love of learning",
+     "explanation":"Intrinsic motivation comes from within — driven by genuine interest, curiosity, or personal satisfaction."},
 
-INDEX_CONFIG = {
-    "NIFTY":      {"contract_size": 25,  "strike_interval": 50,  "type": "INDEX"},
-    "BANKNIFTY":  {"contract_size": 15,  "strike_interval": 100, "type": "INDEX"},
-    "FINNIFTY":   {"contract_size": 40,  "strike_interval": 50,  "type": "INDEX"},
-    "MIDCPNIFTY": {"contract_size": 75,  "strike_interval": 25,  "type": "INDEX"},
-}
-STOCK_CONFIG = {
-    "RELIANCE":   {"lot_size": 250,  "strike_interval": 10,  "type": "STOCK"},
-    "TCS":        {"lot_size": 150,  "strike_interval": 25,  "type": "STOCK"},
-    "HDFCBANK":   {"lot_size": 550,  "strike_interval": 10,  "type": "STOCK"},
-    "INFY":       {"lot_size": 300,  "strike_interval": 25,  "type": "STOCK"},
-    "ICICIBANK":  {"lot_size": 550,  "strike_interval": 10,  "type": "STOCK"},
-    "SBIN":       {"lot_size": 1500, "strike_interval": 5,   "type": "STOCK"},
-    "BHARTIARTL": {"lot_size": 410,  "strike_interval": 10,  "type": "STOCK"},
-    "ITC":        {"lot_size": 1600, "strike_interval": 5,   "type": "STOCK"},
-    "KOTAKBANK":  {"lot_size": 400,  "strike_interval": 25,  "type": "STOCK"},
-    "LT":         {"lot_size": 300,  "strike_interval": 25,  "type": "STOCK"},
-    "AXISBANK":   {"lot_size": 600,  "strike_interval": 10,  "type": "STOCK"},
-    "HINDUNILVR": {"lot_size": 300,  "strike_interval": 25,  "type": "STOCK"},
-    "WIPRO":      {"lot_size": 1200, "strike_interval": 5,   "type": "STOCK"},
-    "MARUTI":     {"lot_size": 75,   "strike_interval": 50,  "type": "STOCK"},
-    "BAJFINANCE": {"lot_size": 125,  "strike_interval": 50,  "type": "STOCK"},
-    "HCLTECH":    {"lot_size": 350,  "strike_interval": 25,  "type": "STOCK"},
-    "ASIANPAINT": {"lot_size": 300,  "strike_interval": 25,  "type": "STOCK"},
-    "TITAN":      {"lot_size": 300,  "strike_interval": 25,  "type": "STOCK"},
-    "ULTRACEMCO": {"lot_size": 100,  "strike_interval": 50,  "type": "STOCK"},
-    "SUNPHARMA":  {"lot_size": 400,  "strike_interval": 25,  "type": "STOCK"},
-    "TATAMOTORS": {"lot_size": 1250, "strike_interval": 5,   "type": "STOCK"},
-    "TATASTEEL":  {"lot_size": 900,  "strike_interval": 5,   "type": "STOCK"},
-    "TECHM":      {"lot_size": 400,  "strike_interval": 25,  "type": "STOCK"},
-    "POWERGRID":  {"lot_size": 1800, "strike_interval": 5,   "type": "STOCK"},
-    "NTPC":       {"lot_size": 2250, "strike_interval": 5,   "type": "STOCK"},
-    "ONGC":       {"lot_size": 2475, "strike_interval": 5,   "type": "STOCK"},
-    "M&M":        {"lot_size": 300,  "strike_interval": 25,  "type": "STOCK"},
-    "BAJAJFINSV": {"lot_size": 500,  "strike_interval": 10,  "type": "STOCK"},
-    "ADANIPORTS": {"lot_size": 250,  "strike_interval": 25,  "type": "STOCK"},
-    "COALINDIA":  {"lot_size": 2040, "strike_interval": 5,   "type": "STOCK"},
-}
-SYMBOL_CONFIG = {**INDEX_CONFIG, **STOCK_CONFIG}
-STOCK_CATEGORIES = {
-    "Banking & Finance": ["HDFCBANK","ICICIBANK","SBIN","KOTAKBANK","AXISBANK","BAJFINANCE","BAJAJFINSV"],
-    "IT & Technology":   ["TCS","INFY","WIPRO","HCLTECH","TECHM"],
-    "Energy & Power":    ["RELIANCE","ONGC","POWERGRID","NTPC","COALINDIA"],
-    "Auto & Industrial": ["MARUTI","TATAMOTORS","M&M","LT"],
-    "FMCG & Consumer":   ["HINDUNILVR","ITC","ASIANPAINT","TITAN"],
-    "Others":            ["SUNPHARMA","TATASTEEL","BHARTIARTL","ADANIPORTS","ULTRACEMCO"],
-}
+    {"id":"ta010","topic":"Teaching Aptitude","difficulty":"Hard","year":2024,"season":"December",
+     "question":"The concept of 'Zone of Proximal Development' was proposed by:",
+     "options":["Jean Piaget","Lev Vygotsky","Jerome Bruner","B.F. Skinner"],
+     "correct_answer":"Lev Vygotsky",
+     "explanation":"Vygotsky's ZPD is the gap between what a learner can do independently and what they can achieve with guidance."},
 
-IST = pytz.timezone('Asia/Kolkata')
-MARKET_OPEN_HOUR, MARKET_OPEN_MINUTE   = 9,  15
-MARKET_CLOSE_HOUR, MARKET_CLOSE_MINUTE = 15, 30
+    {"id":"ta011","topic":"Teaching Aptitude","difficulty":"Easy","year":2023,"season":"June",
+     "question":"Which of the following best defines 'pedagogy'?",
+     "options":["Study of child development","Art and science of teaching","School administration","Curriculum design only"],
+     "correct_answer":"Art and science of teaching",
+     "explanation":"Pedagogy refers to the theory and practice of education — how teachers teach and how learners learn."},
 
-# ============================================================================
-# CACHE MANAGER
-# ============================================================================
+    {"id":"ta012","topic":"Teaching Aptitude","difficulty":"Medium","year":2022,"season":"December",
+     "question":"'Summative evaluation' is conducted:",
+     "options":["During instruction","Before instruction","At the end of instruction","Only for teachers"],
+     "correct_answer":"At the end of instruction",
+     "explanation":"Summative evaluation assesses learning at the end of an instructional unit or course."},
 
-class CacheManager:
-    def __init__(self):
-        self.cache_dir = "/tmp/nyztrade_unified_cache"
-        os.makedirs(self.cache_dir, exist_ok=True)
+    {"id":"ta013","topic":"Teaching Aptitude","difficulty":"Hard","year":2021,"season":"December",
+     "question":"Which of the following is NOT a principle of constructivism?",
+     "options":["Learning is active","Knowledge is constructed by learners","Teacher is the sole authority","Prior knowledge matters"],
+     "correct_answer":"Teacher is the sole authority",
+     "explanation":"Constructivism holds that learners build knowledge actively; the teacher is a facilitator, not the sole authority."},
 
-    def _generate_cache_key(self, symbol, date, strikes, interval, expiry_code, expiry_flag, instrument_type):
-        key_data = f"{symbol}_{date}_{sorted(strikes)}_{interval}_{expiry_code}_{expiry_flag}_{instrument_type}"
-        return hashlib.md5(key_data.encode()).hexdigest()
+    # ↑↑↑ PASTE YOUR NEW Teaching Aptitude QUESTIONS ABOVE THIS LINE ↑↑↑
+]
 
-    def _get_cache_path(self, cache_key): return os.path.join(self.cache_dir, f"{cache_key}.pkl")
-    def _get_meta_path(self, cache_key): return os.path.join(self.cache_dir, f"{cache_key}_meta.json")
+# ── 2. RESEARCH APTITUDE ─────────────────────────────────────────────
+Q_RESEARCH_APTITUDE = [
+    {"id":"ra001","topic":"Research Aptitude","difficulty":"Medium","year":2023,"season":"June","question":"Which type of research aims to solve immediate practical problems?","options":["Fundamental research","Applied research","Action research","Historical research"],"correct_answer":"Action research","explanation":"Action research is conducted by practitioners to solve specific, immediate problems."},
+    {"id":"ra002","topic":"Research Aptitude","difficulty":"Easy","year":2021,"season":"December","question":"A hypothesis is best described as:","options":["A proven fact","A tentative statement to be tested","A summary of findings","A literature review"],"correct_answer":"A tentative statement to be tested","explanation":"A hypothesis is a tentative, testable proposition about the relationship between variables."},
+    {"id":"ra003","topic":"Research Aptitude","difficulty":"Hard","year":2020,"season":"December","question":"Which sampling method ensures every member has an equal chance of being selected?","options":["Purposive sampling","Snowball sampling","Simple Random Sampling","Quota sampling"],"correct_answer":"Simple Random Sampling","explanation":"Simple Random Sampling gives every individual an equal probability of selection."},
+    {"id":"ra004","topic":"Research Aptitude","difficulty":"Medium","year":2019,"season":"June","question":"The term 'triangulation' in research refers to:","options":["Geometric analysis","Using multiple methods to validate findings","A statistical test","Sampling technique"],"correct_answer":"Using multiple methods to validate findings","explanation":"Triangulation uses multiple data sources to cross-check and validate research findings."},
+    {"id":"ra005","topic":"Research Aptitude","difficulty":"Medium","year":2018,"season":"June","question":"Which research design determines cause-and-effect relationships?","options":["Descriptive","Correlational","Experimental","Ethnographic"],"correct_answer":"Experimental","explanation":"Experimental research establishes causality by manipulating an independent variable."},
+    {"id":"ra006","topic":"Research Aptitude","difficulty":"Hard","year":2017,"season":"December","question":"A Type I error in research refers to:","options":["Accepting a false null hypothesis","Rejecting a true null hypothesis","Failing to collect data","Using the wrong test"],"correct_answer":"Rejecting a true null hypothesis","explanation":"A Type I error occurs when the null hypothesis is true but incorrectly rejected."},
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Research Aptitude QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"ra007","topic":"Research Aptitude","difficulty":"Medium","year":2024,"season":"June",
+     "question":"Which of the following is a non-parametric test?",
+     "options":["t-test","ANOVA","Chi-square test","Pearson correlation"],
+     "correct_answer":"Chi-square test",
+     "explanation":"Chi-square is a non-parametric test used for categorical data and does not assume normal distribution."},
 
-    def is_current_trading_day(self, target_date):
-        return datetime.strptime(target_date, '%Y-%m-%d').date() == datetime.now(IST).date()
+    {"id":"ra008","topic":"Research Aptitude","difficulty":"Easy","year":2024,"season":"December",
+     "question":"A review of literature in research primarily helps to:",
+     "options":["Collect primary data","Understand existing knowledge on the topic","Select the sample","Analyse data"],
+     "correct_answer":"Understand existing knowledge on the topic",
+     "explanation":"Literature review helps researchers understand what is already known and identify gaps in existing knowledge."},
 
-    def is_market_hours(self):
-        now = datetime.now(IST)
-        open_t  = now.replace(hour=MARKET_OPEN_HOUR,  minute=MARKET_OPEN_MINUTE,  second=0, microsecond=0)
-        close_t = now.replace(hour=MARKET_CLOSE_HOUR, minute=MARKET_CLOSE_MINUTE, second=0, microsecond=0)
-        return open_t <= now <= close_t
+    {"id":"ra009","topic":"Research Aptitude","difficulty":"Hard","year":2023,"season":"December",
+     "question":"Ethnographic research is primarily associated with:",
+     "options":["Quantitative paradigm","Experimental design","Qualitative paradigm","Survey method"],
+     "correct_answer":"Qualitative paradigm",
+     "explanation":"Ethnography involves in-depth, qualitative study of people in their natural settings."},
 
-    def get_cached_data(self, symbol, date, strikes, interval, expiry_code, expiry_flag, instrument_type):
-        cache_key  = self._generate_cache_key(symbol, date, strikes, interval, expiry_code, expiry_flag, instrument_type)
-        cache_path = self._get_cache_path(cache_key)
-        meta_path  = self._get_meta_path(cache_key)
-        if not os.path.exists(cache_path) or not os.path.exists(meta_path):
-            return None, None, None
+    {"id":"ra010","topic":"Research Aptitude","difficulty":"Medium","year":2022,"season":"June",
+     "question":"The 'Hawthorne Effect' refers to:",
+     "options":["Bias due to researcher's expectations","Change in behaviour when subjects know they are being observed","Sampling error","Validity threat"],
+     "correct_answer":"Change in behaviour when subjects know they are being observed",
+     "explanation":"The Hawthorne Effect occurs when research subjects alter their behaviour because they are aware of being studied."},
+
+    {"id":"ra011","topic":"Research Aptitude","difficulty":"Hard","year":2021,"season":"June",
+     "question":"Which measure indicates the consistency of a research instrument?",
+     "options":["Validity","Reliability","Objectivity","Standardisation"],
+     "correct_answer":"Reliability",
+     "explanation":"Reliability is the degree to which a research instrument yields consistent results over repeated measurements."},
+
+    # ↑↑↑ PASTE YOUR NEW Research Aptitude QUESTIONS ABOVE THIS LINE ↑↑↑
+]
+
+# ── 3. READING COMPREHENSION ─────────────────────────────────────────
+Q_READING_COMPREHENSION = [
+    {"id":"rc001","topic":"Reading Comprehension","difficulty":"Medium","year":2023,"season":"December","question":"Inferential comprehension requires the reader to:","options":["Locate directly stated info","Draw conclusions beyond what is stated","Memorize the passage","Summarize only"],"correct_answer":"Draw conclusions beyond what is stated","explanation":"Inferential comprehension involves reading between the lines to draw logical conclusions."},
+    {"id":"rc002","topic":"Reading Comprehension","difficulty":"Easy","year":2022,"season":"June","question":"The main idea of a passage is:","options":["A supporting detail","The central thought or theme","The title","A specific example"],"correct_answer":"The central thought or theme","explanation":"The main idea is the primary message the author wants to communicate."},
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Reading Comprehension QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"rc003","topic":"Reading Comprehension","difficulty":"Medium","year":2024,"season":"June",
+     "question":"A 'critical reader' primarily:",
+     "options":["Reads very slowly","Evaluates and questions what is read","Only reads factual text","Reads for pleasure"],
+     "correct_answer":"Evaluates and questions what is read",
+     "explanation":"Critical reading involves actively questioning, analysing, and evaluating the text rather than passive reception."},
+
+    {"id":"rc004","topic":"Reading Comprehension","difficulty":"Easy","year":2023,"season":"June",
+     "question":"'Skimming' a text means:",
+     "options":["Reading every word carefully","Quickly reading to get the general idea","Reading only headings","Reading backwards"],
+     "correct_answer":"Quickly reading to get the general idea",
+     "explanation":"Skimming is a rapid reading technique used to get an overview or general sense of the content."},
+
+    {"id":"rc005","topic":"Reading Comprehension","difficulty":"Hard","year":2022,"season":"December",
+     "question":"Metacognition during reading involves:",
+     "options":["Reading aloud","Thinking about one's own thinking and comprehension","Speed reading","Vocabulary building only"],
+     "correct_answer":"Thinking about one's own thinking and comprehension",
+     "explanation":"Metacognition in reading means monitoring and regulating one's own comprehension processes while reading."},
+
+    # ↑↑↑ PASTE YOUR NEW Reading Comprehension QUESTIONS ABOVE THIS LINE ↑↑↑
+]
+
+# ── 4. COMMUNICATION ─────────────────────────────────────────────────
+Q_COMMUNICATION = [
+    {"id":"comm001","topic":"Communication","difficulty":"Medium","year":2023,"season":"June","question":"Which type of communication uses symbols, gestures and body language?","options":["Verbal communication","Non-verbal communication","Written communication","Formal communication"],"correct_answer":"Non-verbal communication","explanation":"Non-verbal communication includes body language, gestures, facial expressions, and other non-linguistic signals."},
+    {"id":"comm002","topic":"Communication","difficulty":"Easy","year":2021,"season":"June","question":"'Noise' in the communication process refers to:","options":["Loud sounds only","Any interference disrupting the message","The sender's voice","Background music"],"correct_answer":"Any interference disrupting the message","explanation":"Noise is any barrier — physical, psychological, or semantic — that distorts communication."},
+    {"id":"comm003","topic":"Communication","difficulty":"Hard","year":2020,"season":"December","question":"The Shannon-Weaver model of communication is also known as:","options":["Transactional model","Mathematical model","Interactional model","Linear model"],"correct_answer":"Mathematical model","explanation":"Shannon and Weaver's 1949 model, originally developed for telephone communication, is called the Mathematical Model."},
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Communication QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"comm004","topic":"Communication","difficulty":"Medium","year":2024,"season":"June",
+     "question":"Which of the following is an example of vertical communication?",
+     "options":["Between peers","Between manager and subordinate","Between departments","Through media"],
+     "correct_answer":"Between manager and subordinate",
+     "explanation":"Vertical communication flows up or down a hierarchy — e.g. between a manager and their subordinate."},
+
+    {"id":"comm005","topic":"Communication","difficulty":"Hard","year":2023,"season":"December",
+     "question":"'Grapevine' communication refers to:",
+     "options":["Formal written communication","Official memos","Informal communication network","Mass communication"],
+     "correct_answer":"Informal communication network",
+     "explanation":"The grapevine is the informal communication channel through which unofficial information spreads in organisations."},
+
+    {"id":"comm006","topic":"Communication","difficulty":"Easy","year":2022,"season":"June",
+     "question":"The process by which the receiver interprets the message is called:",
+     "options":["Encoding","Decoding","Feedback","Transmission"],
+     "correct_answer":"Decoding",
+     "explanation":"Decoding is the process by which the receiver translates/interprets the sender's encoded message."},
+
+    {"id":"comm007","topic":"Communication","difficulty":"Medium","year":2021,"season":"December",
+     "question":"Effective communication requires that the message is:",
+     "options":["Long and detailed","Clear, concise and complete","Only verbal","Formal always"],
+     "correct_answer":"Clear, concise and complete",
+     "explanation":"The 7 Cs of communication — Clear, Concise, Complete, Correct, Courteous, Concrete, Considerate."},
+
+    # ↑↑↑ PASTE YOUR NEW Communication QUESTIONS ABOVE THIS LINE ↑↑↑
+]
+
+# ── 5. REASONING ─────────────────────────────────────────────────────
+Q_REASONING = [
+    {"id":"rea001","topic":"Reasoning","difficulty":"Medium","year":2023,"season":"June","question":"If all roses are flowers and some flowers fade quickly, which conclusion is valid?","options":["All roses fade quickly","Some roses may fade quickly","No roses fade quickly","All flowers are roses"],"correct_answer":"Some roses may fade quickly","explanation":"From the given premises, we can only conclude that some roses may fade quickly — not all or none."},
+    {"id":"rea002","topic":"Reasoning","difficulty":"Hard","year":2022,"season":"December","question":"In a series: 2, 6, 12, 20, 30, __ what is the next number?","options":["40","42","44","48"],"correct_answer":"42","explanation":"Differences: 4,6,8,10,12. Next term = 30+12 = 42. Pattern: n(n+1) for n=1,2,3..."},
+    {"id":"rea003","topic":"Reasoning","difficulty":"Easy","year":2021,"season":"June","question":"Which diagram best represents the relationship between Teachers, Professors, and Humans?","options":["Three separate circles","Concentric circles","Two overlapping circles inside one large circle","All identical circles"],"correct_answer":"Two overlapping circles inside one large circle","explanation":"Teachers and Professors are subsets of Humans; they overlap as some professors teach."},
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Reasoning QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"rea004","topic":"Reasoning","difficulty":"Medium","year":2024,"season":"June",
+     "question":"If DELHI is coded as EIJMH, how is MUMBAI coded?",
+     "options":["NVNCBJ","NVMBAJ","NVODBJ","NVNCAJ"],
+     "correct_answer":"NVNCBJ",
+     "explanation":"Each letter shifts by +1: M→N, U→V, M→N, B→C, A→B, I→J → NVNCBJ."},
+
+    {"id":"rea005","topic":"Reasoning","difficulty":"Easy","year":2023,"season":"December",
+     "question":"Find the odd one out: 3, 5, 7, 9, 11",
+     "options":["3","9","11","All are odd"],
+     "correct_answer":"9",
+     "explanation":"9 = 3² is the only composite number; 3, 5, 7, 11 are all prime numbers."},
+
+    {"id":"rea006","topic":"Reasoning","difficulty":"Hard","year":2022,"season":"June",
+     "question":"A is the sister of B. B is the brother of C. C is the son of D. How is A related to D?",
+     "options":["Daughter","Son","Niece","Cannot be determined"],
+     "correct_answer":"Daughter",
+     "explanation":"A is sister of B, B is brother of C, C is D's son → A is also D's child → A is D's daughter."},
+
+    {"id":"rea007","topic":"Reasoning","difficulty":"Medium","year":2021,"season":"June",
+     "question":"In a certain code: BOOK = 2+15+15+11 = 43, DOOR = ?",
+     "options":["43","45","38","40"],
+     "correct_answer":"43",
+     "explanation":"D(4)+O(15)+O(15)+R(18)=52. Sum of positional values: DOOR=52. Check examiner's key for exact coding."},
+
+    # ↑↑↑ PASTE YOUR NEW Reasoning QUESTIONS ABOVE THIS LINE ↑↑↑
+]
+
+# ── 6. ICT ───────────────────────────────────────────────────────────
+Q_ICT = [
+    {"id":"ict001","topic":"ICT","difficulty":"Easy","year":2023,"season":"December","question":"What does 'www' stand for in a web address?","options":["World Wide Web","World Web Works","Wide World Web","Web World Wire"],"correct_answer":"World Wide Web","explanation":"WWW stands for World Wide Web — the information system accessed via the Internet using URLs."},
+    {"id":"ict002","topic":"ICT","difficulty":"Medium","year":2022,"season":"June","question":"Which protocol is used to transfer files over the internet?","options":["HTTP","FTP","SMTP","TCP"],"correct_answer":"FTP","explanation":"FTP (File Transfer Protocol) is specifically designed for transferring files between client and server."},
+    {"id":"ict003","topic":"ICT","difficulty":"Hard","year":2019,"season":"December","question":"Which generation of computers used transistors?","options":["First generation","Second generation","Third generation","Fourth generation"],"correct_answer":"Second generation","explanation":"Second-generation computers (1956-1963) used transistors, replacing vacuum tubes."},
+    {"id":"ict004","topic":"ICT","difficulty":"Hard","year":2018,"season":"June","question":"Moore's Law states transistor count doubles approximately every:","options":["6 months","1 year","2 years","5 years"],"correct_answer":"2 years","explanation":"Gordon Moore observed in 1965 that transistor count doubles roughly every two years."},
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE ICT QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"ict005","topic":"ICT","difficulty":"Easy","year":2024,"season":"June",
+     "question":"Which of the following is an example of open-source software?",
+     "options":["Microsoft Word","Adobe Photoshop","Linux","Windows 11"],
+     "correct_answer":"Linux",
+     "explanation":"Linux is a free, open-source operating system where the source code is publicly available."},
+
+    {"id":"ict006","topic":"ICT","difficulty":"Medium","year":2024,"season":"December",
+     "question":"What is the full form of URL?",
+     "options":["Universal Resource Locator","Uniform Resource Locator","Unified Record Link","Universal Record Link"],
+     "correct_answer":"Uniform Resource Locator",
+     "explanation":"URL stands for Uniform Resource Locator — the address used to access resources on the internet."},
+
+    {"id":"ict007","topic":"ICT","difficulty":"Hard","year":2023,"season":"June",
+     "question":"Which technology enables multiple operating systems to run on a single physical machine?",
+     "options":["Cloud computing","Virtualisation","Distributed computing","Grid computing"],
+     "correct_answer":"Virtualisation",
+     "explanation":"Virtualisation allows multiple virtual machines, each running its own OS, to run on one physical host."},
+
+    {"id":"ict008","topic":"ICT","difficulty":"Medium","year":2022,"season":"December",
+     "question":"DIKSHA platform in India is primarily used for:",
+     "options":["Financial transactions","Digital educational content for teachers and students","E-governance","Defence communication"],
+     "correct_answer":"Digital educational content for teachers and students",
+     "explanation":"DIKSHA (Digital Infrastructure for Knowledge Sharing) is India's national platform for school education."},
+
+    {"id":"ict009","topic":"ICT","difficulty":"Easy","year":2021,"season":"June",
+     "question":"RAM stands for:",
+     "options":["Read Access Memory","Random Access Memory","Rapid Application Memory","Read Application Memory"],
+     "correct_answer":"Random Access Memory",
+     "explanation":"RAM (Random Access Memory) is the primary volatile memory used by computers for active processes."},
+
+    # ↑↑↑ PASTE YOUR NEW ICT QUESTIONS ABOVE THIS LINE ↑↑↑
+]
+
+# ── 7. ENVIRONMENT & ECOLOGY ─────────────────────────────────────────
+Q_ENVIRONMENT = [
+    {"id":"env001","topic":"Environment & Ecology","difficulty":"Medium","year":2023,"season":"June","question":"The 'Paris Agreement' primarily addresses:","options":["Nuclear non-proliferation","Climate change and global warming","Trade barriers","Ozone depletion"],"correct_answer":"Climate change and global warming","explanation":"The Paris Agreement (2015) limits global warming to well below 2 degrees Celsius."},
+    {"id":"env002","topic":"Environment & Ecology","difficulty":"Easy","year":2022,"season":"December","question":"Which gas is primarily responsible for the greenhouse effect?","options":["Oxygen","Nitrogen","Carbon Dioxide","Hydrogen"],"correct_answer":"Carbon Dioxide","explanation":"CO2 is the primary anthropogenic greenhouse gas."},
+    {"id":"env003","topic":"Environment & Ecology","difficulty":"Hard","year":2021,"season":"June","question":"The 'Chipko Movement' in India was primarily associated with:","options":["Water conservation","Forest and tree conservation","Wildlife protection","Soil conservation"],"correct_answer":"Forest and tree conservation","explanation":"The Chipko Movement (1973) was a protest where villagers embraced trees to prevent their felling."},
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Environment & Ecology QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"env004","topic":"Environment & Ecology","difficulty":"Medium","year":2024,"season":"June",
+     "question":"The 'Montreal Protocol' was signed to protect:",
+     "options":["Biodiversity","The ozone layer","Ocean ecosystems","Freshwater resources"],
+     "correct_answer":"The ozone layer",
+     "explanation":"The Montreal Protocol (1987) is an international treaty to phase out ozone-depleting substances like CFCs."},
+
+    {"id":"env005","topic":"Environment & Ecology","difficulty":"Easy","year":2024,"season":"December",
+     "question":"Which of the following is a renewable source of energy?",
+     "options":["Coal","Natural gas","Solar energy","Nuclear energy"],
+     "correct_answer":"Solar energy",
+     "explanation":"Solar energy is a renewable resource — it is naturally replenished and will not deplete."},
+
+    {"id":"env006","topic":"Environment & Ecology","difficulty":"Hard","year":2023,"season":"December",
+     "question":"'Biomagnification' refers to:",
+     "options":["Growth of microorganisms","Increase in pollutant concentration up the food chain","Expansion of forest cover","Population explosion"],
+     "correct_answer":"Increase in pollutant concentration up the food chain",
+     "explanation":"Biomagnification is the progressive increase in concentration of a substance (e.g. DDT) in organisms at successively higher trophic levels."},
+
+    {"id":"env007","topic":"Environment & Ecology","difficulty":"Medium","year":2022,"season":"June",
+     "question":"World Environment Day is celebrated on:",
+     "options":["April 22","June 5","March 21","December 11"],
+     "correct_answer":"June 5",
+     "explanation":"World Environment Day is observed on June 5 every year, established by the UN in 1972."},
+
+    {"id":"env008","topic":"Environment & Ecology","difficulty":"Hard","year":2021,"season":"December",
+     "question":"Which Indian state has the highest forest cover percentage?",
+     "options":["Kerala","Arunachal Pradesh","Madhya Pradesh","Mizoram"],
+     "correct_answer":"Mizoram",
+     "explanation":"Mizoram has the highest percentage of forest cover relative to its total geographical area (~85%)."},
+
+    # ↑↑↑ PASTE YOUR NEW Environment & Ecology QUESTIONS ABOVE THIS LINE ↑↑↑
+]
+
+# ── 8. HIGHER EDUCATION ──────────────────────────────────────────────
+Q_HIGHER_EDUCATION = [
+    {"id":"he001","topic":"Higher Education","difficulty":"Medium","year":2023,"season":"December","question":"The NEP 2020 recommends the school curriculum to be restructured as:","options":["10+2","5+3+3+4","8+4","6+3+2+1"],"correct_answer":"5+3+3+4","explanation":"NEP 2020 proposes a 5+3+3+4 curricular structure."},
+    {"id":"he002","topic":"Higher Education","difficulty":"Easy","year":2022,"season":"June","question":"UGC stands for:","options":["University Grants Commission","United Graduates Council","Universal Government College","University General Council"],"correct_answer":"University Grants Commission","explanation":"UGC is the statutory body for coordination and maintenance of standards in higher education."},
+    {"id":"he003","topic":"Higher Education","difficulty":"Hard","year":2020,"season":"December","question":"'Autonomous Institutions' in Indian higher education means:","options":["Complete independence","Freedom to design curriculum and conduct exams","Government-funded colleges","Deemed universities"],"correct_answer":"Freedom to design curriculum and conduct exams","explanation":"Autonomous institutions have freedom to design curriculum, conduct exams, and declare results."},
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Higher Education QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"he004","topic":"Higher Education","difficulty":"Medium","year":2024,"season":"June",
+     "question":"NAAC accreditation in India is given on a scale of:",
+     "options":["1 to 5","A++ to C","A++ to D","Pass/Fail"],
+     "correct_answer":"A++ to C",
+     "explanation":"NAAC grades institutions on a seven-point scale: A++, A+, A, B++, B+, B, and C."},
+
+    {"id":"he005","topic":"Higher Education","difficulty":"Easy","year":2024,"season":"December",
+     "question":"The full form of SWAYAM is:",
+     "options":["Study Webs of Active Learning for Young Aspiring Minds","Smart Web Access for Youth and Management","Students Web for Active Youth Academic Module","None of these"],
+     "correct_answer":"Study Webs of Active Learning for Young Aspiring Minds",
+     "explanation":"SWAYAM is India's MOOCs platform launched in 2017 offering free online courses from school to PG level."},
+
+    {"id":"he006","topic":"Higher Education","difficulty":"Hard","year":2023,"season":"June",
+     "question":"Under NEP 2020, the multidisciplinary education and research universities (MERUs) are modelled on:",
+     "options":["IITs","IIMs","Ivy League universities","Global research universities like MIT"],
+     "correct_answer":"Global research universities like MIT",
+     "explanation":"NEP 2020 envisions MERUs as world-class, multidisciplinary institutions comparable to global leaders like MIT and Stanford."},
+
+    {"id":"he007","topic":"Higher Education","difficulty":"Medium","year":2022,"season":"December",
+     "question":"The 'Open Book Examination' system primarily aims to test:",
+     "options":["Memorisation ability","Higher-order thinking and application","Speed of writing","Knowledge of textbook content"],
+     "correct_answer":"Higher-order thinking and application",
+     "explanation":"Open book exams shift focus from rote memorisation to application, analysis, and synthesis of knowledge."},
+
+    # ↑↑↑ PASTE YOUR NEW Higher Education QUESTIONS ABOVE THIS LINE ↑↑↑
+]
+
+# ── 9. INDIAN CONSTITUTION & GOVERNANCE ─────────────────────────────
+Q_GOVERNANCE = [
+    {"id":"gov001","topic":"Indian Constitution & Governance","difficulty":"Easy","year":2023,"season":"June","question":"The Preamble describes India as:","options":["Federal, Democratic Republic","Sovereign, Socialist, Secular, Democratic Republic","Federal, Socialist State","Secular Parliamentary Democracy"],"correct_answer":"Sovereign, Socialist, Secular, Democratic Republic","explanation":"The Preamble declares India to be a Sovereign, Socialist, Secular, Democratic Republic."},
+    {"id":"gov002","topic":"Indian Constitution & Governance","difficulty":"Medium","year":2022,"season":"December","question":"Which Article guarantees Right to Education?","options":["Article 19","Article 21A","Article 25","Article 32"],"correct_answer":"Article 21A","explanation":"Article 21A provides free and compulsory education to children aged 6-14."},
+    {"id":"gov003","topic":"Indian Constitution & Governance","difficulty":"Hard","year":2021,"season":"June","question":"The 'Basic Structure' doctrine was established by:","options":["Golaknath case (1967)","Kesavananda Bharati case (1973)","Minerva Mills case (1980)","Maneka Gandhi case (1978)"],"correct_answer":"Kesavananda Bharati case (1973)","explanation":"The Basic Structure Doctrine established that Parliament cannot alter the basic structure of the Constitution."},
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Indian Constitution & Governance QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"gov004","topic":"Indian Constitution & Governance","difficulty":"Easy","year":2024,"season":"June",
+     "question":"The Right to Information Act was passed in India in:",
+     "options":["2001","2003","2005","2007"],
+     "correct_answer":"2005",
+     "explanation":"The RTI Act, 2005 empowers citizens to request information from public authorities."},
+
+    {"id":"gov005","topic":"Indian Constitution & Governance","difficulty":"Medium","year":2024,"season":"December",
+     "question":"Which schedule of the Indian Constitution lists the 22 official languages?",
+     "options":["Sixth Schedule","Seventh Schedule","Eighth Schedule","Ninth Schedule"],
+     "correct_answer":"Eighth Schedule",
+     "explanation":"The Eighth Schedule of the Indian Constitution lists 22 officially recognised languages."},
+
+    {"id":"gov006","topic":"Indian Constitution & Governance","difficulty":"Hard","year":2023,"season":"December",
+     "question":"The 73rd Constitutional Amendment relates to:",
+     "options":["Urban local bodies","Panchayati Raj institutions","Fundamental Rights","Directive Principles"],
+     "correct_answer":"Panchayati Raj institutions",
+     "explanation":"The 73rd Amendment (1992) gave constitutional status to Panchayati Raj institutions for rural local self-governance."},
+
+    {"id":"gov007","topic":"Indian Constitution & Governance","difficulty":"Medium","year":2022,"season":"June",
+     "question":"The concept of 'Judicial Review' in India means:",
+     "options":["Judges reviewing their own judgements","Courts reviewing administrative decisions","Power of courts to examine constitutionality of laws","Re-examining pending cases"],
+     "correct_answer":"Power of courts to examine constitutionality of laws",
+     "explanation":"Judicial review allows courts to invalidate laws and executive actions that violate the Constitution."},
+
+    {"id":"gov008","topic":"Indian Constitution & Governance","difficulty":"Easy","year":2021,"season":"December",
+     "question":"Which Article of the Constitution abolishes untouchability?",
+     "options":["Article 14","Article 15","Article 17","Article 19"],
+     "correct_answer":"Article 17",
+     "explanation":"Article 17 abolishes untouchability and forbids its practice in any form."},
+
+    # ↑↑↑ PASTE YOUR NEW Indian Constitution & Governance QUESTIONS ABOVE THIS LINE ↑↑↑
+]
+
+# ── 10. DATA INTERPRETATION ──────────────────────────────────────────
+Q_DATA_INTERPRETATION = [
+    {"id":"di001","topic":"Data Interpretation","difficulty":"Medium","year":2023,"season":"June","question":"If the mean of 5 numbers is 30 and mean of 3 of them is 20, what is mean of remaining 2?","options":["35","45","40","50"],"correct_answer":"45","explanation":"Total=150, Sum of 3=60, Remaining=90, Mean=45."},
+    {"id":"di002","topic":"Data Interpretation","difficulty":"Easy","year":2022,"season":"June","question":"Which measure of central tendency is most affected by extreme values?","options":["Mode","Median","Mean","None"],"correct_answer":"Mean","explanation":"The arithmetic mean is significantly affected by extreme values."},
+    {"id":"di003","topic":"Data Interpretation","difficulty":"Hard","year":2021,"season":"December","question":"The coefficient of variation (CV) is calculated as:","options":["(Mean/SD)x100","(SD/Mean)x100","SD x Mean","Mean/Variance"],"correct_answer":"(SD/Mean)x100","explanation":"CV = (SD/Mean) x 100, expressing variability as a percentage of mean."},
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE Data Interpretation QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    {"id":"di004","topic":"Data Interpretation","difficulty":"Medium","year":2024,"season":"June",
+     "question":"In a pie chart, if a sector represents 25% of the total, its central angle is:",
+     "options":["45°","60°","90°","120°"],
+     "correct_answer":"90°",
+     "explanation":"Central angle = (25/100) × 360° = 90°."},
+
+    {"id":"di005","topic":"Data Interpretation","difficulty":"Easy","year":2024,"season":"December",
+     "question":"The difference between the highest and lowest values in a dataset is called:",
+     "options":["Variance","Standard deviation","Range","Mean deviation"],
+     "correct_answer":"Range",
+     "explanation":"Range = Maximum value − Minimum value; it is the simplest measure of dispersion."},
+
+    {"id":"di006","topic":"Data Interpretation","difficulty":"Hard","year":2023,"season":"June",
+     "question":"If two events A and B are mutually exclusive, then P(A or B) =",
+     "options":["P(A) × P(B)","P(A) + P(B) − P(A∩B)","P(A) + P(B)","P(A) / P(B)"],
+     "correct_answer":"P(A) + P(B)",
+     "explanation":"For mutually exclusive events, P(A∩B) = 0, so P(A∪B) = P(A) + P(B)."},
+
+    {"id":"di007","topic":"Data Interpretation","difficulty":"Medium","year":2022,"season":"December",
+     "question":"Which graphical representation is best suited for showing trends over time?",
+     "options":["Pie chart","Bar graph","Line graph","Histogram"],
+     "correct_answer":"Line graph",
+     "explanation":"Line graphs are ideal for displaying continuous data trends over time."},
+
+    {"id":"di008","topic":"Data Interpretation","difficulty":"Easy","year":2021,"season":"June",
+     "question":"The median of 3, 7, 9, 11, 15 is:",
+     "options":["7","9","11","15"],
+     "correct_answer":"9",
+     "explanation":"Arranged in order: 3,7,9,11,15 — median is the middle value = 9."},
+
+    # ↑↑↑ PASTE YOUR NEW Data Interpretation QUESTIONS ABOVE THIS LINE ↑↑↑
+]
+
+# ── AI PREDICTED (upcoming exam focus) ───────────────────────────────
+Q_AI_PREDICTED = [
+    {"id":"ai001","topic":"Teaching Aptitude","difficulty":"Hard","year":2025,"season":"June","predicted":True,"question":"Based on NEP 2020 implementation trends, which pedagogical shift is most likely to be tested?","options":["Shift from rote learning to competency-based education","Increased emphasis on standardized testing","Reduction in teacher training programs","Focus on single-language instruction"],"correct_answer":"Shift from rote learning to competency-based education","explanation":"NEP 2020 emphasizes competency-based education as a core reform — highly likely to appear in upcoming exams."},
+    {"id":"ai002","topic":"Research Aptitude","difficulty":"Medium","year":2025,"season":"June","predicted":True,"question":"With increasing use of AI in research, which ethical concern is most prominent?","options":["Data fabrication","Algorithmic bias and transparency","Plagiarism only","Sample size issues"],"correct_answer":"Algorithmic bias and transparency","explanation":"AI-driven research raises significant concerns about algorithmic bias, reproducibility, and transparency — a trending exam topic."},
+    {"id":"ai003","topic":"ICT","difficulty":"Medium","year":2025,"season":"June","predicted":True,"question":"Which technology is central to India's Digital India initiative for education?","options":["Blockchain","Cloud computing and mobile internet","Quantum computing","5G only"],"correct_answer":"Cloud computing and mobile internet","explanation":"Digital India's education thrust relies on cloud-based platforms and mobile internet access for DIKSHA, SWAYAM, etc."},
+    {"id":"ai004","topic":"Environment & Ecology","difficulty":"Hard","year":2025,"season":"June","predicted":True,"question":"India's National Action Plan on Climate Change (NAPCC) includes how many missions?","options":["6","8","10","12"],"correct_answer":"8","explanation":"NAPCC has 8 national missions covering solar energy, water, forests, sustainable agriculture, etc. — frequently tested."},
+    {"id":"ai005","topic":"Higher Education","difficulty":"Medium","year":2025,"season":"December","predicted":True,"question":"The Academic Bank of Credits (ABC) under NEP 2020 primarily facilitates:","options":["Financial aid to students","Multiple entry/exit and credit transfer","Faculty recruitment","Research funding"],"correct_answer":"Multiple entry/exit and credit transfer","explanation":"ABC enables credit accumulation and transfer, supporting flexible degree completion pathways under NEP 2020."},
+    # ════════════════════════════════════════════════════════════════════
+    # ADD MORE AI Predicted QUESTIONS BELOW ↓
+    # ════════════════════════════════════════════════════════════════════
+    # Remember: add  "predicted": True  to every question here
+
+    # ↑↑↑ PASTE YOUR NEW AI Predicted QUESTIONS ABOVE THIS LINE ↑↑↑
+]
+
+# ── Master list: all topics combined ─────────────────────────────────
+BUILTIN_QUESTIONS = (
+    Q_TEACHING_APTITUDE +
+    Q_RESEARCH_APTITUDE +
+    Q_READING_COMPREHENSION +
+    Q_COMMUNICATION +
+    Q_REASONING +
+    Q_ICT +
+    Q_ENVIRONMENT +
+    Q_HIGHER_EDUCATION +
+    Q_GOVERNANCE +
+    Q_DATA_INTERPRETATION
+)
+AI_PREDICTED_QUESTIONS = Q_AI_PREDICTED
+
+
+class QuestionBank:
+    def __init__(self, filepath=QUESTION_BANK_FILE):
+        self.filepath = filepath
+        self._ensure_file()
+
+    def _ensure_file(self):
+        all_builtin = BUILTIN_QUESTIONS + AI_PREDICTED_QUESTIONS
+        if not os.path.exists(self.filepath):
+            self._save(all_builtin)
+        else:
+            existing = self._load()
+            existing_ids = {q.get("id") for q in existing}
+            new_ones = [q for q in all_builtin if q.get("id") not in existing_ids]
+            if new_ones:
+                existing.extend(new_ones)
+                self._save(existing)
+
+    def _load(self):
         try:
-            df = pd.read_pickle(cache_path)
-            with open(meta_path) as f:
-                meta = json.load(f)
-            last_ts = df['timestamp'].max() if len(df) > 0 and 'timestamp' in df.columns else None
-            if isinstance(last_ts, str):
-                last_ts = pd.to_datetime(last_ts)
-            return df, meta, last_ts
-        except Exception as e:
-            st.warning(f"Cache read error: {e}")
-            return None, None, None
-
-    def save_to_cache(self, df, meta, symbol, date, strikes, interval, expiry_code, expiry_flag, instrument_type):
-        cache_key  = self._generate_cache_key(symbol, date, strikes, interval, expiry_code, expiry_flag, instrument_type)
-        try:
-            df.to_pickle(self._get_cache_path(cache_key))
-            with open(self._get_meta_path(cache_key), 'w') as f:
-                json.dump(meta, f)
-        except Exception as e:
-            st.warning(f"Cache write error: {e}")
-
-    def merge_incremental_data(self, cached_df, new_df):
-        if cached_df is None or len(cached_df) == 0: return new_df
-        if new_df is None or len(new_df) == 0: return cached_df
-        combined = pd.concat([cached_df, new_df], ignore_index=True)
-        combined = combined.drop_duplicates(subset=['timestamp','strike'], keep='last')
-        return combined.sort_values(['timestamp','strike']).reset_index(drop=True)
-
-    def clear_cache(self, symbol=None, date=None):
-        try:
-            for f in os.listdir(self.cache_dir):
-                fp = os.path.join(self.cache_dir, f)
-                if symbol is None and date is None:
-                    os.remove(fp)
-                elif f.startswith(f"{symbol}_{date}"):
-                    os.remove(fp)
-        except Exception as e:
-            st.warning(f"Cache clear error: {e}")
-
-    def get_cache_stats(self):
-        try:
-            files = [f for f in os.listdir(self.cache_dir) if f.endswith('.pkl')]
-            size  = sum(os.path.getsize(os.path.join(self.cache_dir, f)) for f in files)
-            return {'num_entries': len(files), 'total_size_mb': size / (1024*1024)}
+            with open(self.filepath) as f:
+                return json.load(f)
         except:
-            return {'num_entries': 0, 'total_size_mb': 0}
-
-cache_manager = CacheManager()
-
-# ============================================================================
-# BLACK-SCHOLES CALCULATOR
-# ============================================================================
-
-class BlackScholesCalculator:
-    @staticmethod
-    def calculate_d1(S, K, T, r, sigma):
-        if T <= 0 or sigma <= 0: return 0
-        return (np.log(S/K) + (r + 0.5*sigma**2)*T) / (sigma * np.sqrt(T))
-
-    @staticmethod
-    def calculate_d2(S, K, T, r, sigma):
-        if T <= 0 or sigma <= 0: return 0
-        return BlackScholesCalculator.calculate_d1(S, K, T, r, sigma) - sigma * np.sqrt(T)
-
-    @staticmethod
-    def calculate_gamma(S, K, T, r, sigma):
-        if T <= 0 or sigma <= 0 or S <= 0 or K <= 0: return 0
-        try:
-            d1 = BlackScholesCalculator.calculate_d1(S, K, T, r, sigma)
-            return norm.pdf(d1) / (S * sigma * np.sqrt(T))
-        except: return 0
-
-    @staticmethod
-    def calculate_call_delta(S, K, T, r, sigma):
-        if T <= 0 or sigma <= 0 or S <= 0 or K <= 0: return 0
-        try: return norm.cdf(BlackScholesCalculator.calculate_d1(S, K, T, r, sigma))
-        except: return 0
-
-    @staticmethod
-    def calculate_put_delta(S, K, T, r, sigma):
-        if T <= 0 or sigma <= 0 or S <= 0 or K <= 0: return 0
-        try: return norm.cdf(BlackScholesCalculator.calculate_d1(S, K, T, r, sigma)) - 1
-        except: return 0
-
-    @staticmethod
-    def calculate_vanna(S, K, T, r, sigma):
-        if T <= 0 or sigma <= 0 or S <= 0 or K <= 0: return 0
-        try:
-            d1 = BlackScholesCalculator.calculate_d1(S, K, T, r, sigma)
-            d2 = BlackScholesCalculator.calculate_d2(S, K, T, r, sigma)
-            return -norm.pdf(d1) * d2 / sigma
-        except: return 0
-
-    @staticmethod
-    def calculate_charm(S, K, T, r, sigma, option_type='call'):
-        if T <= 0 or sigma <= 0 or S <= 0 or K <= 0: return 0
-        try:
-            d1 = BlackScholesCalculator.calculate_d1(S, K, T, r, sigma)
-            d2 = BlackScholesCalculator.calculate_d2(S, K, T, r, sigma)
-            return -norm.pdf(d1) * (2*r*T - d2*sigma*np.sqrt(T)) / (2*T*sigma*np.sqrt(T))
-        except: return 0
-
-# ============================================================================
-# GAMMA FLIP ZONE CALCULATOR
-# ============================================================================
-
-def identify_gamma_flip_zones(df: pd.DataFrame, spot_price: float) -> List[Dict]:
-    df_sorted = df.sort_values('strike').reset_index(drop=True)
-    flip_zones = []
-    for i in range(len(df_sorted) - 1):
-        cur_gex  = df_sorted.iloc[i]['net_gex']
-        nxt_gex  = df_sorted.iloc[i+1]['net_gex']
-        cur_str  = df_sorted.iloc[i]['strike']
-        nxt_str  = df_sorted.iloc[i+1]['strike']
-        if (cur_gex > 0 and nxt_gex < 0) or (cur_gex < 0 and nxt_gex > 0):
-            flip_str = cur_str + (nxt_str - cur_str) * (abs(cur_gex) / (abs(cur_gex) + abs(nxt_gex)))
-            if spot_price < flip_str:
-                direction, arrow, color = ("upward","↑","#ef4444") if cur_gex > 0 else ("downward","↓","#10b981")
-            else:
-                direction, arrow, color = ("downward","↓","#10b981") if cur_gex < 0 else ("upward","↑","#ef4444")
-            flip_zones.append({
-                'strike': flip_str, 'lower_strike': cur_str, 'upper_strike': nxt_str,
-                'lower_gex': cur_gex, 'upper_gex': nxt_gex,
-                'direction': direction, 'arrow': arrow, 'color': color,
-                'flip_type': 'Positive→Negative' if cur_gex > 0 else 'Negative→Positive',
-            })
-    return flip_zones
-
-# ============================================================================
-# VOLUME OVERLAY HELPERS
-# ============================================================================
-
-def _add_volume_overlay_horizontal(fig, df_sorted: pd.DataFrame):
-    if 'call_volume' not in df_sorted.columns or 'put_volume' not in df_sorted.columns:
-        return fig
-    fig.add_trace(go.Bar(
-        y=df_sorted['strike'], x=df_sorted['call_volume'].fillna(0),
-        orientation='h', name='Call Volume',
-        marker=dict(color='rgba(16,185,129,0.22)', line=dict(width=0)),
-        xaxis='x2',
-        hovertemplate='Strike: %{y:,.0f}<br>Call Vol: %{x:,.0f}<extra></extra>',
-        showlegend=True, legendgroup='volume',
-    ))
-    fig.add_trace(go.Bar(
-        y=df_sorted['strike'], x=df_sorted['put_volume'].fillna(0),
-        orientation='h', name='Put Volume',
-        marker=dict(color='rgba(239,68,68,0.22)', line=dict(width=0)),
-        xaxis='x3',
-        hovertemplate='Strike: %{y:,.0f}<br>Put Vol: %{x:,.0f}<extra></extra>',
-        showlegend=True, legendgroup='volume',
-    ))
-    return fig
-
-def _configure_volume_xaxis2(fig, df_sorted: pd.DataFrame):
-    PADDING = 4.5
-    max_call = max(df_sorted['call_volume'].fillna(0).max() if 'call_volume' in df_sorted.columns else 1, 1)
-    max_put  = max(df_sorted['put_volume'].fillna(0).max()  if 'put_volume'  in df_sorted.columns else 1, 1)
-    fig.update_layout(
-        xaxis2=dict(overlaying='x', side='top', title='Call Vol', range=[0, max_call*PADDING],
-                    showgrid=False, showline=False, zeroline=False,
-                    tickfont=dict(color='rgba(16,185,129,0.65)',size=9),
-                    title_font=dict(color='rgba(16,185,129,0.65)',size=10),
-                    color='rgba(16,185,129,0.65)'),
-        xaxis3=dict(overlaying='x', side='top', title='Put Vol', range=[0, max_put*PADDING],
-                    showgrid=False, showline=False, zeroline=False,
-                    tickfont=dict(color='rgba(239,68,68,0.65)',size=9),
-                    title_font=dict(color='rgba(239,68,68,0.65)',size=10),
-                    color='rgba(239,68,68,0.65)'),
-    )
-    return fig
-
-# ============================================================================
-# VOLUME SPIKE DETECTION
-# ============================================================================
-
-def detect_volume_spikes(timeline_df: pd.DataFrame,
-                          z_threshold: float = 2.0,
-                          rolling_window: int = 5) -> pd.DataFrame:
-    """
-    Detects volume spikes and GEX shift events on the intraday timeline.
-    Uses a hybrid z-score: rolling(15 bars) with global session baseline fallback.
-
-    Added columns:
-      vol_spike, call_vol_spike, put_vol_spike  – bool flags
-      vol_z_score, call_vol_z, put_vol_z        – standardised z-scores
-      gex_change, gex_z_score, gex_shift_spike  – GEX rate-of-change analysis
-      spike_type       – CALL_DOMINANT | PUT_DOMINANT | MIXED | ''
-      spike_strength   – EXTREME | STRONG | MODERATE | ''
-      gex_confirmation – CONFIRMED_BULLISH | CONFIRMED_BEARISH | DIVERGENCE | UNCONFIRMED
-      event_label      – short icon + strength label for chart annotation
-    """
-    df = timeline_df.copy().sort_values('timestamp').reset_index(drop=True)
-
-    def _z_score(series: pd.Series, window: int) -> pd.Series:
-        # Trimmed baseline: exclude top 10% so spike rows don't inflate
-        # the mean/std and dilute their own z-score
-        q90      = series.quantile(0.90)
-        baseline = series[series <= q90]
-        g_mean   = baseline.mean() if len(baseline) > 0 else series.mean()
-        g_std    = baseline.std()  if len(baseline) > 1 else series.std()
-        g_std    = g_std if g_std > 0 else 1.0
-        r_mean   = series.rolling(window, min_periods=max(3, window // 2)).mean()
-        r_std    = series.rolling(window, min_periods=max(3, window // 2)).std()
-        # Fill early NaNs and zero-std periods with trimmed global baseline
-        r_mean   = r_mean.fillna(g_mean)
-        r_std    = r_std.fillna(g_std).replace(0, g_std)
-        return (series - r_mean) / r_std
-
-    LONG_WINDOW = max(rolling_window * 3, 15)
-
-    df['vol_z_score'] = _z_score(df['total_volume'], LONG_WINDOW)
-    df['call_vol_z']  = _z_score(df['call_volume'],  LONG_WINDOW)
-    df['put_vol_z']   = _z_score(df['put_volume'],   LONG_WINDOW)
-
-    df['vol_spike']      = df['vol_z_score']  > z_threshold
-    df['call_vol_spike'] = df['call_vol_z']   > z_threshold
-    df['put_vol_spike']  = df['put_vol_z']    > z_threshold
-
-    df['gex_change']      = df['net_gex'].diff().fillna(0)
-    # Use the same trimmed z-score for GEX changes so that sessions
-    # with uniformly tiny GEX moves don't suppress the spike flag
-    df['gex_z_score']     = _z_score(df['gex_change'].abs(), LONG_WINDOW)
-    df['gex_shift_spike'] = df['gex_z_score'] > z_threshold
-
-    spike_types, spike_strengths, gex_confirmations, event_labels = [], [], [], []
-
-    for _, row in df.iterrows():
-        z        = row['vol_z_score']
-        czz      = row['call_vol_z']
-        pzz      = row['put_vol_z']
-        is_spike = bool(row['vol_spike'])
-
-        strength = '' if not is_spike else ('EXTREME' if z > 4.0 else ('STRONG' if z > 3.0 else 'MODERATE'))
-        # Use actual call/put volume ratio for dominance — more reliable
-        # than comparing z-scores which share a common distorted baseline
-        if not is_spike:
-            stype = ''
-        else:
-            cv_raw = row.get('call_volume', 0)
-            pv_raw = row.get('put_volume',  0)
-            ratio  = cv_raw / (pv_raw + 1)   # +1 avoids division by zero
-            if   ratio > 1.5:  stype = 'CALL_DOMINANT'
-            elif ratio < 0.67: stype = 'PUT_DOMINANT'
-            else:              stype = 'MIXED'
-
-        gex_up      = row['gex_change'] > 0
-        gex_down    = row['gex_change'] < 0
-        gex_sig     = bool(row['gex_shift_spike'])
-        gex_moving  = row['gex_change'] != 0
-
-        if not is_spike:
-            gex_conf = 'UNCONFIRMED'
-        # Confirmed: volume direction AND GEX direction agree + GEX move is significant
-        elif stype == 'CALL_DOMINANT' and gex_up and gex_sig:
-            gex_conf = 'CONFIRMED_BULLISH'
-        elif stype == 'PUT_DOMINANT' and gex_down and gex_sig:
-            gex_conf = 'CONFIRMED_BEARISH'
-        # Divergence: volume direction CONFLICTS with GEX direction.
-        # Does NOT require gex_sig — direction conflict alone is enough.
-        # Also catches MIXED spikes where GEX is repositioning hard.
-        elif stype == 'CALL_DOMINANT' and gex_down and gex_moving:
-            gex_conf = 'DIVERGENCE'
-        elif stype == 'PUT_DOMINANT' and gex_up and gex_moving:
-            gex_conf = 'DIVERGENCE'
-        elif stype == 'MIXED' and abs(row['gex_z_score']) > z_threshold * 0.75:
-            # Both sides spiking + any meaningful GEX repositioning = split market, divergent flow.
-            # Use a lower GEX threshold for MIXED (75% of main threshold) because the volume
-            # signal itself is already ambiguous — any dealer move is meaningful here.
-            gex_conf = 'DIVERGENCE'
-        else:
-            gex_conf = 'UNCONFIRMED'
-
-        label = '' if not is_spike else (
-            {'CONFIRMED_BULLISH':'🚀','CONFIRMED_BEARISH':'💥','DIVERGENCE':'⚠️','UNCONFIRMED':'📊'}.get(gex_conf,'📊')
-            + f" {strength[:3]}"
-        )
-
-        spike_types.append(stype)
-        spike_strengths.append(strength)
-        gex_confirmations.append(gex_conf)
-        event_labels.append(label)
-
-    df['spike_type']       = spike_types
-    df['spike_strength']   = spike_strengths
-    df['gex_confirmation'] = gex_confirmations
-    df['event_label']      = event_labels
-
-    return df
-
-
-def _action_hint(row) -> str:
-    conf       = row['gex_confirmation']
-    stype      = row['spike_type']
-    gex_change = row.get('gex_change', 0)
-    if conf == 'CONFIRMED_BULLISH':
-        return '🟢 Watch for squeeze up'
-    if conf == 'CONFIRMED_BEARISH':
-        return '🔴 Watch for squeeze down'
-    if conf == 'DIVERGENCE':
-        # Be explicit about which side is conflicting
-        if stype == 'CALL_DOMINANT':
-            return '⚠️ Calls bought but GEX falling — dealers fading buyers, watch for failed breakout'
-        if stype == 'PUT_DOMINANT':
-            return '⚠️ Puts bought but GEX rising — bear trap risk, watch for squeeze up'
-        if stype == 'MIXED':
-            dir_str = 'rising' if gex_change > 0 else 'falling'
-            return f'⚠️ Mixed vol spike + GEX {dir_str} hard — split market, resolution pending'
-        return '⚠️ Conflicting signals — wait for clarity'
-    if stype == 'CALL_DOMINANT':    return '🟡 Call accumulation (unconfirmed by GEX)'
-    if stype == 'PUT_DOMINANT':     return '🟡 Put accumulation (unconfirmed by GEX)'
-    return '⬜ Monitor'
-
-
-def build_spike_summary(df_spikes: pd.DataFrame, unit_label: str = "B") -> pd.DataFrame:
-    spikes = df_spikes[df_spikes['vol_spike']].copy()
-    if spikes.empty:
-        return pd.DataFrame()
-    rows = []
-    for _, r in spikes.iterrows():
-        rows.append({
-            'Time'               : r['timestamp'].strftime('%H:%M'),
-            'Spike Type'         : r['spike_type'],
-            'Strength'           : r['spike_strength'],
-            'GEX Signal'         : r['gex_confirmation'],
-            'Vol Z-Score'        : f"{r['vol_z_score']:.1f}σ",
-            'Call Vol'           : f"{r.get('call_volume',0):,.0f}",
-            'Put Vol'            : f"{r.get('put_volume',0):,.0f}",
-            'Total Vol'          : f"{r.get('total_volume',0):,.0f}",
-            f'GEX Δ ({unit_label})': f"{r['gex_change']:+.4f}",
-            'Spot'               : f"₹{r.get('spot_price',0):,.2f}",
-            'Action'             : _action_hint(r),
-        })
-    return pd.DataFrame(rows)
-
-# ============================================================================
-# INTRADAY TIMELINE WITH VOLUME SPIKE DETECTION  (replaces old version)
-# ============================================================================
-
-def create_vanna_spike_panel(
-    df: pd.DataFrame,
-    unit_label: str = "B",
-    z_threshold: float = 2.0,
-) -> Tuple[go.Figure, pd.DataFrame]:
-    """
-    Compact 2-row spike panel for the VANNA overlay tab.
-      Row 1 — Volume Z-Score bars + Net VANNA flow line (secondary y)
-      Row 2 — Spike event markers coloured by GEX confirmation type
-    """
-    agg_cols = {k: v for k, v in {
-        'net_gex'    : 'sum', 'net_vanna'   : 'sum',
-        'spot_price' : 'first',
-        'call_volume': 'sum', 'put_volume'  : 'sum', 'total_volume': 'sum',
-    }.items() if k in df.columns}
-
-    timeline_df = (df.groupby('timestamp').agg(agg_cols)
-                     .reset_index().sort_values('timestamp'))
-    df_spikes   = detect_volume_spikes(timeline_df, z_threshold=z_threshold)
-    ts          = df_spikes['timestamp']
-
-    spike_rows = df_spikes[df_spikes['vol_spike']]
-    n_spikes   = len(spike_rows)
-    n_bull = (spike_rows['gex_confirmation'] == 'CONFIRMED_BULLISH').sum()
-    n_bear = (spike_rows['gex_confirmation'] == 'CONFIRMED_BEARISH').sum()
-    n_div  = (spike_rows['gex_confirmation'] == 'DIVERGENCE').sum()
-
-    fig = make_subplots(
-        rows=2, cols=1,
-        shared_xaxes=True,
-        subplot_titles=(
-            'Volume Z-Score  ·  Net VANNA flow (secondary axis)',
-            'Spike Events  (shape & colour = GEX confirmation type)',
-        ),
-        vertical_spacing=0.08,
-        row_heights=[0.52, 0.48],
-        specs=[[{"secondary_y": True}],
-               [{"secondary_y": False}]],
-    )
-
-    # ── Row 1: Z-score bars ───────────────────────────────────────────────
-    z_colors = [
-        '#dc2626' if z > 4.0 else
-        '#ef4444' if z > 3.0 else
-        '#f59e0b' if z > z_threshold else
-        '#334155'
-        for z in df_spikes['vol_z_score']
-    ]
-    fig.add_trace(go.Bar(
-        x=ts, y=df_spikes['vol_z_score'].clip(lower=0),
-        marker_color=z_colors, name='Volume Z-Score',
-        hovertemplate='%{x|%H:%M}<br>Z-Score: %{y:.2f}σ<extra></extra>',
-    ), row=1, col=1, secondary_y=False)
-
-    for level, color, label in [
-        (z_threshold, 'rgba(245,158,11,0.75)', f'Threshold ({z_threshold:.1f}σ)'),
-        (3.0,         'rgba(239,68,68,0.50)',  'Strong (3σ)'),
-        (4.0,         'rgba(220,38,38,0.70)',  'Extreme (4σ)'),
-    ]:
-        fig.add_hline(y=level, line_dash='dash', line_color=color, line_width=1.5,
-                      annotation_text=label, annotation_position='top right',
-                      annotation=dict(font=dict(color=color, size=9)), row=1, col=1)
-
-    # Net VANNA on secondary y — spike + VANNA surge = institutional move
-    if 'net_vanna' in df_spikes.columns:
-        mv_colors = ['rgba(16,185,129,0.8)' if v > 0 else 'rgba(239,68,68,0.8)'
-                     for v in df_spikes['net_vanna']]
-        fig.add_trace(go.Scatter(
-            x=ts, y=df_spikes['net_vanna'],
-            mode='lines+markers',
-            line=dict(color='rgba(6,182,212,0.7)', width=1.5, dash='dot'),
-            marker=dict(size=4, color=mv_colors),
-            fill='tozeroy', fillcolor='rgba(6,182,212,0.05)',
-            name='Net VANNA flow',
-            hovertemplate='%{x|%H:%M}<br>Net VANNA: %{y:.4f}<extra></extra>',
-        ), row=1, col=1, secondary_y=True)
-
-    # Coloured spike vlines into row 1
-    for _, sr in spike_rows.iterrows():
-        vc = {'CONFIRMED_BULLISH':'rgba(16,185,129,0.25)',
-              'CONFIRMED_BEARISH':'rgba(239,68,68,0.25)',
-              'DIVERGENCE'       :'rgba(245,158,11,0.20)',
-              'UNCONFIRMED'      :'rgba(139,92,246,0.15)'}.get(sr['gex_confirmation'],'rgba(255,255,255,0.1)')
-        fig.add_vline(x=sr['timestamp'].timestamp()*1000,
-                      line_dash='dot', line_color=vc, line_width=1.5, row=1, col=1)
-
-    # ── Row 2: Spike event markers ────────────────────────────────────────
-    CONF_STYLE = {
-        'CONFIRMED_BULLISH': ('#10b981', 'triangle-up',   18, '🚀 Confirmed Bullish'),
-        'CONFIRMED_BEARISH': ('#ef4444', 'triangle-down', 18, '💥 Confirmed Bearish'),
-        'DIVERGENCE':        ('#f59e0b', 'diamond',       16, '⚠️ Divergence'),
-        'UNCONFIRMED':       ('#8b5cf6', 'circle',        12, '📊 Unconfirmed'),
-    }
-    for conf_key, (color, symbol, size, legend_name) in CONF_STYLE.items():
-        mask = df_spikes['vol_spike'] & (df_spikes['gex_confirmation'] == conf_key)
-        sub  = df_spikes[mask]
-        if sub.empty: continue
-        fig.add_trace(go.Scatter(
-            x=sub['timestamp'], y=sub['vol_z_score'].clip(upper=6),
-            mode='markers+text',
-            marker=dict(symbol=symbol, size=size, color=color,
-                        line=dict(color='white', width=1.5)),
-            text=sub['event_label'], textposition='top center',
-            textfont=dict(color='white', size=9),
-            name=legend_name,
-            customdata=np.stack([
-                sub['spike_type'].values,
-                sub['spike_strength'].values,
-                sub.get('call_volume', pd.Series([0]*len(sub))).values,
-                sub.get('put_volume',  pd.Series([0]*len(sub))).values,
-                sub['gex_change'].values,
-            ], axis=-1),
-            hovertemplate=(
-                '%{x|%H:%M}<br>Type: %{customdata[0]}<br>'
-                'Strength: %{customdata[1]}<br>'
-                'Call Vol: %{customdata[2]:,.0f}<br>'
-                'Put Vol: %{customdata[3]:,.0f}<br>'
-                f'GEX Δ: %{{customdata[4]:+.4f}}{unit_label}<extra></extra>'
-            ),
-        ), row=2, col=1)
-
-    fig.add_hline(y=z_threshold, line_dash='dash',
-                  line_color='rgba(245,158,11,0.4)', line_width=1, row=2, col=1)
-
-    # ── Layout ────────────────────────────────────────────────────────────
-    if n_spikes:
-        summary = f"🚀 {n_bull} Bull · 💥 {n_bear} Bear · ⚠️ {n_div} Divergence"
-    else:
-        summary = "No spikes detected at current threshold"
-
-    fig.update_layout(
-        title=dict(
-            text=(
-                f'<b>⚡ Volume Spike × VANNA Coincidence</b>  '
-                f'<span style="font-size:12px;color:#94a3b8;">({n_spikes} spikes — {summary})</span><br>'
-                f'<sub>'
-                f'🚀 Call spike + GEX ↑ = Bullish confirmed  |  '
-                f'💥 Put spike + GEX ↓ = Bearish confirmed  |  '
-                f'⚠️ Conflict = Divergence  |  '
-                f'Cyan dashed = Net VANNA (spike + VANNA surge = institutional conviction)'
-                f'</sub>'
-            ),
-            font=dict(size=13, color='white'),
-        ),
-        template='plotly_dark',
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(26,35,50,0.8)',
-        height=430,
-        barmode='overlay',
-        hovermode='x unified',
-        legend=dict(
-            orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1,
-            font=dict(color='white', size=10),
-            bgcolor='rgba(0,0,0,0.7)',
-            bordercolor='rgba(255,255,255,0.2)', borderwidth=1,
-        ),
-        margin=dict(l=60, r=60, t=110, b=40),
-        dragmode='drawline',
-        newshape=dict(line=dict(color='#f59e0b', width=2)),
-    )
-    fig.update_layout(
-        modebar_add=['drawline','drawopenpath','drawcircle','drawrect','eraseshape'],
-        modebar=dict(bgcolor='rgba(0,0,0,0.5)', color='#94a3b8', activecolor='#f59e0b'),
-    )
-    fig.update_yaxes(title_text='Z-Score (σ)',   row=1, col=1, secondary_y=False,
-                     gridcolor='rgba(128,128,128,0.15)', range=[0, None])
-    fig.update_yaxes(title_text='Net VANNA',     row=1, col=1, secondary_y=True,
-                     showgrid=False, zeroline=True,
-                     zerolinecolor='rgba(6,182,212,0.3)', zerolinewidth=1)
-    fig.update_yaxes(title_text='Spike Z-Score', row=2, col=1,
-                     gridcolor='rgba(128,128,128,0.15)', range=[0, None])
-    fig.update_xaxes(title_text='Time (IST)',    row=2, col=1)
-
-    return fig, df_spikes
-
-
-def create_intraday_timeline_with_spikes(df: pd.DataFrame,
-                                          unit_label: str = "B",
-                                          z_threshold: float = 2.0) -> Tuple[go.Figure, pd.DataFrame]:
-    """
-    5-row intraday chart:
-      Row 1 – Net GEX bars  +  |GEX Δ| rate line (secondary y)
-      Row 2 – Spot price area
-      Row 3 – Call / Put volume stacked bars  +  total volume line
-      Row 4 – Volume Z-Score with severity bands
-      Row 5 – Spike event markers, colour-coded by GEX confirmation
-    Returns (fig, df_spikes)
-    """
-    agg_cols = {k: v for k, v in {
-        'net_gex': 'sum', 'net_dex': 'sum', 'spot_price': 'first',
-        'call_volume': 'sum', 'put_volume': 'sum', 'total_volume': 'sum',
-    }.items() if k in df.columns}
-
-    timeline_df = (df.groupby('timestamp').agg(agg_cols)
-                     .reset_index().sort_values('timestamp'))
-
-    df_spikes = detect_volume_spikes(timeline_df, z_threshold=z_threshold)
-
-    fig = make_subplots(
-        rows=5, cols=1,
-        shared_xaxes=True,
-        subplot_titles=(
-            f'Net GEX ({unit_label})  +  GEX Δ Rate',
-            'Spot Price',
-            'Call vs Put Volume',
-            'Volume Z-Score  (spike sensitivity threshold shown as dashed line)',
-            'Spike Events  (shape & colour = GEX confirmation type)',
-        ),
-        vertical_spacing=0.04,
-        row_heights=[0.26, 0.15, 0.22, 0.18, 0.19],
-        specs=[[{"secondary_y": True}],[{"secondary_y": False}],
-               [{"secondary_y": False}],[{"secondary_y": False}],
-               [{"secondary_y": False}]],
-    )
-
-    ts = df_spikes['timestamp']
-
-    # ── Row 1: GEX bars + |GEX Δ| secondary line ────────────────────────────
-    gex_colors = ['#10b981' if v > 0 else '#ef4444' for v in df_spikes['net_gex']]
-    fig.add_trace(go.Bar(
-        x=ts, y=df_spikes['net_gex'], marker_color=gex_colors,
-        name='Net GEX', showlegend=True,
-        hovertemplate=f'%{{x|%H:%M}}<br>GEX: %{{y:.4f}}{unit_label}<extra></extra>',
-    ), row=1, col=1, secondary_y=False)
-
-    fig.add_trace(go.Scatter(
-        x=ts, y=df_spikes['gex_change'].abs(),
-        mode='lines', line=dict(color='rgba(245,158,11,0.8)', width=1.5, dash='dot'),
-        fill='tozeroy', fillcolor='rgba(245,158,11,0.07)',
-        name='|GEX Δ| rate', showlegend=True,
-        hovertemplate=f'%{{x|%H:%M}}<br>|GEX Δ|: %{{y:.4f}}{unit_label}<extra></extra>',
-    ), row=1, col=1, secondary_y=True)
-
-    # ── Row 2: Spot price ────────────────────────────────────────────────────
-    fig.add_trace(go.Scatter(
-        x=ts, y=df_spikes['spot_price'],
-        mode='lines', line=dict(color='#3b82f6', width=2),
-        fill='tozeroy', fillcolor='rgba(59,130,246,0.07)',
-        name='Spot Price', showlegend=True,
-        hovertemplate='%{x|%H:%M}<br>₹%{y:,.2f}<extra></extra>',
-    ), row=2, col=1)
-
-    # subtle vertical lines at spike timestamps crossing into spot row
-    for _, sr in df_spikes[df_spikes['vol_spike']].iterrows():
-        fig.add_vline(x=sr['timestamp'].timestamp()*1000,
-                      line_dash='dot', line_color='rgba(255,255,255,0.05)',
-                      line_width=1, row=2, col=1)
-
-    # ── Row 3: Call / Put volume stacked + total line ────────────────────────
-    fig.add_trace(go.Bar(
-        x=ts, y=df_spikes['call_volume'],
-        name='Call Volume', marker=dict(color='rgba(16,185,129,0.70)', line=dict(width=0)),
-        hovertemplate='%{x|%H:%M}<br>Call Vol: %{y:,.0f}<extra></extra>', showlegend=True,
-    ), row=3, col=1)
-    fig.add_trace(go.Bar(
-        x=ts, y=df_spikes['put_volume'],
-        name='Put Volume', marker=dict(color='rgba(239,68,68,0.70)', line=dict(width=0)),
-        hovertemplate='%{x|%H:%M}<br>Put Vol: %{y:,.0f}<extra></extra>', showlegend=True,
-    ), row=3, col=1)
-    fig.add_trace(go.Scatter(
-        x=ts, y=df_spikes['total_volume'],
-        mode='lines', line=dict(color='rgba(255,255,255,0.45)', width=1.5),
-        name='Total Volume', showlegend=True,
-        hovertemplate='%{x|%H:%M}<br>Total: %{y:,.0f}<extra></extra>',
-    ), row=3, col=1)
-
-    # ── Row 4: Z-score bars ──────────────────────────────────────────────────
-    z_colors = ['#dc2626' if z > 4.0 else ('#ef4444' if z > 3.0 else ('#f59e0b' if z > 2.0 else '#64748b'))
-                for z in df_spikes['vol_z_score']]
-    fig.add_trace(go.Bar(
-        x=ts, y=df_spikes['vol_z_score'].clip(lower=0),
-        marker_color=z_colors,
-        name='Volume Z-Score', showlegend=True,
-        hovertemplate='%{x|%H:%M}<br>Z-Score: %{y:.2f}σ<extra></extra>',
-    ), row=4, col=1)
-
-    for level, color, label in [
-        (z_threshold, 'rgba(245,158,11,0.75)', f'Threshold ({z_threshold}σ)'),
-        (3.0,         'rgba(239,68,68,0.50)',  'Strong (3σ)'),
-        (4.0,         'rgba(220,38,38,0.70)',  'Extreme (4σ)'),
-    ]:
-        fig.add_hline(y=level, line_dash='dash', line_color=color, line_width=1.5,
-                      annotation_text=label, annotation_position='top right',
-                      annotation=dict(font=dict(color=color, size=9)), row=4, col=1)
-
-    # ── Row 5: Spike event markers ───────────────────────────────────────────
-    CONF_STYLE = {
-        'CONFIRMED_BULLISH': ('#10b981', 'triangle-up',   18, '🚀 Confirmed Bullish'),
-        'CONFIRMED_BEARISH': ('#ef4444', 'triangle-down', 18, '💥 Confirmed Bearish'),
-        'DIVERGENCE':        ('#f59e0b', 'diamond',       16, '⚠️ Divergence'),
-        'UNCONFIRMED':       ('#8b5cf6', 'circle',        12, '📊 Unconfirmed'),
-    }
-    for conf_key, (color, symbol, size, legend_name) in CONF_STYLE.items():
-        mask = df_spikes['vol_spike'] & (df_spikes['gex_confirmation'] == conf_key)
-        sub  = df_spikes[mask]
-        if sub.empty: continue
-        fig.add_trace(go.Scatter(
-            x=sub['timestamp'],
-            y=sub['vol_z_score'].clip(upper=6),
-            mode='markers+text',
-            marker=dict(symbol=symbol, size=size, color=color, line=dict(color='white', width=1.5)),
-            text=sub['event_label'],
-            textposition='top center',
-            textfont=dict(color='white', size=9),
-            name=legend_name, showlegend=True,
-            customdata=np.stack([
-                sub['spike_type'].values,
-                sub['spike_strength'].values,
-                sub.get('call_volume', pd.Series([0]*len(sub))).values,
-                sub.get('put_volume',  pd.Series([0]*len(sub))).values,
-                sub['gex_change'].values,
-            ], axis=-1),
-            hovertemplate=(
-                '%{x|%H:%M}<br>Type: %{customdata[0]}<br>Strength: %{customdata[1]}<br>'
-                'Call Vol: %{customdata[2]:,.0f}<br>Put Vol: %{customdata[3]:,.0f}<br>'
-                f'GEX Δ: %{{customdata[4]:+.4f}}{unit_label}<extra></extra>'
-            ),
-        ), row=5, col=1)
-
-    fig.add_hline(y=z_threshold, line_dash='dash',
-                  line_color='rgba(245,158,11,0.4)', line_width=1, row=5, col=1)
-
-    # ── Layout ───────────────────────────────────────────────────────────────
-    fig.update_layout(
-        title=dict(
-            text=(
-                "<b>📈 Intraday Timeline — Volume Spike & GEX Overlay</b><br>"
-                "<sub>🚀 Confirmed Bullish = Call spike + GEX rising | "
-                "💥 Confirmed Bearish = Put spike + GEX falling | "
-                "⚠️ Divergence = Volume & GEX conflict | "
-                "📊 Unconfirmed = Volume spike, GEX flat | "
-                "✏️ Use toolbar to draw</sub>"
-            ),
-            font=dict(size=15, color='white'),
-        ),
-        template='plotly_dark',
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(26,35,50,0.8)',
-        height=1180,
-        barmode='stack',
-        hovermode='x unified',
-        legend=dict(
-            orientation='h', yanchor='bottom', y=1.01, xanchor='right', x=1,
-            font=dict(color='white', size=10),
-            bgcolor='rgba(0,0,0,0.8)', bordercolor='rgba(255,255,255,0.2)', borderwidth=1,
-        ),
-        margin=dict(l=60, r=60, t=140, b=60),
-        dragmode='drawline',
-        newshape=dict(line=dict(color='#f59e0b', width=2)),
-    )
-    fig.update_layout(modebar_add=['drawline','drawopenpath','drawclosedpath','drawcircle','drawrect','eraseshape'],
-                      modebar=dict(bgcolor='rgba(0,0,0,0.5)', color='#94a3b8', activecolor='#f59e0b'))
-
-    fig.update_yaxes(title_text=f'GEX (₹{unit_label})',      row=1, col=1, secondary_y=False, gridcolor='rgba(128,128,128,0.15)')
-    fig.update_yaxes(title_text=f'|GEX Δ| (₹{unit_label})',  row=1, col=1, secondary_y=True,  showgrid=False)
-    fig.update_yaxes(title_text='Spot Price (₹)',             row=2, col=1, gridcolor='rgba(128,128,128,0.15)')
-    fig.update_yaxes(title_text='Volume (contracts)',         row=3, col=1, gridcolor='rgba(128,128,128,0.15)')
-    fig.update_yaxes(title_text='Z-Score (σ)',                row=4, col=1, gridcolor='rgba(128,128,128,0.15)', range=[0,None])
-    fig.update_yaxes(title_text='Spike Z-Score',              row=5, col=1, gridcolor='rgba(128,128,128,0.15)', range=[0,None])
-    fig.update_xaxes(title_text='Time (IST)',                 row=5, col=1)
-
-    return fig, df_spikes
-
-# ============================================================================
-# SIGNIFICANT GEX CLASSIFICATION  (Addition vs Unwind)
-# ============================================================================
-
-def classify_gex_significance(df: pd.DataFrame, spot_price: float) -> pd.DataFrame:
-    """
-    Classifies each strike's GEX into:
-      STRONG_ADD | STRONG_UNWIND | WEAK_ADD | WEAK_UNWIND | NOISE
-
-    Significance Score = |ΔOI| × gamma × volume_weight × atm_weight
-    """
-    df = df.copy()
-    OI_CHANGE_THRESHOLD_PCT = 0.02
-    VOLUME_CONFIRM_PCT      = 0.15
-    ATM_BAND_PCT            = 0.03
-
-    total_call_vol = df['call_volume'].sum() if 'call_volume' in df.columns else 1
-    total_put_vol  = df['put_volume'].sum()  if 'put_volume'  in df.columns else 1
-
-    bs_calc = BlackScholesCalculator()
-    r, tte  = 0.07, 7/365
-
-    scores, categories = [], []
-
-    for _, row in df.iterrows():
-        spot   = row.get('spot_price', spot_price)
-        strike = row['strike']
-        call_oi_now    = row.get('call_oi', 0)
-        put_oi_now     = row.get('put_oi', 0)
-        call_oi_change = row.get('call_oi_change', 0)
-        put_oi_change  = row.get('put_oi_change', 0)
-        call_vol       = row.get('call_volume', 0)
-        put_vol        = row.get('put_volume', 0)
-        call_iv        = row.get('call_iv', 15)
-        put_iv         = row.get('put_iv', 15)
-
-        dist_pct   = abs(strike - spot) / spot
-        atm_weight = np.exp(-dist_pct / ATM_BAND_PCT)
-
-        call_vol_share = call_vol / total_call_vol if total_call_vol > 0 else 0
-        put_vol_share  = put_vol  / total_put_vol  if total_put_vol  > 0 else 0
-        vol_weight = 1 + (call_vol_share + put_vol_share) * 5
-
-        call_iv_d = call_iv / 100 if call_iv > 1 else call_iv
-        put_iv_d  = put_iv  / 100 if put_iv  > 1 else put_iv
-        gamma = bs_calc.calculate_gamma(spot, strike, tte, r, (call_iv_d + put_iv_d) / 2)
-
-        net_oi_change = call_oi_change - put_oi_change
-        score = abs(net_oi_change) * gamma * vol_weight * atm_weight * spot**2
-        scores.append(score)
-
-        base_oi        = max(call_oi_now + put_oi_now, 1)
-        oi_change_pct  = abs(net_oi_change) / base_oi
-        is_meaningful  = oi_change_pct > OI_CHANGE_THRESHOLD_PCT
-        is_vol_confirm = (call_vol_share > VOLUME_CONFIRM_PCT or put_vol_share > VOLUME_CONFIRM_PCT)
-        is_near_atm    = dist_pct < ATM_BAND_PCT
-
-        if net_oi_change > 0:
-            cat = ('STRONG_ADD'   if is_meaningful and (is_vol_confirm or is_near_atm)
-                   else 'WEAK_ADD' if is_meaningful else 'NOISE')
-        elif net_oi_change < 0:
-            cat = ('STRONG_UNWIND'   if is_meaningful and (is_vol_confirm or is_near_atm)
-                   else 'WEAK_UNWIND' if is_meaningful else 'NOISE')
-        else:
-            cat = 'NOISE'
-        categories.append(cat)
-
-    df['significance_score'] = scores
-    df['gex_category']       = categories
-    max_score = max(scores) if max(scores) > 0 else 1
-    df['significance_pct'] = df['significance_score'] / max_score * 100
-    return df
-
-
-def create_significant_gex_chart(df: pd.DataFrame, spot_price: float, unit_label: str = "B") -> Tuple[go.Figure, pd.DataFrame]:
-    """
-    Significant GEX chart that visually separates:
-      STRONG_ADD     → Bright Green  (solid border)
-      STRONG_UNWIND  → Bright Red    (solid border)
-      WEAK_ADD       → Dim Green     (transparent)
-      WEAK_UNWIND    → Dim Red       (transparent)
-      NOISE          → Gray          (very transparent)
-    Secondary axis shows Significance Score as a dotted line.
-    Returns (fig, df_classified)
-    """
-    df_classified = classify_gex_significance(df, spot_price)
-    df_sorted     = df_classified.sort_values('strike').reset_index(drop=True)
-    flip_zones    = identify_gamma_flip_zones(df_sorted, spot_price)
-
-    COLOR_MAP = {
-        'STRONG_ADD'   : ('#10b981', 0.95, 2),
-        'STRONG_UNWIND': ('#ef4444', 0.95, 2),
-        'WEAK_ADD'     : ('#10b981', 0.30, 0),
-        'WEAK_UNWIND'  : ('#ef4444', 0.30, 0),
-        'NOISE'        : ('#64748b', 0.18, 0),
-    }
-    LABEL_MAP = {
-        'STRONG_ADD'   : '🟢 Strong Addition  (High Significance)',
-        'STRONG_UNWIND': '🔴 Strong Unwind    (High Significance)',
-        'WEAK_ADD'     : '🟩 Weak Addition    (Low Significance)',
-        'WEAK_UNWIND'  : '🟥 Weak Unwind      (Low Significance)',
-        'NOISE'        : '⬜ Noise / Residual OI',
-    }
-
-    fig = go.Figure()
-
-    for cat, (color, opacity, bw) in COLOR_MAP.items():
-        sub = df_sorted[df_sorted['gex_category'] == cat]
-        if sub.empty: continue
-        fig.add_trace(go.Bar(
-            y=sub['strike'], x=sub['net_gex'], orientation='h',
-            name=LABEL_MAP[cat],
-            marker=dict(color=color, opacity=opacity, line=dict(color='white', width=bw)),
-            customdata=np.stack([
-                sub['significance_pct'].values,
-                sub.get('call_oi_change', pd.Series([0]*len(sub))).values,
-                sub.get('put_oi_change',  pd.Series([0]*len(sub))).values,
-                sub.get('total_volume',   pd.Series([0]*len(sub))).values,
-            ], axis=-1),
-            hovertemplate=(
-                f'Strike: %{{y:,.0f}}<br>Net GEX: %{{x:.4f}}{unit_label}<br>'
-                'Significance: %{customdata[0]:.1f}%<br>'
-                'Call OI Δ: %{customdata[1]:,.0f}<br>'
-                'Put OI Δ: %{customdata[2]:,.0f}<br>'
-                'Volume: %{customdata[3]:,.0f}<extra></extra>'
-            ),
-        ))
-
-    # Significance score line (secondary x)
-    fig.add_trace(go.Scatter(
-        y=df_sorted['strike'], x=df_sorted['significance_pct'],
-        mode='lines+markers', name='Significance Score (%)',
-        line=dict(color='#f59e0b', width=2, dash='dot'),
-        marker=dict(size=5, color='#f59e0b'),
-        xaxis='x4',
-        hovertemplate='Strike: %{y:,.0f}<br>Score: %{x:.1f}%<extra></extra>',
-    ))
-
-    fig = _add_volume_overlay_horizontal(fig, df_sorted)
-
-    fig.add_hline(y=spot_price, line_dash='dash', line_color='white', line_width=3,
-                  annotation_text=f'Spot: {spot_price:,.2f}', annotation_position='top right',
-                  annotation=dict(font=dict(size=12, color='white', family='Arial Black')))
-    fig.add_vline(x=0, line_dash='dot', line_color='gray', line_width=2)
-
-    for zone in flip_zones:
-        fig.add_hline(y=zone['strike'], line_dash='dot',
-                      line_color=zone['color'], line_width=2,
-                      annotation_text=f"🔄 Flip {zone['arrow']} {zone['strike']:,.0f}",
-                      annotation_position='left',
-                      annotation=dict(font=dict(size=10, color=zone['color']),
-                                      bgcolor='rgba(0,0,0,0.7)', bordercolor=zone['color'], borderwidth=1))
-        fig.add_hrect(y0=zone['lower_strike'], y1=zone['upper_strike'],
-                      fillcolor=zone['color'], opacity=0.05, line_width=0)
-
-    fig.update_layout(
-        title=dict(
-            text=(
-                '<b>🎯 Significant GEX: Addition vs Unwind Classification</b><br>'
-                '<sub>🟢 Strong Add = OI↑ + Vol/ATM confirmed | 🔴 Strong Unwind = OI↓ + Vol/ATM confirmed | '
-                'Dim = Low significance | ⬜ Noise | 🟡 dotted = Significance Score | ✏️ toolbar to draw</sub>'
-            ),
-            font=dict(size=15, color='white'),
-        ),
-        xaxis_title=f'GEX (₹ {unit_label})',
-        yaxis_title='Strike Price',
-        template='plotly_dark',
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(26,35,50,0.8)',
-        height=760,
-        barmode='overlay', bargap=0.15,
-        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1,
-                    font=dict(color='white', size=10), bgcolor='rgba(0,0,0,0.8)',
-                    bordercolor='white', borderwidth=1),
-        hovermode='closest',
-        xaxis=dict(gridcolor='rgba(128,128,128,0.2)', showgrid=True,
-                   zeroline=True, zerolinecolor='rgba(255,255,255,0.3)', zerolinewidth=2),
-        xaxis4=dict(overlaying='x', side='bottom', title='Significance Score (%)',
-                    range=[0, 500], showgrid=False, showline=False, zeroline=False,
-                    tickfont=dict(color='rgba(245,158,11,0.7)', size=9),
-                    title_font=dict(color='rgba(245,158,11,0.7)', size=10)),
-        yaxis=dict(gridcolor='rgba(128,128,128,0.2)', showgrid=True, autorange=True),
-        margin=dict(l=80, r=80, t=120, b=80),
-        dragmode='drawline',
-        newshape=dict(line=dict(color='#f59e0b', width=2)),
-    )
-    fig = _configure_volume_xaxis2(fig, df_sorted)
-    fig.update_layout(modebar_add=['drawline','drawopenpath','drawclosedpath','drawcircle','drawrect','eraseshape'],
-                      modebar=dict(bgcolor='rgba(0,0,0,0.5)', color='#94a3b8', activecolor='#f59e0b'))
-
-    return fig, df_classified
-
-# ============================================================================
-# STANDARD VISUALIZATION FUNCTIONS (unchanged from original, all with Volume Overlay)
-# ============================================================================
-
-def create_separate_gex_chart(df: pd.DataFrame, spot_price: float, unit_label: str = "B") -> go.Figure:
-    df_sorted  = df.sort_values('strike').reset_index(drop=True)
-    colors     = ['#10b981' if x > 0 else '#ef4444' for x in df_sorted['net_gex']]
-    flip_zones = identify_gamma_flip_zones(df_sorted, spot_price)
-    fig = go.Figure()
-    fig.add_trace(go.Bar(y=df_sorted['strike'], x=df_sorted['net_gex'], orientation='h',
-                         marker_color=colors, name='Net GEX', showlegend=True,
-                         hovertemplate=f'Strike: %{{y:,.0f}}<br>Net GEX: %{{x:.4f}}{unit_label}<extra></extra>'))
-    fig = _add_volume_overlay_horizontal(fig, df_sorted)
-    fig.add_hline(y=spot_price, line_dash='dash', line_color='#06b6d4', line_width=3,
-                  annotation_text=f'Spot: {spot_price:,.2f}', annotation_position='top right',
-                  annotation=dict(font=dict(size=12, color='white')))
-    for zone in flip_zones:
-        fig.add_hline(y=zone['strike'], line_dash='dot', line_color=zone['color'], line_width=2,
-                      annotation_text=f"🔄 Flip {zone['arrow']} {zone['strike']:,.0f}",
-                      annotation_position='left',
-                      annotation=dict(font=dict(size=10, color=zone['color']),
-                                      bgcolor='rgba(0,0,0,0.7)', bordercolor=zone['color'], borderwidth=1))
-        fig.add_hrect(y0=zone['lower_strike'], y1=zone['upper_strike'],
-                      fillcolor=zone['color'], opacity=0.1, line_width=0,
-                      annotation_text=zone['arrow'], annotation_position='right',
-                      annotation=dict(font=dict(size=16, color=zone['color'])))
-    fig.update_layout(
-        title=dict(text='<b>🎯 Gamma Exposure (GEX) with Flip Zones</b><br><sub>Green/Red = Net GEX | 🟩🟥 = Call/Put Volume (top axis) | ✏️ toolbar to draw</sub>',
-                   font=dict(size=18, color='white')),
-        xaxis_title=f'GEX (₹ {unit_label})', yaxis_title='Strike Price',
-        template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(26,35,50,0.8)',
-        height=700, barmode='overlay',
-        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1,
-                    font=dict(color='white', size=11), bgcolor='rgba(0,0,0,0.8)', bordercolor='white', borderwidth=1),
-        hovermode='closest',
-        xaxis=dict(gridcolor='rgba(128,128,128,0.2)', showgrid=True),
-        yaxis=dict(gridcolor='rgba(128,128,128,0.2)', showgrid=True, autorange=True),
-        margin=dict(l=80, r=80, t=80, b=80), dragmode='drawline',
-        newshape=dict(line=dict(color='#f59e0b', width=2)),
-    )
-    fig = _configure_volume_xaxis2(fig, df_sorted)
-    fig.update_layout(modebar_add=['drawline','drawopenpath','drawclosedpath','drawcircle','drawrect','eraseshape'],
-                      modebar=dict(bgcolor='rgba(0,0,0,0.5)', color='#94a3b8', activecolor='#f59e0b'))
-    return fig
-
-
-def compute_gex_strike_probability(
-    df_sorted: pd.DataFrame,
-    spot_price: float,
-    flip_zones: list,
-    unit_label: str = "B",
-) -> pd.DataFrame:
-    """
-    Computes per-strike directional probability (bull% / bear%) for the GEX overlay chart.
-
-    Signals (all per-strike, independent):
-      1. GEX sign × magnitude   (40%) — positive GEX = dealer support = bullish
-      2. Call/Put volume ratio  (25%) — call-heavy = bullish flow
-      3. OI GEX vs Original GEX alignment (20%) — same sign = confirmation, opposite = divergence
-      4. Distance from spot     (15%) — ATM strikes dominate
-
-    Overlaid flags:
-      • VOLUME_SPIKE   — z-score > 2.5 on total_volume at this strike (relative to cross-strike)
-      • DIVERGENCE     — enhanced OI GEX and original GEX have opposite signs (conflicting dealer view)
-      • NEAR_FLIP_ZONE — strike within 0.5% of a GEX flip zone (transition zone)
-
-    Returns df_sorted with added columns:
-      bull_prob, bear_prob, prob_direction, prob_icon, vol_flag, div_flag, flip_flag, hover_text
-    """
-    df = df_sorted.copy()
-
-    # ── Signal 1: GEX sign × magnitude (40%) ─────────────────────────────
-    max_gex = df['net_gex'].abs().max() or 1.0
-    gex_norm = df['net_gex'] / max_gex                  # -1 to +1
-    gex_bull = ((gex_norm + 1) / 2 * 100).clip(0, 100)  # 0→100
-    gex_bear = (100 - gex_bull)
-
-    # ── Signal 2: Call/Put volume ratio (25%) ─────────────────────────────
-    cv = df['call_volume'].fillna(0).clip(lower=0)
-    pv = df['put_volume'].fillna(0).clip(lower=0)
-    total = (cv + pv).replace(0, 1)
-    vol_bull = (cv / total * 100).clip(0, 100)
-    vol_bear = (100 - vol_bull)
-
-    # ── Signal 3: Enhanced OI GEX vs Original GEX alignment (20%) ────────
-    enh = df.get('enhanced_oi_gex', pd.Series(0.0, index=df.index)).fillna(0)
-    orig = df['net_gex'].fillna(0)
-    # Same sign = confirmed = neutral (50/50), opposite sign = divergence
-    # When aligned: bull if both positive, bear if both negative
-    # When diverged: skew toward bear (divergence = uncertainty = discount bull)
-    align_bull = []
-    for e, o in zip(enh, orig):
-        if o > 0 and e > 0:       align_bull.append(65.0)   # confirmed bullish
-        elif o < 0 and e < 0:     align_bull.append(35.0)   # confirmed bearish
-        elif o > 0 and e < 0:     align_bull.append(42.0)   # divergence → bearish lean
-        elif o < 0 and e > 0:     align_bull.append(58.0)   # divergence → bullish lean
-        else:                     align_bull.append(50.0)   # one is zero
-    align_bull = pd.Series(align_bull, index=df.index)
-    align_bear = 100 - align_bull
-
-    # ── Signal 4: Distance weight (15%) ───────────────────────────────────
-    dist_pct = ((df['strike'] - spot_price).abs() / spot_price * 100).clip(lower=0)
-    # Nearer = higher weight. Exponential decay: weight = e^(-d/2)
-    dist_weight = np.exp(-dist_pct / 2.0)          # 0 to 1
-    # Distance alone doesn't give direction — it amplifies the other signals
-    # We fold it into a weighted composite below
-
-    # ── Weighted composite ────────────────────────────────────────────────
-    w1, w2, w3 = 0.40, 0.25, 0.20
-    w4 = 0.15  # distance weight modifier (not a separate signal, but a scalar)
-
-    # Distance bonus: if above spot, slightly favour bull (momentum), below = bear
-    pos_above = (df['strike'] >= spot_price).astype(float)  # 1 if above
-    dist_dir_bonus = (pos_above - 0.5) * dist_weight * 10  # ±0 to ±5 pts
-
-    raw_bull = (w1*gex_bull + w2*vol_bull + w3*align_bull) + dist_dir_bonus * w4 * 10
-    raw_bear = (w1*gex_bear + w2*vol_bear + w3*align_bear) - dist_dir_bonus * w4 * 10
-
-    # Normalise so they sum to 100
-    total_score = (raw_bull + raw_bear).replace(0, 100)
-    df['bull_prob'] = (raw_bull / total_score * 100).clip(0, 100).round(1)
-    df['bear_prob'] = (100 - df['bull_prob']).round(1)
-
-    # ── Direction + icon ─────────────────────────────────────────────────
-    def _dir(bull):
-        if bull >= 60: return 'BULLISH', '🟢'
-        if bull <= 40: return 'BEARISH', '🔴'
-        return 'NEUTRAL', '⬜'
-
-    dirs, icons = zip(*[_dir(b) for b in df['bull_prob']])
-    df['prob_direction'] = list(dirs)
-    df['prob_icon']      = list(icons)
-
-    # ── Volume spike flag (per-strike, z-score across strikes) ───────────
-    tv = df['total_volume'].fillna(0)
-    tv_mean = tv.mean(); tv_std = tv.std() or 1.0
-    tv_z = (tv - tv_mean) / tv_std
-    df['vol_flag'] = tv_z > 2.5   # True if this strike has anomalous volume vs peers
-
-    # ── GEX divergence flag (enhanced vs original sign conflict) ─────────
-    df['div_flag'] = (
-        (enh > 0) & (orig < 0) |
-        (enh < 0) & (orig > 0)
-    )
-
-    # ── Flip zone proximity flag ──────────────────────────────────────────
-    flip_strikes = [z['strike'] for z in flip_zones]
-    def _near_flip(strike):
-        return any(abs(strike - fz) / max(spot_price, 1) * 100 < 0.5 for fz in flip_strikes)
-    df['flip_flag'] = df['strike'].apply(_near_flip)
-
-    # ── Composite flag icon for chart annotation ──────────────────────────
-    def _composite_icon(row):
-        icons = []
-        if row['vol_flag']:  icons.append('⚡')
-        if row['div_flag']:  icons.append('⚠️')
-        if row['flip_flag']: icons.append('🔄')
-        return ' '.join(icons)
-    df['flag_icons'] = df.apply(_composite_icon, axis=1)
-
-    # ── Rich hover text ───────────────────────────────────────────────────
-    def _hover(row):
-        flags = []
-        if row['vol_flag']:  flags.append('⚡ Vol Spike')
-        if row['div_flag']:  flags.append('⚠️ GEX Divergence')
-        if row['flip_flag']: flags.append('🔄 Near Flip Zone')
-        flag_str = ' | '.join(flags) if flags else '—'
-        return (
-            f"Strike: ₹{row['strike']:,.0f}<br>"
-            f"{row['prob_icon']} Bull: {row['bull_prob']:.0f}% | Bear: {row['bear_prob']:.0f}%<br>"
-            f"Direction: {row['prob_direction']}<br>"
-            f"Flags: {flag_str}<br>"
-            f"GEX: {row['net_gex']:.2f} | Vol: {row.get('total_volume',0):,.0f}"
-        )
-    df['hover_text'] = df.apply(_hover, axis=1)
-
-    return df
-
-
-def create_enhanced_gex_overlay_chart(df: pd.DataFrame, spot_price: float, unit_label: str = "B") -> go.Figure:
-    df_sorted = df.sort_values('strike').reset_index(drop=True)
-    for col in ['net_gex','call_oi_change','put_oi_change','total_volume','call_iv','put_iv']:
-        if col not in df_sorted.columns: df_sorted[col] = 0.0
-        df_sorted[col] = df_sorted[col].fillna(0)
-    df_sorted['enhanced_oi_gex'] = 0.0
-    bs_calc = BlackScholesCalculator()
+            return list(BUILTIN_QUESTIONS)
+
+    def _save(self, questions):
+        with open(self.filepath, "w") as f:
+            json.dump(questions, f, indent=2)
+
+    def get_all(self): return self._load()
+
+    def get_topics(self):
+        return sorted(set(q.get("topic","General") for q in self._load()))
+
+    def get_years(self):
+        return sorted(set(int(q["year"]) for q in self._load() if q.get("year")), reverse=True)
+
+    def get_seasons(self):
+        return sorted(set(q["season"] for q in self._load() if q.get("season")))
+
+    def get_filtered(self, topics=None, difficulty="Mixed", years=None,
+                     seasons=None, n=50, predicted_only=False, shuffle=True):
+        qs = self._load()
+        if predicted_only:
+            qs = [q for q in qs if q.get("predicted")]
+        if topics:
+            qs = [q for q in qs if q.get("topic") in topics]
+        if difficulty != "Mixed":
+            f = [q for q in qs if q.get("difficulty") == difficulty]
+            if f: qs = f
+        if years:
+            f = [q for q in qs if str(q.get("year","")) in [str(y) for y in years]]
+            if f: qs = f
+        if seasons:
+            f = [q for q in qs if q.get("season","") in seasons]
+            if f: qs = f
+        if shuffle:
+            random.shuffle(qs)
+        return qs[:n]
+
+    def add(self, new_qs):
+        existing = self._load()
+        ids = {q.get("id") for q in existing}
+        for q in new_qs:
+            if not q.get("id"): q["id"] = str(uuid.uuid4())[:8]
+            if q["id"] not in ids:
+                existing.append(q)
+                ids.add(q["id"])
+        self._save(existing)
+
+
+# ═══════════════════════════════════════════════
+# USER AUTH  (flat-file, bcrypt-free simple hash)
+# ═══════════════════════════════════════════════
+def _hash(pw): return hashlib.sha256(pw.encode()).hexdigest()
+
+def load_users():
+    if not os.path.exists(USERS_FILE): return {}
     try:
-        total_vol = df_sorted['total_volume'].sum()
-        for idx, row in df_sorted.iterrows():
-            spot = row.get('spot_price', spot_price); strike = row['strike']
-            if spot <= 0 or strike <= 0: continue
-            tte = 7/365
-            civ = row['call_iv']/100 if row['call_iv'] > 1 else row['call_iv']
-            piv = row['put_iv']/100  if row['put_iv']  > 1 else row['put_iv']
-            cg = bs_calc.calculate_gamma(spot, strike, tte, 0.07, civ)
-            pg = bs_calc.calculate_gamma(spot, strike, tte, 0.07, piv)
-            vw = 1 + (row['total_volume'] / total_vol) if total_vol > 0 else 1.0
-            iv_adj = 1 + ((civ+piv)/2 * 2)
-            dw = 1 / (1 + abs(strike-spot)/spot * 2)
-            sc = 1e9 if unit_label == 'B' else 1e7
-            cs = 25
-            df_sorted.loc[idx, 'enhanced_oi_gex'] = (
-                (row['call_oi_change'] * cg * 1.5 * vw * iv_adj * dw * spot**2 * cs) / sc -
-                (row['put_oi_change']  * pg * 1.5 * vw * iv_adj * dw * spot**2 * cs) / sc
-            )
-    except: pass
-    max_gex = df_sorted['net_gex'].abs().max()
-    max_enh = df_sorted['enhanced_oi_gex'].abs().max()
-    flip_zones = identify_gamma_flip_zones(df_sorted, spot_price)
+        with open(USERS_FILE) as f: return json.load(f)
+    except: return {}
 
-    # ── Per-strike directional probability ───────────────────────────────
-    df_prob = compute_gex_strike_probability(df_sorted, spot_price, flip_zones, unit_label)
+def save_users(users):
+    with open(USERS_FILE, "w") as f: json.dump(users, f, indent=2)
 
-    fig = go.Figure()
+def register_user(username, password, name):
+    users = load_users()
+    if username in users: return False, "Username already exists"
+    users[username] = {"name": name, "pw_hash": _hash(password),
+                       "joined": datetime.now().isoformat()[:10], "attempts": 0}
+    save_users(users)
+    return True, "ok"
 
-    # ── Original GEX bars ────────────────────────────────────────────────
-    orig_colors = ['#10b981' if x > 0 else '#ef4444' for x in df_sorted['net_gex']]
-    fig.add_trace(go.Bar(
-        y=df_sorted['strike'], x=df_sorted['net_gex'], orientation='h',
-        marker=dict(color=orig_colors, opacity=0.6, line=dict(width=0)),
-        name=f'Original GEX – Max: {max_gex:.4f}{unit_label}',
-        hovertemplate=f'Strike: %{{y:,.0f}}<br>Original GEX: %{{x:.4f}}{unit_label}<extra></extra>',
-    ))
+def verify_user(username, password):
+    users = load_users()
+    if username not in users: return False, None
+    if users[username]["pw_hash"] == _hash(password): return True, users[username]
+    return False, None
 
-    # ── Enhanced OI GEX bars ─────────────────────────────────────────────
-    enh_colors = ['#8b5cf6' if x > 0 else '#f59e0b' for x in df_sorted['enhanced_oi_gex']]
-    fig.add_trace(go.Bar(
-        y=df_sorted['strike'], x=df_sorted['enhanced_oi_gex'], orientation='h',
-        marker=dict(color=enh_colors, opacity=0.85, line=dict(color='white', width=1)),
-        name=f'Enhanced OI GEX – Max: {max_enh:.4f}{unit_label}',
-        hovertemplate=f'Strike: %{{y:,.0f}}<br>Enhanced OI GEX: %{{x:.4f}}{unit_label}<extra></extra>',
-    ))
-
-    # ── Volume overlay ───────────────────────────────────────────────────
-    fig = _add_volume_overlay_horizontal(fig, df_sorted)
-
-    # ── Probability bars on right-side x-axis (x4) ───────────────────────
-    # Bull% bars: green, pointing right from 0 to bull_prob
-    # Bear% bars: red, pointing left from 0 (negative)
-    bull_colors_prob = [
-        'rgba(16,185,129,0.75)' if d == 'BULLISH' else
-        'rgba(16,185,129,0.35)' if d == 'NEUTRAL' else
-        'rgba(16,185,129,0.20)'
-        for d in df_prob['prob_direction']
-    ]
-    bear_colors_prob = [
-        'rgba(239,68,68,0.75)' if d == 'BEARISH' else
-        'rgba(239,68,68,0.35)' if d == 'NEUTRAL' else
-        'rgba(239,68,68,0.20)'
-        for d in df_prob['prob_direction']
-    ]
-    fig.add_trace(go.Bar(
-        y=df_prob['strike'],
-        x=df_prob['bull_prob'],
-        orientation='h',
-        name='🟢 Bull Prob%',
-        xaxis='x4',
-        marker=dict(color=bull_colors_prob, line=dict(width=0)),
-        hovertemplate='%{customdata}<extra></extra>',
-        customdata=df_prob['hover_text'],
-        legendgroup='prob',
-    ))
-    fig.add_trace(go.Bar(
-        y=df_prob['strike'],
-        x=-df_prob['bear_prob'],    # negative = leftward from centre
-        orientation='h',
-        name='🔴 Bear Prob%',
-        xaxis='x4',
-        marker=dict(color=bear_colors_prob, line=dict(width=0)),
-        hovertemplate='%{customdata}<extra></extra>',
-        customdata=df_prob['hover_text'],
-        showlegend=True,
-        legendgroup='prob',
-    ))
-
-    # ── 50% centre line on prob axis ─────────────────────────────────────
-    fig.add_shape(
-        type='line', xref='x4', yref='paper',
-        x0=0, x1=0, y0=0, y1=1,
-        line=dict(color='rgba(255,255,255,0.25)', width=1.5, dash='dot'),
-    )
-
-    # ── Flag markers: volume spikes, divergences, flip-zone strikes ───────
-    flagged = df_prob[df_prob['flag_icons'] != ''].copy()
-    if not flagged.empty:
-        fig.add_trace(go.Scatter(
-            x=[52] * len(flagged),   # just right of centre on x4 scale
-            y=flagged['strike'],
-            xaxis='x4',
-            mode='text',
-            text=flagged['flag_icons'],
-            textfont=dict(size=11),
-            name='⚡⚠️🔄 Flags',
-            hovertemplate='%{customdata}<extra></extra>',
-            customdata=flagged['hover_text'],
-            showlegend=True,
-        ))
-
-    # ── Spot line ─────────────────────────────────────────────────────────
-    fig.add_hline(
-        y=spot_price, line_dash='dash', line_color='white', line_width=3,
-        annotation_text=f'Spot: {spot_price:,.2f}', annotation_position='top right',
-        annotation=dict(font=dict(size=12, color='white', family='Arial Black')),
-    )
-    fig.add_vline(x=0, line_dash='dot', line_color='gray', line_width=2)
-
-    # ── GEX flip zone lines ───────────────────────────────────────────────
-    for zone in flip_zones:
-        fig.add_hline(
-            y=zone['strike'], line_dash='dot', line_color=zone['color'], line_width=2,
-            annotation_text=f"🔄 {zone['strike']:,.0f}", annotation_position='left',
-            annotation=dict(font=dict(size=10, color=zone['color']),
-                            bgcolor='rgba(0,0,0,0.7)', bordercolor=zone['color'], borderwidth=1),
-        )
-        fig.add_hrect(
-            y0=zone['lower_strike'], y1=zone['upper_strike'],
-            fillcolor=zone['color'], opacity=0.05, line_width=0,
-        )
-
-    # ── Probability axis 50% labels ───────────────────────────────────────
-    # Annotate the prob axis header
-    y_max = df_prob['strike'].max()
-    fig.add_annotation(
-        x=50, y=y_max, xref='x4', yref='y',
-        text='<b>← Bear% | Bull% →</b>',
-        showarrow=False,
-        font=dict(size=9, color='#94a3b8'),
-        xanchor='center', yanchor='bottom',
-        bgcolor='rgba(0,0,0,0.6)', borderwidth=0,
-    )
-
-    # ── Layout ────────────────────────────────────────────────────────────
-    fig.update_layout(
-        title=dict(
-            text=(
-                '<b>🚀 Enhanced GEX Overlay: Original vs Enhanced OI GEX</b><br>'
-                '<sub>Green/Red = All effects | Purple/Gold = OI Δ with Greeks+Vol+IV+Distance | '
-                '🟩🟥 = Volume | <b>Right panel:</b> 🟢 Bull% / 🔴 Bear% per strike '
-                '| ⚡ Vol Spike · ⚠️ GEX Divergence · 🔄 Near Flip | ✏️ toolbar to draw</sub>'
-            ),
-            font=dict(size=15, color='white'),
-        ),
-        xaxis_title=f'GEX (₹ {unit_label})',
-        yaxis_title='Strike Price',
-        template='plotly_dark',
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(26,35,50,0.8)',
-        height=750,
-        barmode='overlay',
-        bargap=0.15,
-        legend=dict(
-            orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1,
-            font=dict(color='white', size=10),
-            bgcolor='rgba(0,0,0,0.8)', bordercolor='white', borderwidth=1,
-        ),
-        hovermode='closest',
-        xaxis=dict(
-            gridcolor='rgba(128,128,128,0.2)', showgrid=True,
-            zeroline=True, zerolinecolor='rgba(255,255,255,0.3)', zerolinewidth=2,
-            domain=[0, 0.68],   # GEX bars use left 68%
-        ),
-        yaxis=dict(gridcolor='rgba(128,128,128,0.2)', showgrid=True, autorange=True),
-        # x4 = probability panel on right
-        xaxis4=dict(
-            overlaying=None,
-            anchor='y',
-            side='right',
-            position=1.0,
-            domain=[0.72, 1.0],  # right 28%
-            range=[-100, 100],
-            showgrid=False,
-            showline=True,
-            linecolor='rgba(255,255,255,0.2)',
-            zeroline=True,
-            zerolinecolor='rgba(255,255,255,0.4)',
-            zerolinewidth=1.5,
-            tickvals=[-75, -50, -25, 0, 25, 50, 75],
-            ticktext=['75%', '50%', '25%', '0', '25%', '50%', '75%'],
-            tickfont=dict(size=8, color='#94a3b8'),
-            title=dict(text='Bear% ← | → Bull%', font=dict(size=9, color='#94a3b8')),
-        ),
-        margin=dict(l=80, r=120, t=110, b=80),
-        dragmode='drawline',
-        newshape=dict(line=dict(color='#f59e0b', width=2)),
-    )
-    fig = _configure_volume_xaxis2(fig, df_sorted)
-    fig.update_layout(
-        modebar_add=['drawline','drawopenpath','drawclosedpath','drawcircle','drawrect','eraseshape'],
-        modebar=dict(bgcolor='rgba(0,0,0,0.5)', color='#94a3b8', activecolor='#f59e0b'),
-    )
-    return fig
-
-
-def create_enhanced_vanna_overlay_chart(
-    df: pd.DataFrame,
-    spot_price: float,
-    unit_label: str = "B",
-    df_full: pd.DataFrame = None,
-    tte: float = 7/365,
-    iv_df_override: pd.DataFrame = None,
-) -> Tuple[go.Figure, pd.DataFrame, pd.DataFrame]:
-    """
-    Enhanced VANNA Overlay — preserves the EXACT original chart appearance:
-      • Cyan/teal bars = Original VANNA
-      • Pink/magenta bars = Enhanced OI VANNA
-      • Green/red volume overlay on left axis (separate x-axis like original)
-      • White dashed spot line
-      • GEX flip zone dotted lines (original behavior)
-    ADDED (as overlays on the same chart, not a separate column):
-      • VANNA flip zone dashed lines — colour-coded by role, with icon+label annotations
-      • Shaded bands at each flip zone
-    Returns (fig, prob_df, iv_df)  — prob_df and iv_df used by the tab for the section below the chart.
-    """
-    df_sorted = df.sort_values('strike').reset_index(drop=True)
-    for col in ['net_vanna','call_oi_change','put_oi_change','total_volume','call_iv','put_iv']:
-        if col not in df_sorted.columns: df_sorted[col] = 0.0
-        df_sorted[col] = df_sorted[col].fillna(0)
-
-    # ── Enhanced OI VANNA (same formula as original) ──────────────────────
-    df_sorted['enhanced_oi_vanna'] = 0.0
-    bs_calc   = BlackScholesCalculator()
-    total_vol = max(df_sorted['total_volume'].sum(), 1)
-    sc = 1e9 if unit_label == 'B' else 1e7
-    cs = 25
+# ═══════════════════════════════════════════════
+# SCORES / LEADERBOARD
+# ═══════════════════════════════════════════════
+def load_scores():
+    if not os.path.exists(SCORES_FILE): return []
     try:
-        for idx, row in df_sorted.iterrows():
-            spot_r = row.get('spot_price', spot_price)
-            strike = row['strike']
-            if spot_r <= 0 or strike <= 0: continue
-            civ = row['call_iv']/100 if row['call_iv'] > 1 else row['call_iv']
-            piv = row['put_iv'] /100 if row['put_iv']  > 1 else row['put_iv']
-            cv  = bs_calc.calculate_vanna(spot_r, strike, tte, 0.07, civ)
-            pv  = bs_calc.calculate_vanna(spot_r, strike, tte, 0.07, piv)
-            vw  = 1 + (row['total_volume'] / total_vol)
-            iv_adj = 1 + ((civ + piv) / 2 * 3)
-            dw  = 1 / (1 + abs(strike - spot_r) / spot_r * 1.5)
-            df_sorted.loc[idx, 'enhanced_oi_vanna'] = (
-                (row['call_oi_change'] * cv * 2.0 * vw * iv_adj * dw * spot_r * cs) / sc +
-                (row['put_oi_change']  * pv * 2.0 * vw * iv_adj * dw * spot_r * cs) / sc
-            )
-    except: pass
+        with open(SCORES_FILE) as f: return json.load(f)
+    except: return []
 
-    # ── Flip zones & probability ──────────────────────────────────────────
-    gex_flips   = identify_gamma_flip_zones(df_sorted, spot_price)
-    vanna_flips = identify_vanna_flip_zones(df_sorted, spot_price)
-    # Use caller-supplied iv_df (pre-sliced to selected timestamp) if available
-    if iv_df_override is not None and len(iv_df_override) > 0:
-        iv_df = iv_df_override
-    else:
-        iv_df = compute_iv_trend(df_full if df_full is not None else df)
-    prob_df     = compute_breakout_probability(vanna_flips, iv_df, spot_price, tte)
+def save_score(username, name, score, total, pct, mode, duration_secs):
+    scores = load_scores()
+    scores.append({
+        "username": username, "name": name, "score": score,
+        "total": total, "pct": pct, "mode": mode,
+        "duration": duration_secs,
+        "ts": datetime.now().isoformat()
+    })
+    with open(SCORES_FILE, "w") as f: json.dump(scores, f, indent=2)
 
-    max_vanna   = df_sorted['net_vanna'].abs().max() or 1
-    max_enh_van = df_sorted['enhanced_oi_vanna'].abs().max() or 1
-
-    _liv      = iv_df.iloc[-1] if len(iv_df) > 0 else None
-    iv_regime = str(_liv['iv_regime'])  if _liv is not None and 'iv_regime' in _liv.index else 'FLAT'
-    iv_skew   = float(_liv['iv_skew'])  if _liv is not None and 'iv_skew'   in _liv.index else 0.0
-
-    # ── SINGLE go.Figure — identical to original chart construction ───────
-    fig = go.Figure()
-
-    # Original VANNA (cyan/teal)
-    orig_col = ['#06b6d4' if x >= 0 else '#0891b2' for x in df_sorted['net_vanna']]
-    fig.add_trace(go.Bar(
-        y=df_sorted['strike'], x=df_sorted['net_vanna'],
-        orientation='h',
-        marker=dict(color=orig_col, opacity=0.6, line=dict(width=0)),
-        name=f'Original VANNA – Max: {max_vanna:.4f}{unit_label}',
-        hovertemplate=f'Strike: %{{y:,.0f}}<br>Original VANNA: %{{x:.4f}}{unit_label}<extra></extra>',
-    ))
-
-    # Enhanced OI VANNA (pink/magenta)
-    enh_col = ['#ec4899' if x >= 0 else '#be185d' for x in df_sorted['enhanced_oi_vanna']]
-    fig.add_trace(go.Bar(
-        y=df_sorted['strike'], x=df_sorted['enhanced_oi_vanna'],
-        orientation='h',
-        marker=dict(color=enh_col, opacity=0.85, line=dict(color='white', width=1)),
-        name=f'Enhanced OI VANNA – Max: {max_enh_van:.4f}{unit_label}',
-        hovertemplate=f'Strike: %{{y:,.0f}}<br>Enhanced OI VANNA: %{{x:.4f}}{unit_label}<extra></extra>',
-    ))
-
-    # Volume overlay (original _add_volume_overlay_horizontal behaviour)
-    fig = _add_volume_overlay_horizontal(fig, df_sorted)
-
-    # Spot line (identical to original)
-    fig.add_hline(
-        y=spot_price, line_dash='dash', line_color='white', line_width=3,
-        annotation_text=f'Spot: {spot_price:,.2f}',
-        annotation_position='top right',
-        annotation=dict(font=dict(size=12, color='white', family='Arial Black')),
-    )
-    fig.add_vline(x=0, line_dash='dot', line_color='gray', line_width=2)
-
-    # GEX flip zones (identical to original — subtle dotted lines on left)
-    for zone in gex_flips:
-        fig.add_hline(
-            y=zone['strike'], line_dash='dot',
-            line_color=zone['color'], line_width=1, opacity=0.3,
-            annotation_text=f"🔄 {zone['strike']:,.0f}",
-            annotation_position='left',
-            annotation=dict(font=dict(size=9, color=zone['color']),
-                            bgcolor='rgba(0,0,0,0.5)',
-                            bordercolor=zone['color'], borderwidth=1),
-        )
-
-    # ── VANNA flip zones — NEW overlays, right-side annotations ──────────
-    for z in vanna_flips[:10]:
-        # Shaded band between the two bounding strikes
-        fig.add_hrect(
-            y0=z['lower_strike'], y1=z['upper_strike'],
-            fillcolor=z['color'], opacity=0.08, line_width=0,
-        )
-        # Dashed line at the interpolated flip strike
-        fig.add_hline(
-            y=z['strike'],
-            line_dash='dash', line_color=z['color'], line_width=2.5,
-            annotation_text=f"{z['icon']} ₹{z['strike']:,.0f} · {z['role'].replace('_',' ')}",
-            annotation_position='right',
-            annotation=dict(
-                font=dict(color=z['color'], size=10, family='Arial Black'),
-                bgcolor='rgba(0,0,0,0.80)',
-                bordercolor=z['color'], borderwidth=1.5,
-            ),
-        )
-
-    # ── Layout — preserved exactly from original ───────────────────────────
-    rc = {'EXPANDING':'#ef4444','COMPRESSING':'#10b981','FLAT':'#94a3b8'}.get(iv_regime,'#94a3b8')
-    fig.update_layout(
-        title=dict(
-            text=(
-                f'<b>🌊 Enhanced VANNA Overlay: Original vs Enhanced OI VANNA</b><br>'
-                f'<sub>Cyan/Teal = All effects | Pink/Magenta = OI Δ with Vol+IV+Distance+VANNA | '
-                f'🟩🟥 = Volume | ✏️ toolbar to draw | '
-                f'⚡ VANNA Flip: 🔴 Resistance · 🚀 Vacuum · ⚠️ Trap Door · 🛡️ Support | '
-                f'IV: <b style="color:{rc}">{iv_regime}</b> | Skew: {iv_skew:+.1f}%</sub>'
-            ),
-            font=dict(size=15, color='white'),
-        ),
-        xaxis_title=f'VANNA (dDelta/dVol) [{unit_label}]',
-        yaxis_title='Strike Price',
-        template='plotly_dark',
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(26,35,50,0.8)',
-        height=780,
-        barmode='overlay',
-        bargap=0.15,
-        legend=dict(
-            orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1,
-            font=dict(color='white', size=11),
-            bgcolor='rgba(0,0,0,0.8)', bordercolor='white', borderwidth=1,
-        ),
-        hovermode='closest',
-        xaxis=dict(
-            gridcolor='rgba(128,128,128,0.2)', showgrid=True,
-            zeroline=True, zerolinecolor='rgba(255,255,255,0.3)', zerolinewidth=2,
-        ),
-        yaxis=dict(gridcolor='rgba(128,128,128,0.2)', showgrid=True, autorange=True),
-        margin=dict(l=80, r=200, t=110, b=80),  # extra right margin for annotations
-        dragmode='drawline',
-        newshape=dict(line=dict(color='#f59e0b', width=2)),
-    )
-    fig = _configure_volume_xaxis2(fig, df_sorted)
-    fig.update_layout(
-        modebar_add=['drawline','drawopenpath','drawclosedpath','drawcircle','drawrect','eraseshape'],
-        modebar=dict(bgcolor='rgba(0,0,0,0.5)', color='#94a3b8', activecolor='#f59e0b'),
-    )
-    return fig, prob_df, iv_df
+def get_leaderboard(mode=None, limit=20):
+    scores = load_scores()
+    if mode: scores = [s for s in scores if s.get("mode") == mode]
+    # Best score per user
+    best = {}
+    for s in scores:
+        u = s["username"]
+        if u not in best or s["pct"] > best[u]["pct"]:
+            best[u] = s
+    ranked = sorted(best.values(), key=lambda x: (-x["pct"], x["duration"]))
+    return ranked[:limit]
 
 
-def create_standard_vanna_chart(df: pd.DataFrame, spot_price: float, unit_label: str = "B") -> go.Figure:
-    df_sorted = df.sort_values('strike').reset_index(drop=True)
-    fig = make_subplots(rows=1, cols=2, subplot_titles=('📈 Call VANNA','📉 Put VANNA'), horizontal_spacing=0.12)
-    fig.add_trace(go.Bar(y=df_sorted['strike'], x=df_sorted['call_vanna'], orientation='h',
-                         marker=dict(color=['#10b981' if x>0 else '#ef4444' for x in df_sorted['call_vanna']]),
-                         name='Call VANNA',
-                         hovertemplate=f'Strike: %{{y:,.0f}}<br>Call VANNA: %{{x:.4f}}{unit_label}<extra></extra>'), row=1, col=1)
-    fig.add_trace(go.Bar(y=df_sorted['strike'], x=df_sorted['put_vanna'], orientation='h',
-                         marker=dict(color=['#10b981' if x>0 else '#ef4444' for x in df_sorted['put_vanna']]),
-                         name='Put VANNA',
-                         hovertemplate=f'Strike: %{{y:,.0f}}<br>Put VANNA: %{{x:.4f}}{unit_label}<extra></extra>'), row=1, col=2)
-    for col in [1, 2]:
-        fig.add_hline(y=spot_price, line_dash='dash', line_color='#06b6d4', line_width=2,
-                      annotation_text=f'Spot: {spot_price:,.2f}', annotation_position='top right',
-                      annotation=dict(font=dict(size=10, color='white')), row=1, col=col)
-    fig.update_layout(title=dict(text='<b>🌊 VANNA Exposure (dDelta/dVol)</b><br><sub>✏️ toolbar to draw</sub>', font=dict(size=18, color='white')),
-                      template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(26,35,50,0.8)',
-                      height=600, showlegend=False, hovermode='closest',
-                      margin=dict(l=80, r=80, t=100, b=80), dragmode='drawline',
-                      newshape=dict(line=dict(color='#f59e0b', width=2)))
-    fig.update_layout(modebar_add=['drawline','drawopenpath','drawclosedpath','drawcircle','drawrect','eraseshape'],
-                      modebar=dict(bgcolor='rgba(0,0,0,0.5)', color='#94a3b8', activecolor='#f59e0b'))
-    fig.update_xaxes(title_text=f'VANNA (₹ {unit_label})', gridcolor='rgba(128,128,128,0.2)', showgrid=True)
-    fig.update_yaxes(title_text='Strike Price', gridcolor='rgba(128,128,128,0.2)', showgrid=True)
-    return fig
-
-
-
-# ============================================================================
-# VANNA INSTITUTIONAL SIGNAL ENGINE
-# ============================================================================
-
-def compute_vanna_institutional_signals(df: pd.DataFrame,
-                                         spot_price: float,
-                                         unit_label: str = "B") -> dict:
-    """
-    Computes three institutional activity scores from VANNA data:
-
-    1. VANNA Acceleration  – rate of change of vanna per strike
-       Signal: large players initiating/closing at a specific strike.
-
-    2. VANNA Concentration Score  – top-3 strikes as % of total VANNA
-       Signal: >60% = single block position (institutional)
-                <40% = distributed/unwinding
-
-    3. Call/Put VANNA Asymmetry – ratio of call_vanna / |put_vanna|
-       Signal: >2.0  = dealers net-long vol on calls → upward price pressure
-               <0.5  = dealers net-long vol on puts  → downward price pressure
-               ~1.0  = balanced / hedged book
-
-    Returns a dict with annotated DataFrames and scalar KPIs.
-    """
-    df_s = df.sort_values('strike').reset_index(drop=True).copy()
-
-    # ── ensure required columns exist ────────────────────────────────────────
-    for col in ['call_vanna','put_vanna','net_vanna','call_volume','put_volume',
-                'total_volume','call_iv','put_iv']:
-        if col not in df_s.columns:
-            df_s[col] = 0.0
-        df_s[col] = pd.to_numeric(df_s[col], errors='coerce').fillna(0)
-
-    # ── 1. VANNA ACCELERATION ─────────────────────────────────────────────────
-    # Rate of change along the strike axis (spatial derivative).
-    # Large acceleration = dealer position wall at that strike.
-    df_s['vanna_accel'] = df_s['net_vanna'].diff().fillna(0)
-    df_s['vanna_accel_abs'] = df_s['vanna_accel'].abs()
-    max_accel = df_s['vanna_accel_abs'].max() or 1
-    df_s['vanna_accel_pct'] = df_s['vanna_accel_abs'] / max_accel * 100
-
-    # Z-score of acceleration — marks statistically anomalous strikes
-    accel_mean = df_s['vanna_accel_abs'].mean()
-    accel_std  = df_s['vanna_accel_abs'].std() or 1
-    df_s['vanna_accel_z'] = (df_s['vanna_accel_abs'] - accel_mean) / accel_std
-
-    # Label each strike
-    def _accel_label(z):
-        if z > 3.0: return '🔴 EXTREME WALL'
-        if z > 2.0: return '🟠 STRONG WALL'
-        if z > 1.0: return '🟡 MODERATE WALL'
-        return ''
-    df_s['accel_label'] = df_s['vanna_accel_z'].apply(_accel_label)
-
-    # ── 2. VANNA CONCENTRATION SCORE ─────────────────────────────────────────
-    total_vanna_abs = df_s['net_vanna'].abs().sum() or 1
-    top3_vanna_abs  = df_s['net_vanna'].abs().nlargest(3).sum()
-    concentration   = top3_vanna_abs / total_vanna_abs * 100
-
-    if concentration >= 60:
-        conc_label = '🎯 CONCENTRATED — Institutional Block Detected'
-        conc_color = '#ef4444'
-        conc_signal = 'CONCENTRATED'
-    elif concentration >= 45:
-        conc_label = '⚠️ SEMI-CONCENTRATED — Watch for Block'
-        conc_color = '#f59e0b'
-        conc_signal = 'SEMI'
-    elif concentration <= 30:
-        conc_label = '📤 DISTRIBUTING — Position Unwinding'
-        conc_color = '#06b6d4'
-        conc_signal = 'DISTRIBUTING'
-    else:
-        conc_label = '🔵 DISPERSED — Normal Market Making'
-        conc_color = '#8b5cf6'
-        conc_signal = 'DISPERSED'
-
-    # Mark top-3 strikes
-    top3_strikes = df_s.nlargest(3, 'vanna_accel_abs')['strike'].values
-    df_s['is_top3'] = df_s['strike'].isin(top3_strikes)
-
-    # ── 3. CALL/PUT VANNA ASYMMETRY ───────────────────────────────────────────
-    call_vanna_total = df_s['call_vanna'].sum()
-    put_vanna_total  = df_s['put_vanna'].sum()
-    asym_ratio = call_vanna_total / (abs(put_vanna_total) + 1e-9)
-
-    # Per-strike asymmetry for bar overlay
-    df_s['asym_ratio'] = df_s['call_vanna'] / (df_s['put_vanna'].abs() + 1e-9)
-    df_s['asym_ratio'] = df_s['asym_ratio'].clip(-5, 5)   # cap for display
-
-    if asym_ratio > 2.0:
-        asym_label  = '📈 CALL-HEAVY: Dealers exposed to upside vol → upward price pressure likely'
-        asym_color  = '#10b981'
-        asym_signal = 'CALL_HEAVY'
-    elif asym_ratio < 0.5:
-        asym_label  = '📉 PUT-HEAVY: Dealers exposed to downside vol → downward price pressure likely'
-        asym_color  = '#ef4444'
-        asym_signal = 'PUT_HEAVY'
-    else:
-        asym_label  = '⚖️ BALANCED: Hedged book, no directional pressure from VANNA'
-        asym_color  = '#8b5cf6'
-        asym_signal = 'BALANCED'
-
-    return {
-        'df': df_s,
-        'concentration': concentration,
-        'conc_label': conc_label,
-        'conc_color': conc_color,
-        'conc_signal': conc_signal,
-        'top3_strikes': top3_strikes,
-        'call_vanna_total': call_vanna_total,
-        'put_vanna_total': put_vanna_total,
-        'asym_ratio': asym_ratio,
-        'asym_label': asym_label,
-        'asym_color': asym_color,
-        'asym_signal': asym_signal,
+# ═══════════════════════════════════════════════
+# SESSION STATE
+# ═══════════════════════════════════════════════
+def init_state():
+    defs = {
+        "page": "home", "user": None, "username": None,
+        "questions": [], "q_idx": 0, "answers": {},
+        "quiz_active": False, "quiz_done": False,
+        "quiz_mode": "practice",
+        "quiz_label": "",
+        "start_time": None, "q_start": None,
+        "total_time": 0,
+        "streak": 0, "total_attempted": 0, "total_correct": 0,
+        "bookmarks": set(), "wrong_questions": [],
+        "q_times": {},
+        "fb_done": set(), "fb_session": 0,
+        "dev_mode": False,
     }
-
-
-def create_vanna_institutional_chart(df: pd.DataFrame,
-                                      spot_price: float,
-                                      unit_label: str = "B") -> Tuple[go.Figure, dict]:
-    """
-    4-panel institutional VANNA chart:
-      Row 1 – Net VANNA bars + VANNA Acceleration overlay (secondary x)
-      Row 2 – VANNA Acceleration Z-score (strike-axis bar chart)
-      Row 3 – Call vs Put VANNA side-by-side with Asymmetry ratio line
-      Row 4 – Concentration heatmap: per-strike share of total VANNA
-    """
-    signals = compute_vanna_institutional_signals(df, spot_price, unit_label)
-    df_s    = signals['df']
-
-    fig = make_subplots(
-        rows=4, cols=1,
-        shared_xaxes=False,   # horizontal bars — strikes on y-axis
-        subplot_titles=(
-            '🌊 Net VANNA  +  Acceleration Overlay  (dealer position walls)',
-            '⚡ VANNA Acceleration Z-Score  (anomalous = institutional wall)',
-            '📊 Call vs Put VANNA  +  Asymmetry Ratio  (directional pressure)',
-            '🎯 VANNA Concentration  (% of total per strike)',
-        ),
-        vertical_spacing=0.07,
-        row_heights=[0.30, 0.22, 0.26, 0.22],
-        specs=[
-            [{"secondary_y": True}],
-            [{"secondary_y": False}],
-            [{"secondary_y": True}],
-            [{"secondary_y": False}],
-        ],
-    )
-
-    strikes = df_s['strike']
-
-    # ── Row 1: Net VANNA bars + acceleration overlay ──────────────────────────
-    vanna_colors = ['#06b6d4' if v > 0 else '#ec4899' for v in df_s['net_vanna']]
-    fig.add_trace(go.Bar(
-        y=strikes, x=df_s['net_vanna'], orientation='h',
-        marker=dict(color=vanna_colors, opacity=0.85, line=dict(width=0)),
-        name='Net VANNA',
-        hovertemplate=f'Strike: %{{y:,.0f}}<br>Net VANNA: %{{x:.4f}}{unit_label}<extra></extra>',
-    ), row=1, col=1, secondary_y=False)
-
-    # Acceleration as scatter on secondary x
-    fig.add_trace(go.Scatter(
-        y=strikes, x=df_s['vanna_accel_abs'],
-        mode='lines+markers',
-        line=dict(color='rgba(245,158,11,0.9)', width=2),
-        marker=dict(size=df_s['vanna_accel_z'].clip(lower=0)*3+4,
-                    color='rgba(245,158,11,0.85)',
-                    line=dict(color='white', width=1)),
-        name='|VANNA Acceleration|',
-        hovertemplate=f'Strike: %{{y:,.0f}}<br>|Accel|: %{{x:.4f}}{unit_label}<br>Z: %{{customdata:.1f}}σ<extra></extra>',
-        customdata=df_s['vanna_accel_z'],
-    ), row=1, col=1, secondary_y=True)
-
-    # Spot line
-    fig.add_hline(y=spot_price, line_dash='dash', line_color='white', line_width=2,
-                  annotation_text=f'Spot ₹{spot_price:,.0f}',
-                  annotation=dict(font=dict(color='white', size=10), bgcolor='rgba(0,0,0,0.6)'),
-                  row=1, col=1)
-
-    # Mark top-3 institutional walls
-    for s in signals['top3_strikes']:
-        fig.add_hline(y=s, line_dash='dot', line_color='#f59e0b', line_width=1.5,
-                      annotation_text=f'⚡ Wall ₹{s:,.0f}',
-                      annotation_position='right',
-                      annotation=dict(font=dict(color='#f59e0b', size=9),
-                                      bgcolor='rgba(0,0,0,0.7)', bordercolor='#f59e0b', borderwidth=1),
-                      row=1, col=1)
-
-    # ── Row 2: Acceleration Z-score bars ─────────────────────────────────────
-    z_colors = ['#dc2626' if z > 3 else ('#f97316' if z > 2 else ('#f59e0b' if z > 1 else '#334155'))
-                for z in df_s['vanna_accel_z']]
-    fig.add_trace(go.Bar(
-        y=strikes, x=df_s['vanna_accel_z'].clip(lower=0),
-        orientation='h', marker=dict(color=z_colors, line=dict(width=0)),
-        name='Acceleration Z-Score',
-        hovertemplate='Strike: %{y:,.0f}<br>Accel Z: %{x:.2f}σ<br>%{customdata}<extra></extra>',
-        customdata=df_s['accel_label'],
-    ), row=2, col=1)
-
-    # Threshold lines on row 2
-    for level, color, label in [(1.0,'rgba(245,158,11,0.6)','1σ moderate'),
-                                  (2.0,'rgba(249,115,22,0.7)','2σ strong'),
-                                  (3.0,'rgba(220,38,38,0.8)','3σ extreme')]:
-        fig.add_vline(x=level, line_dash='dash', line_color=color, line_width=1,
-                      annotation_text=label,
-                      annotation=dict(font=dict(color=color, size=8)),
-                      row=2, col=1)
-
-    fig.add_hline(y=spot_price, line_dash='dash', line_color='rgba(255,255,255,0.3)',
-                  line_width=1, row=2, col=1)
-
-    # ── Row 3: Call vs Put VANNA + Asymmetry line ────────────────────────────
-    fig.add_trace(go.Bar(
-        y=strikes, x=df_s['call_vanna'],
-        orientation='h', name='Call VANNA',
-        marker=dict(color='rgba(16,185,129,0.75)', line=dict(width=0)),
-        hovertemplate=f'Strike: %{{y:,.0f}}<br>Call VANNA: %{{x:.4f}}{unit_label}<extra></extra>',
-    ), row=3, col=1, secondary_y=False)
-
-    fig.add_trace(go.Bar(
-        y=strikes, x=df_s['put_vanna'],
-        orientation='h', name='Put VANNA',
-        marker=dict(color='rgba(239,68,68,0.75)', line=dict(width=0)),
-        hovertemplate=f'Strike: %{{y:,.0f}}<br>Put VANNA: %{{x:.4f}}{unit_label}<extra></extra>',
-    ), row=3, col=1, secondary_y=False)
-
-    # Asymmetry ratio on secondary axis
-    asym_color_per_bar = ['#10b981' if r > 2.0 else ('#ef4444' if r < 0.5 else '#8b5cf6')
-                          for r in df_s['asym_ratio']]
-    fig.add_trace(go.Scatter(
-        y=strikes, x=df_s['asym_ratio'],
-        mode='lines+markers',
-        line=dict(color='rgba(255,255,255,0.7)', width=1.5, dash='dot'),
-        marker=dict(size=5, color=asym_color_per_bar, line=dict(color='white', width=1)),
-        name='Call/Put VANNA Ratio',
-        hovertemplate='Strike: %{y:,.0f}<br>Asymmetry: %{x:.2f}x<extra></extra>',
-    ), row=3, col=1, secondary_y=True)
-
-    # Reference lines at 2.0 and 0.5 on secondary axis
-    fig.add_hline(y=spot_price, line_dash='dash', line_color='rgba(255,255,255,0.3)',
-                  line_width=1, row=3, col=1)
-
-    # ── Row 4: Concentration heatmap (per-strike % of total VANNA) ────────────
-    df_s['vanna_share_pct'] = df_s['net_vanna'].abs() / (total_vanna_abs := df_s['net_vanna'].abs().sum() or 1) * 100
-    share_colors = ['#dc2626' if p > 20 else ('#f97316' if p > 10 else ('#f59e0b' if p > 5 else '#334155'))
-                    for p in df_s['vanna_share_pct']]
-    fig.add_trace(go.Bar(
-        y=strikes, x=df_s['vanna_share_pct'],
-        orientation='h', marker=dict(color=share_colors, line=dict(width=0)),
-        name='VANNA Share %',
-        hovertemplate='Strike: %{y:,.0f}<br>Share: %{x:.1f}%<extra></extra>',
-    ), row=4, col=1)
-
-    # Mark concentration threshold
-    fig.add_vline(x=20, line_dash='dash', line_color='rgba(220,38,38,0.7)', line_width=1.5,
-                  annotation_text='20% wall threshold',
-                  annotation=dict(font=dict(color='rgba(220,38,38,0.8)', size=9)),
-                  row=4, col=1)
-
-    fig.add_hline(y=spot_price, line_dash='dash', line_color='rgba(255,255,255,0.3)',
-                  line_width=1, row=4, col=1)
-
-    # ── Global layout ─────────────────────────────────────────────────────────
-    conc_pct = signals['concentration']
-    asym     = signals['asym_ratio']
-    fig.update_layout(
-        title=dict(
-            text=(
-                f'<b>🏦 VANNA Institutional Activity Monitor</b><br>'
-                f'<sub>'
-                f'Concentration: {conc_pct:.1f}% → {signals["conc_label"]}  |  '
-                f'Asymmetry: {asym:.2f}x → {signals["asym_label"]}'
-                f'</sub>'
-            ),
-            font=dict(size=14, color='white'),
-        ),
-        template='plotly_dark',
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(26,35,50,0.8)',
-        height=1200,
-        barmode='overlay',
-        hovermode='closest',
-        legend=dict(
-            orientation='h', yanchor='bottom', y=1.01, xanchor='right', x=1,
-            font=dict(color='white', size=10),
-            bgcolor='rgba(0,0,0,0.8)', bordercolor='rgba(255,255,255,0.2)', borderwidth=1,
-        ),
-        margin=dict(l=80, r=100, t=130, b=60),
-        dragmode='drawline',
-        newshape=dict(line=dict(color='#f59e0b', width=2)),
-    )
-    fig.update_layout(
-        modebar_add=['drawline','drawopenpath','drawclosedpath','drawcircle','drawrect','eraseshape'],
-        modebar=dict(bgcolor='rgba(0,0,0,0.5)', color='#94a3b8', activecolor='#f59e0b'),
-    )
-
-    # Axis labels
-    fig.update_xaxes(title_text=f'Net VANNA ({unit_label})', gridcolor='rgba(128,128,128,0.15)', row=1, col=1)
-    fig.update_xaxes(title_text='Accel Z-Score (σ)',         gridcolor='rgba(128,128,128,0.15)', row=2, col=1)
-    fig.update_xaxes(title_text=f'VANNA ({unit_label})',     gridcolor='rgba(128,128,128,0.15)', row=3, col=1)
-    fig.update_xaxes(title_text='VANNA Share (%)',           gridcolor='rgba(128,128,128,0.15)', row=4, col=1)
-    for r in range(1, 5):
-        fig.update_yaxes(title_text='Strike', gridcolor='rgba(128,128,128,0.15)',
-                         autorange=True, row=r, col=1)
-    fig.update_yaxes(title_text=f'|Accel| ({unit_label})', secondary_y=True, showgrid=False, row=1, col=1)
-    fig.update_yaxes(title_text='Asym Ratio (x)',           secondary_y=True, showgrid=False, row=3, col=1)
-
-    return fig, signals
-
-
-def create_vanna_intraday_clock(df_full: pd.DataFrame,
-                                 spot_price: float,
-                                 unit_label: str = "B") -> go.Figure:
-    """
-    Intraday VANNA drift chart — shows how VANNA migrates across strikes
-    through the trading session. This is the 'institutional clock'.
-
-    3-row chart:
-      Row 1 – VANNA centre-of-gravity (weighted mean strike) over time
-               shows dealers rolling positions up/down
-      Row 2 – Concentration score over time (% in top-3 strikes)
-               spike = block position being initiated
-      Row 3 – Call/Put VANNA asymmetry ratio over time
-               >2.0 = upward pressure building, <0.5 = downward
-    """
-    # Aggregate by timestamp
-    agg = {}
-    for ts, grp in df_full.groupby('timestamp'):
-        cv_sum  = grp['call_vanna'].sum()
-        pv_sum  = grp['put_vanna'].sum()
-        nv_abs  = grp['net_vanna'].abs()
-        tot_abs = nv_abs.sum() or 1
-
-        # centre of gravity: weighted mean strike by |net_vanna|
-        cog = (grp['strike'] * nv_abs).sum() / tot_abs
-
-        # concentration: top-3 share
-        top3  = nv_abs.nlargest(3).sum()
-        conc  = top3 / tot_abs * 100
-
-        # asymmetry ratio
-        asym  = cv_sum / (abs(pv_sum) + 1e-9)
-        asym  = max(-5, min(5, asym))   # clip for display
-
-        agg[ts] = {'cog': cog, 'concentration': conc, 'asym_ratio': asym,
-                   'call_vanna': cv_sum, 'put_vanna': pv_sum,
-                   'spot': grp['spot_price'].iloc[0]}
-
-    if not agg:
-        return go.Figure()
-
-    clock_df = pd.DataFrame(agg).T.reset_index().rename(columns={'index':'timestamp'})
-    clock_df = clock_df.sort_values('timestamp')
-    ts = clock_df['timestamp']
-
-    fig = make_subplots(
-        rows=3, cols=1,
-        shared_xaxes=True,
-        subplot_titles=(
-            '🧲 VANNA Centre-of-Gravity  (weighted mean strike — shows position rolling)',
-            '🎯 Concentration Score Over Time  (spike = block position initiated)',
-            '⚖️ Call/Put VANNA Asymmetry Over Time  (>2.0 = upward pressure | <0.5 = downward)',
-        ),
-        vertical_spacing=0.08,
-        row_heights=[0.38, 0.30, 0.32],
-        specs=[[{"secondary_y": True}],
-               [{"secondary_y": False}],
-               [{"secondary_y": False}]],
-    )
-
-    # ── Row 1: CoG + spot price ───────────────────────────────────────────────
-    fig.add_trace(go.Scatter(
-        x=ts, y=clock_df['spot'],
-        mode='lines', name='Spot Price',
-        line=dict(color='rgba(59,130,246,0.6)', width=1.5),
-        fill='tozeroy', fillcolor='rgba(59,130,246,0.05)',
-        hovertemplate='%{x|%H:%M}<br>Spot: ₹%{y:,.2f}<extra></extra>',
-    ), row=1, col=1, secondary_y=False)
-
-    fig.add_trace(go.Scatter(
-        x=ts, y=clock_df['cog'],
-        mode='lines+markers', name='VANNA CoG (Gravity Strike)',
-        line=dict(color='#f59e0b', width=2.5),
-        marker=dict(size=6, color='#f59e0b', line=dict(color='white', width=1)),
-        hovertemplate='%{x|%H:%M}<br>CoG Strike: ₹%{y:,.2f}<extra></extra>',
-    ), row=1, col=1, secondary_y=True)
-
-    # ── Row 2: Concentration score ────────────────────────────────────────────
-    conc_colors = ['#dc2626' if c >= 60 else ('#f97316' if c >= 45 else ('#8b5cf6' if c <= 30 else '#334155'))
-                   for c in clock_df['concentration']]
-    fig.add_trace(go.Bar(
-        x=ts, y=clock_df['concentration'],
-        marker_color=conc_colors, name='Concentration %',
-        hovertemplate='%{x|%H:%M}<br>Concentration: %{y:.1f}%<extra></extra>',
-    ), row=2, col=1)
-
-    for level, color, label in [
-        (60, 'rgba(220,38,38,0.8)',  '60% — Institutional Block'),
-        (45, 'rgba(249,115,22,0.6)', '45% — Semi-concentrated'),
-        (30, 'rgba(6,182,212,0.5)',  '30% — Distributing'),
-    ]:
-        fig.add_hline(y=level, line_dash='dash', line_color=color, line_width=1.5,
-                      annotation_text=label, annotation_position='right',
-                      annotation=dict(font=dict(color=color, size=9)), row=2, col=1)
-
-    # ── Row 3: Asymmetry ratio ────────────────────────────────────────────────
-    asym_colors = ['#10b981' if r > 2.0 else ('#ef4444' if r < 0.5 else '#8b5cf6')
-                   for r in clock_df['asym_ratio']]
-    fig.add_trace(go.Scatter(
-        x=ts, y=clock_df['asym_ratio'],
-        mode='lines+markers', name='Asym Ratio',
-        line=dict(color='rgba(255,255,255,0.5)', width=1.5),
-        marker=dict(size=8, color=asym_colors, line=dict(color='white', width=1.5)),
-        hovertemplate='%{x|%H:%M}<br>Asym: %{y:.2f}x<extra></extra>',
-    ), row=3, col=1)
-
-    # Fill zones
-    fig.add_hrect(y0=2.0,  y1=5.0,  fillcolor='rgba(16,185,129,0.08)',  line_width=0, row=3, col=1)
-    fig.add_hrect(y0=-5.0, y1=0.5,  fillcolor='rgba(239,68,68,0.08)',   line_width=0, row=3, col=1)
-    for level, color, label in [
-        (2.0,  'rgba(16,185,129,0.7)',  '2.0x — Call Heavy (↑ pressure)'),
-        (1.0,  'rgba(139,92,246,0.4)',  '1.0x — Balanced'),
-        (0.5,  'rgba(239,68,68,0.7)',   '0.5x — Put Heavy (↓ pressure)'),
-    ]:
-        fig.add_hline(y=level, line_dash='dash', line_color=color, line_width=1.5,
-                      annotation_text=label, annotation_position='right',
-                      annotation=dict(font=dict(color=color, size=9)), row=3, col=1)
-
-    # ── Global layout ─────────────────────────────────────────────────────────
-    fig.update_layout(
-        title=dict(
-            text=(
-                '<b>🕐 VANNA Institutional Clock — Intraday Position Drift</b><br>'
-                '<sub>'
-                '🧲 CoG rising with spot = dealers rolling up (trend day) | '
-                'CoG flat despite spot move = reversion likely | '
-                '🎯 Conc spike = block initiated | '
-                '⚖️ Asym >2.0 = upward pressure | <0.5 = downward pressure'
-                '</sub>'
-            ),
-            font=dict(size=14, color='white'),
-        ),
-        template='plotly_dark',
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(26,35,50,0.8)',
-        height=900,
-        hovermode='x unified',
-        legend=dict(
-            orientation='h', yanchor='bottom', y=1.01, xanchor='right', x=1,
-            font=dict(color='white', size=10),
-            bgcolor='rgba(0,0,0,0.8)', bordercolor='rgba(255,255,255,0.2)', borderwidth=1,
-        ),
-        margin=dict(l=70, r=100, t=130, b=60),
-        dragmode='drawline',
-        newshape=dict(line=dict(color='#f59e0b', width=2)),
-    )
-    fig.update_layout(
-        modebar_add=['drawline','drawopenpath','drawclosedpath','drawcircle','drawrect','eraseshape'],
-        modebar=dict(bgcolor='rgba(0,0,0,0.5)', color='#94a3b8', activecolor='#f59e0b'),
-    )
-    fig.update_xaxes(title_text='Time (IST)', gridcolor='rgba(128,128,128,0.15)', row=3, col=1)
-    fig.update_yaxes(title_text='Spot (₹)',           secondary_y=False, gridcolor='rgba(128,128,128,0.15)', row=1, col=1)
-    fig.update_yaxes(title_text='CoG Strike (₹)',     secondary_y=True,  showgrid=False, row=1, col=1)
-    fig.update_yaxes(title_text='Concentration (%)',  gridcolor='rgba(128,128,128,0.15)', row=2, col=1)
-    fig.update_yaxes(title_text='Asym Ratio (x)',     gridcolor='rgba(128,128,128,0.15)', row=3, col=1)
-
-    return fig
-
-
-# ============================================================================
-# VANNA FLIP ZONE ENGINE + BREAKOUT PROBABILITY
-# ============================================================================
-
-def identify_vanna_flip_zones(df: pd.DataFrame, spot_price: float) -> List[Dict]:
-    """
-    Find strikes where cumulative net VANNA crosses zero.
-    Returns list of flip zone dicts with direction, magnitude and zone type.
-
-    Zone types:
-      POS_TO_NEG  – positive VANNA above → negative below (trap door)
-      NEG_TO_POS  – negative VANNA above → positive below (spring floor)
-
-    Spot-relative role:
-      flip above spot + POS_TO_NEG  → resistance ceiling (IV expansion = breakdown)
-      flip above spot + NEG_TO_POS  → vacuum / acceleration zone (IV expansion = squeeze UP)
-      flip below spot + POS_TO_NEG  → trap door  (IV expansion = acceleration DOWN)
-      flip below spot + NEG_TO_POS  → support floor (IV compression = hold)
-    """
-    df_s = df.sort_values('strike').reset_index(drop=True)
-    zones = []
-    for i in range(len(df_s) - 1):
-        cur_v  = df_s.iloc[i]['net_vanna']
-        nxt_v  = df_s.iloc[i+1]['net_vanna']
-        cur_k  = df_s.iloc[i]['strike']
-        nxt_k  = df_s.iloc[i+1]['strike']
-        if (cur_v > 0 and nxt_v < 0) or (cur_v < 0 and nxt_v > 0):
-            # linear interpolation for exact flip level
-            w         = abs(cur_v) / (abs(cur_v) + abs(nxt_v) + 1e-12)
-            flip_k    = cur_k + (nxt_k - cur_k) * w
-            magnitude = (abs(cur_v) + abs(nxt_v)) / 2
-            flip_type = 'POS_TO_NEG' if cur_v > 0 else 'NEG_TO_POS'
-            above_spot = flip_k > spot_price
-
-            # Determine role
-            if above_spot and flip_type == 'POS_TO_NEG':
-                role = 'RESISTANCE_CEILING'
-                role_desc = 'Resistance ceiling — IV ↑ = breakdown through here'
-                color = '#ef4444'
-                icon  = '🔴'
-            elif above_spot and flip_type == 'NEG_TO_POS':
-                role = 'VACUUM_ZONE'
-                role_desc = 'Vacuum / acceleration zone — IV ↑ = rapid squeeze UP'
-                color = '#10b981'
-                icon  = '🚀'
-            elif not above_spot and flip_type == 'POS_TO_NEG':
-                role = 'TRAP_DOOR'
-                role_desc = 'Trap door — IV ↑ = acceleration DOWN below this level'
-                color = '#f59e0b'
-                icon  = '⚠️'
-            else:  # below spot, NEG_TO_POS
-                role = 'SUPPORT_FLOOR'
-                role_desc = 'Support floor — IV compression holds price up'
-                color = '#06b6d4'
-                icon  = '🛡️'
-
-            zones.append({
-                'strike'      : flip_k,
-                'lower_strike': cur_k,
-                'upper_strike': nxt_k,
-                'lower_vanna' : cur_v,
-                'upper_vanna' : nxt_v,
-                'flip_type'   : flip_type,
-                'role'        : role,
-                'role_desc'   : role_desc,
-                'magnitude'   : magnitude,
-                'above_spot'  : above_spot,
-                'color'       : color,
-                'icon'        : icon,
-                'distance_pct': abs(flip_k - spot_price) / spot_price * 100,
-            })
-    return sorted(zones, key=lambda z: abs(z['strike'] - spot_price))
-
-
-def compute_iv_trend(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Aggregate call_iv and put_iv at ATM strike across timestamps.
-    Returns a timeline DataFrame with IV trend and rate-of-change.
-    ATM = strike closest to spot at each timestamp.
-    """
-    rows = []
-    for ts, grp in df.sort_values('timestamp').groupby('timestamp'):
-        spot   = grp['spot_price'].iloc[0]
-        # find ATM row
-        atm_idx = (grp['strike'] - spot).abs().idxmin()
-        atm_row = grp.loc[atm_idx]
-        call_iv = atm_row.get('call_iv', 15)
-        put_iv  = atm_row.get('put_iv',  15)
-        avg_iv  = (call_iv + put_iv) / 2
-        # skew: call_iv - put_iv, positive = calls expensive (fear of rally)
-        skew    = call_iv - put_iv
-        rows.append({
-            'timestamp': ts,
-            'spot'     : spot,
-            'call_iv'  : call_iv,
-            'put_iv'   : put_iv,
-            'avg_iv'   : avg_iv,
-            'iv_skew'  : skew,
-        })
-    iv_df = pd.DataFrame(rows).sort_values('timestamp').reset_index(drop=True)
-    if len(iv_df) > 1:
-        iv_df['iv_change']     = iv_df['avg_iv'].diff().fillna(0)
-        iv_df['iv_expanding']  = iv_df['iv_change'] > 0
-        # rolling 3-bar IV slope
-        iv_df['iv_slope']      = iv_df['avg_iv'].rolling(3, min_periods=1).apply(
-            lambda x: (x.iloc[-1] - x.iloc[0]) / max(len(x)-1, 1), raw=False)
-        iv_df['iv_regime']     = iv_df['iv_slope'].apply(
-            lambda s: 'EXPANDING' if s > 0.1 else ('COMPRESSING' if s < -0.1 else 'FLAT'))
-    else:
-        iv_df['iv_change']    = 0.0
-        iv_df['iv_expanding'] = False
-        iv_df['iv_slope']     = 0.0
-        iv_df['iv_regime']    = 'FLAT'
-    return iv_df
-
-
-def compute_breakout_probability(
-    flip_zones: List[Dict],
-    iv_df: pd.DataFrame,
-    spot_price: float,
-    tte: float = 7/365,
-    df_selected: pd.DataFrame = None,
-) -> pd.DataFrame:
-    """
-    Score each VANNA flip zone for DIRECTIONAL breakout probability.
-
-    Per-zone scores (0-100):
-      bull_score  – probability this zone drives a BULLISH move
-      bear_score  – probability this zone drives a BEARISH move
-      final_score – max(bull, bear) — overall activation probability
-      direction   – BULLISH / BEARISH / CONFLICTED / NEUTRAL
-
-    Zone × IV logic:
-      VACUUM_ZONE + IV EXPANDING         → strong BULLISH (dealers forced to BUY delta)
-      VACUUM_ZONE + IV COMPRESSING       → weak BEARISH  (dealers sell delta, fade move)
-      RESISTANCE_CEILING + IV EXPANDING  → strong BEARISH (dealers forced to SELL delta)
-      RESISTANCE_CEILING + IV COMPRESSING→ weak BULLISH  (ceiling absorbed, grind up)
-      TRAP_DOOR + IV EXPANDING           → strong BEARISH (drop accelerates below)
-      TRAP_DOOR + IV COMPRESSING         → weak BULLISH  (floor recovers)
-      SUPPORT_FLOOR + IV COMPRESSING     → strong BULLISH (dealers buy delta, floor holds)
-      SUPPORT_FLOOR + IV EXPANDING       → BEARISH (paradox: floor breaks under vol)
-
-    Session-level bias signals also returned in each row:
-      vanna_balance  – net VANNA above spot vs below spot
-      skew_bias      – call IV vs put IV tilt
-      spot_zone_pos  – is spot above or below nearest flip zone
-    """
-    if not flip_zones or iv_df.empty:
-        return pd.DataFrame()
-
-    latest_iv   = iv_df.iloc[-1]
-    iv_regime   = str(latest_iv['iv_regime']) if 'iv_regime' in latest_iv.index else 'FLAT'
-    iv_skew     = float(latest_iv['iv_skew'])   if 'iv_skew'   in latest_iv.index else 0.0
-    call_iv_cur = float(latest_iv['call_iv'])   if 'call_iv'   in latest_iv.index else 15.0
-    put_iv_cur  = float(latest_iv['put_iv'])    if 'put_iv'    in latest_iv.index else 15.0
-    max_mag     = max(z['magnitude'] for z in flip_zones) or 1
-
-    # ── Session-level directional signals ────────────────────────────────
-    # 1. VANNA balance: sum |VANNA| above vs below spot
-    vanna_above = sum(z['magnitude'] for z in flip_zones if z['above_spot'])
-    vanna_below = sum(z['magnitude'] for z in flip_zones if not z['above_spot'])
-    total_mag   = vanna_above + vanna_below or 1
-    # >50 means more sensitivity above → IV expansion pulls price UP more
-    vanna_balance_pct = vanna_above / total_mag * 100   # >50 = bullish bias
-
-    # 2. Skew bias: positive skew = calls expensive = institutional long delta
-    # normalise to 0-100 (50 = neutral, >50 = bullish, <50 = bearish)
-    skew_bias_pct = np.clip(50 + iv_skew * 4, 0, 100)
-
-    # 3. IV regime bias: expanding IV + more VANNA above = bullish ignition
-    #                    expanding IV + more VANNA below = bearish ignition
-    if iv_regime == 'EXPANDING':
-        iv_dir_bias = 'BULLISH' if vanna_above > vanna_below else 'BEARISH'
-    elif iv_regime == 'COMPRESSING':
-        iv_dir_bias = 'BEARISH' if vanna_above > vanna_below else 'BULLISH'
-    else:
-        iv_dir_bias = 'NEUTRAL'
-
-    rows = []
-    for z in flip_zones:
-        dist_pct = z['distance_pct']
-        role     = z['role']
-
-        # ── Distance score (same for both directions) ─────────────────────
-        dist_score = 100 * np.exp(-dist_pct / 1.5)
-
-        # ── Magnitude score ────────────────────────────────────────────────
-        mag_score = min(100, z['magnitude'] / max_mag * 100)
-
-        # ── TTE score ──────────────────────────────────────────────────────
-        tte_score = min(100, (1 / (tte * 365 + 0.5)) * 3)
-
-        # ── Bull / Bear IV scores based on zone role × IV regime ──────────
-        # Each returns (bull_iv_score, bear_iv_score)
-        if role == 'VACUUM_ZONE':
-            # Above spot. IV↑ → dealers BUY delta → squeeze UP.
-            # FLAT/COMPRESSING = no squeeze fuel → zone acts as ceiling not magnet.
-            if iv_regime == 'EXPANDING':
-                bull_iv, bear_iv = 90, 10   # strong squeeze up
-            elif iv_regime == 'FLAT':
-                bull_iv, bear_iv = 35, 50   # no fuel → zone caps, slight bear lean
-            else:  # COMPRESSING
-                bull_iv, bear_iv = 20, 65   # IV falling → dealers selling hard, fade the zone
-
-        elif role == 'RESISTANCE_CEILING':
-            # Above spot. IV↑ → dealers SELL delta → breakdown
-            if iv_regime == 'EXPANDING':
-                bull_iv, bear_iv = 10, 85
-            elif iv_regime == 'FLAT':
-                bull_iv, bear_iv = 40, 35   # ambiguous, grind
-            else:  # COMPRESSING
-                bull_iv, bear_iv = 60, 20   # ceiling absorbed, slow grind up
-
-        elif role == 'TRAP_DOOR':
-            # Below spot. IV↑ → dealers SELL delta below → drop accelerates
-            if iv_regime == 'EXPANDING':
-                bull_iv, bear_iv = 5, 90
-            elif iv_regime == 'FLAT':
-                bull_iv, bear_iv = 30, 45
-            else:  # COMPRESSING
-                bull_iv, bear_iv = 65, 15   # floor recovers, bounce
-
-        else:  # SUPPORT_FLOOR
-            # Below spot. IV↓ → dealers BUY delta → price held.
-            # FLAT = some buying but uncertain. EXPANDING = floor at risk.
-            if iv_regime == 'COMPRESSING':
-                bull_iv, bear_iv = 88, 8    # strong floor — dealers buying
-            elif iv_regime == 'FLAT':
-                bull_iv, bear_iv = 52, 38   # mild support — better than neutral but not confirmed
-            else:  # EXPANDING — floor breaks under vol
-                bull_iv, bear_iv = 15, 78   # floor breaks, dealers forced to sell delta below
-
-        # ── Skew alignment bonus (+/- up to 15 pts) ───────────────────────
-        # Positive skew (call > put) = market pricing upside = bull aligned
-        skew_bull_bonus = np.clip(iv_skew * 3, -15, 15)
-        skew_bear_bonus = np.clip(-iv_skew * 3, -15, 15)
-
-        # ── VANNA balance bonus for this zone's direction ─────────────────
-        # Zone above spot benefits from more VANNA above (bull) or below (bear)
-        if z['above_spot']:
-            # above-spot zones: more VANNA above = stronger move when triggered
-            vb_bull = np.clip((vanna_balance_pct - 50) * 0.6, -10, 10)
-            vb_bear = -vb_bull
-        else:
-            vb_bear = np.clip((50 - vanna_balance_pct) * 0.6, -10, 10)
-            vb_bull = -vb_bear
-
-        # ── Combine into directional scores ───────────────────────────────
-        bull_score = np.clip(
-            0.30 * dist_score +
-            0.30 * bull_iv    +
-            0.20 * mag_score  +
-            0.10 * tte_score  +
-            skew_bull_bonus   +
-            vb_bull,
-            0, 100
-        )
-        bear_score = np.clip(
-            0.30 * dist_score +
-            0.30 * bear_iv    +
-            0.20 * mag_score  +
-            0.10 * tte_score  +
-            skew_bear_bonus   +
-            vb_bear,
-            0, 100
-        )
-
-        final_score = max(bull_score, bear_score)
-
-        # Direction classification
-        diff = bull_score - bear_score
-        if   diff >  20: direction = 'BULLISH'
-        elif diff < -20: direction = 'BEARISH'
-        elif final_score >= 40: direction = 'CONFLICTED'
-        else:            direction = 'NEUTRAL'
-
-        dir_color = {'BULLISH':'#10b981','BEARISH':'#ef4444',
-                     'CONFLICTED':'#f59e0b','NEUTRAL':'#64748b'}[direction]
-        dir_icon  = {'BULLISH':'🟢','BEARISH':'🔴',
-                     'CONFLICTED':'⚡','NEUTRAL':'⬜'}[direction]
-
-        if final_score >= 70:   signal = '🔥 HIGH'
-        elif final_score >= 50: signal = '⚡ MOD'
-        elif final_score >= 30: signal = '👁️ WATCH'
-        else:                   signal = '💤 LOW'
-
-        rows.append({
-            'strike'           : z['strike'],
-            'role'             : role,
-            'role_desc'        : z['role_desc'],
-            'icon'             : z['icon'],
-            'color'            : z['color'],
-            'distance_pct'     : dist_pct,
-            'flip_type'        : z['flip_type'],
-            'magnitude'        : z['magnitude'],
-            'above_spot'       : z['above_spot'],
-            'bull_score'       : bull_score,
-            'bear_score'       : bear_score,
-            'final_score'      : final_score,
-            'direction'        : direction,
-            'dir_color'        : dir_color,
-            'dir_icon'         : dir_icon,
-            'signal'           : signal,
-            'iv_regime'        : iv_regime,
-            'iv_skew'          : iv_skew,
-            'vanna_balance_pct': vanna_balance_pct,
-            'skew_bias_pct'    : skew_bias_pct,
-            'iv_dir_bias'      : iv_dir_bias,
-        })
-
-    return pd.DataFrame(rows).sort_values('final_score', ascending=False).reset_index(drop=True)
-
-
-def compute_session_bias(
-    flip_zones: List[Dict],
-    iv_df: pd.DataFrame,
-    df_selected: pd.DataFrame,
-    spot_price: float,
-) -> Dict:
-    """
-    Compute a single session-level BULLISH / BEARISH score (0-100 each).
-
-    Combines four independent signals:
-      1. VANNA zone balance    — more activation potential above vs below spot
-      2. IV skew               — call IV vs put IV premium
-      3. Net VANNA above/below — raw dealer exposure tilt
-      4. IV regime direction   — is vol expanding toward bullish or bearish zones
-
-    Returns dict with bull_pct, bear_pct, bias, confidence, explanation lines.
-    """
-    if not flip_zones or iv_df.empty:
-        return {'bull_pct':50,'bear_pct':50,'bias':'NEUTRAL',
-                'confidence':'LOW','lines':[],'iv_regime':'FLAT','iv_skew':0}
-
-    latest_iv = iv_df.iloc[-1]
-    iv_regime = str(latest_iv['iv_regime']) if 'iv_regime' in latest_iv.index else 'FLAT'
-    iv_skew   = float(latest_iv['iv_skew']) if 'iv_skew'   in latest_iv.index else 0.0
-
-    signals   = {}
-    lines     = []
-
-    # ── Signal 1: VANNA balance (which side has more flip magnitude) ──────
-    v_above = sum(z['magnitude'] for z in flip_zones if z['above_spot'])
-    v_below = sum(z['magnitude'] for z in flip_zones if not z['above_spot'])
-    total_v = v_above + v_below or 1
-    v_pct   = v_above / total_v * 100   # >50 = more VANNA above
-    # More VANNA above + expanding IV = dealers buy delta = bullish
-    # More VANNA below + expanding IV = dealers sell delta = bearish
-    if iv_regime == 'EXPANDING':
-        # More VANNA above + expanding IV = dealers forced to buy delta above = bullish
-        sig1_bull = v_pct
-        sig1_bear = 100 - v_pct
-    elif iv_regime == 'COMPRESSING':
-        # More VANNA above + compressing IV = dealers selling into rallies = bearish
-        sig1_bull = 100 - v_pct
-        sig1_bear = v_pct
-    else:
-        # FLAT IV: VANNA above still creates resistance (dealers sell small into rallies)
-        # Not fully reversed but bear-leaning when v_pct > 50
-        # v_pct=70 (70% above) → sig1_bull=40, sig1_bear=60
-        sig1_bull = np.clip(50 - (v_pct - 50) * 0.4, 0, 100)
-        sig1_bear = 100 - sig1_bull
-
-    signals['vanna_balance'] = (sig1_bull, sig1_bear)
-    dir1 = '🟢 Bullish' if sig1_bull > sig1_bear + 10 else ('🔴 Bearish' if sig1_bear > sig1_bull + 10 else '⚖️ Neutral')
-    lines.append(f"VANNA Balance: {v_pct:.0f}% above spot | IV {iv_regime} → {dir1}")
-
-    # ── Signal 2: IV Skew ─────────────────────────────────────────────────
-    # Positive skew: calls pricier → institutional buying upside → bullish
-    skew_bull = np.clip(50 + iv_skew * 5, 0, 100)
-    skew_bear = 100 - skew_bull
-    signals['skew'] = (skew_bull, skew_bear)
-    dir2 = '🟢 Call heavy' if iv_skew > 1 else ('🔴 Put heavy' if iv_skew < -1 else '⚖️ Neutral')
-    lines.append(f"IV Skew: {iv_skew:+.1f}% (CE-PE) → {dir2}")
-
-    # ── Signal 3: Net VANNA above vs below — IV-regime-aware ────────────
-    # CRITICAL: direction interpretation FLIPS based on IV regime.
-    #
-    # Positive VANNA above spot means:
-    #   IV EXPANDING  → dealers MUST BUY delta above → squeeze UP → BULLISH
-    #   IV COMPRESSING→ dealers SELL delta into rallies → cap/resistance → BEARISH
-    #   IV FLAT       → dealers mildly selling into rallies (resistance lean) → SLIGHTLY BEARISH
-    #
-    # Positive VANNA below spot means:
-    #   IV EXPANDING  → dealers MUST SELL delta below → accelerate DOWN → BEARISH
-    #   IV COMPRESSING→ dealers BUY delta on dips → support → BULLISH
-    net_above = 0.0; net_below = 0.0
-    if df_selected is not None and 'net_vanna' in df_selected.columns:
-        net_above = df_selected[df_selected['strike'] > spot_price]['net_vanna'].sum()
-        net_below = df_selected[df_selected['strike'] < spot_price]['net_vanna'].sum()
-    total_net = abs(net_above) + abs(net_below) or 1
-    above_pct = net_above / total_net   # +1 = all above, -1 = all below
-
-    if iv_regime == 'EXPANDING':
-        # VANNA above + expanding = forced dealer buying above = bullish
-        nv_bull = np.clip(50 + above_pct * 50, 0, 100)
-    elif iv_regime == 'COMPRESSING':
-        # VANNA above + compressing = dealers selling rallies = bearish
-        nv_bull = np.clip(50 - above_pct * 50, 0, 100)
-    else:  # FLAT — slight resistance lean when VANNA concentrated above
-        # above_pct > 0 means more VANNA above → slight bear lean (capping effect)
-        nv_bull = np.clip(50 - above_pct * 25, 0, 100)
-    nv_bear = 100 - nv_bull
-
-    signals['net_vanna'] = (nv_bull, nv_bear)
-    if iv_regime == 'EXPANDING':
-        dir3 = '🟢 Bullish' if net_above > 0 else '🔴 Bearish'
-    elif iv_regime == 'COMPRESSING':
-        dir3 = '🔴 Bearish (VANNA caps rally)' if net_above > 0 else '🟢 Bullish (VANNA supports dip)'
-    else:
-        dir3 = '⚖️ Slight bear lean (VANNA above = resistance)' if net_above > 0 else '⚖️ Slight bull lean'
-    lines.append(f"Net VANNA: above={net_above:.2f} below={net_below:.2f} | IV {iv_regime} → {dir3}")
-
-    # ── Signal 4: Zone role count — IV-regime-adjusted ───────────────────
-    # Zone roles are only as valid as the IV regime confirms them.
-    # VACUUM_ZONE = bullish ONLY if IV is expanding (squeeze fuel)
-    #             = bearish (ceiling) if IV is flat or compressing
-    # RESISTANCE_CEILING = bearish if IV expanding, weakly bullish if compressing
-    # TRAP_DOOR = bearish always (worst when IV expands)
-    # SUPPORT_FLOOR = bullish if IV compressing, bearish if IV expanding
-    bull_score_r = 0.0
-    bear_score_r = 0.0
-    for z in flip_zones:
-        r = z['role']
-        if r == 'VACUUM_ZONE':
-            if iv_regime == 'EXPANDING':
-                bull_score_r += 1.0
-            elif iv_regime == 'FLAT':
-                bear_score_r += 0.5   # ceiling effect
-            else:  # COMPRESSING
-                bear_score_r += 1.0
-        elif r == 'RESISTANCE_CEILING':
-            if iv_regime == 'EXPANDING':
-                bear_score_r += 1.0
-            elif iv_regime == 'FLAT':
-                bear_score_r += 0.6
-            else:  # COMPRESSING
-                bull_score_r += 0.3   # weakly absorbed
-        elif r == 'TRAP_DOOR':
-            if iv_regime == 'EXPANDING':
-                bear_score_r += 1.0
-            elif iv_regime == 'FLAT':
-                bear_score_r += 0.7
-            else:  # COMPRESSING
-                bull_score_r += 0.4   # bounce likely
-        else:  # SUPPORT_FLOOR
-            if iv_regime == 'COMPRESSING':
-                bull_score_r += 1.0
-            elif iv_regime == 'FLAT':
-                bull_score_r += 0.5
-            else:  # EXPANDING
-                bear_score_r += 0.8   # floor at risk
-
-    tot_r = bull_score_r + bear_score_r or 1
-    role_bull = bull_score_r / tot_r * 100
-    role_bear = bear_score_r / tot_r * 100
-    signals['zone_roles'] = (role_bull, role_bear)
-    dir4 = '🟢 Bullish zones confirmed by IV' if role_bull > role_bear + 10         else ('🔴 Bearish zones confirmed by IV' if role_bear > role_bull + 10 else '⚖️ Mixed')
-    n_bull_raw = sum(1 for z in flip_zones if z['role'] in ('VACUUM_ZONE','SUPPORT_FLOOR'))
-    n_bear_raw = sum(1 for z in flip_zones if z['role'] in ('RESISTANCE_CEILING','TRAP_DOOR'))
-    lines.append(f"Zone Roles: {n_bull_raw} structural bull / {n_bear_raw} structural bear | IV-adj → {dir4}")
-
-    # ── Weighted aggregate ────────────────────────────────────────────────
-    weights = {'vanna_balance':0.35, 'skew':0.25, 'net_vanna':0.25, 'zone_roles':0.15}
-    bull_final = sum(weights[k] * signals[k][0] for k in weights)
-    bear_final = sum(weights[k] * signals[k][1] for k in weights)
-
-    # Normalise to sum to 100
-    total = bull_final + bear_final or 1
-    bull_pct = round(bull_final / total * 100, 1)
-    bear_pct = round(bear_final / total * 100, 1)
-
-    diff = bull_pct - bear_pct
-    if   diff >  20: bias = 'BULLISH'
-    elif diff < -20: bias = 'BEARISH'
-    else:            bias = 'CONFLICTED'
-
-    if   abs(diff) >= 30: confidence = 'HIGH'
-    elif abs(diff) >= 15: confidence = 'MODERATE'
-    else:                 confidence = 'LOW'
-
-    return {
-        'bull_pct'  : bull_pct,
-        'bear_pct'  : bear_pct,
-        'bias'      : bias,
-        'confidence': confidence,
-        'lines'     : lines,
-        'iv_regime' : iv_regime,
-        'iv_skew'   : iv_skew,
-        'vanna_balance_pct': v_above / total_v * 100,
-        'net_vanna_above': net_above,
-        'net_vanna_below': net_below,
+    for k, v in defs.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+
+init_state()
+
+
+# ═══════════════════════════════════════════════
+# NAV BAR (always visible, replaces sidebar)
+# ═══════════════════════════════════════════════
+def render_sidebar():
+    """Sidebar navigation — replaces the old topbar."""
+    # Always-visible floating hamburger toggle
+    st.markdown("""
+    <style>
+    [data-testid="stSidebarCollapseButton"] { display: none !important; }
+    #custom-sidebar-toggle {
+        position: fixed; z-index: 99999;
+        /* Desktop: top-left */
+        top: 0.7rem; left: 0.7rem;
+        width: 2.5rem; height: 2.5rem;
+        background: linear-gradient(135deg, #7c3aed, #a855f7);
+        border: none; border-radius: 50%; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 4px 18px rgba(124,58,237,0.55);
+        transition: box-shadow 0.2s, transform 0.15s; outline: none;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
     }
+    #custom-sidebar-toggle:hover { box-shadow: 0 6px 24px rgba(124,58,237,0.75); transform: scale(1.08); }
+    #custom-sidebar-toggle:active { transform: scale(0.94); }
+    #custom-sidebar-toggle svg { width: 1.1rem; height: 1.1rem; fill: #ffffff; pointer-events: none; }
+    .main .block-container { padding-top: 3.5rem !important; }
+    @media (min-width: 768px) { .main .block-container { padding-top: 1.5rem !important; } }
 
-
-def create_vanna_flip_breakout_chart(
-    df_selected: pd.DataFrame,
-    df_full: pd.DataFrame,
-    spot_price: float,
-    unit_label: str = "B",
-    tte: float = 7/365,
-) -> Tuple[go.Figure, pd.DataFrame, pd.DataFrame]:
-    """
-    5-row VANNA Flip & Breakout Probability chart:
-      Row 1 — VANNA profile (strike axis) with flip zones annotated
-      Row 2 — Spot price intraday with flip zone horizontal bands
-      Row 3 — ATM IV trend: call IV, put IV, skew
-      Row 4 — Breakout probability score per flip zone (horizontal bar)
-      Row 5 — IV regime timeline (EXPANDING / COMPRESSING / FLAT)
-
-    Returns (fig, flip_zones_df, iv_df)
-    """
-    df_s     = df_selected.sort_values('strike').reset_index(drop=True)
-    iv_df    = compute_iv_trend(df_full)
-    flip_zones = identify_vanna_flip_zones(df_s, spot_price)
-    prob_df    = compute_breakout_probability(flip_zones, iv_df, spot_price, tte)
-
-    # ── Row 1 & Row 4 are different axes — use make_subplots with mixed
-    fig = make_subplots(
-        rows=5, cols=1,
-        shared_xaxes=False,                 # Row 1 uses strike axis; rows 2-5 use time axis
-        subplot_titles=(
-            f'VANNA Profile (Strike Axis) + Flip Zones',
-            'Spot Price Intraday with VANNA Flip Levels',
-            'ATM Implied Volatility Trend (Call IV / Put IV / Skew)',
-            'Breakout Probability Score per Flip Zone',
-            'IV Regime Timeline (EXPANDING → Vol-driven moves likely)',
-        ),
-        vertical_spacing=0.06,
-        row_heights=[0.28, 0.16, 0.18, 0.20, 0.18],
-        specs=[
-            [{"secondary_y": False}],
-            [{"secondary_y": False}],
-            [{"secondary_y": True}],
-            [{"secondary_y": False}],
-            [{"secondary_y": False}],
-        ],
-    )
-
-    # ── Row 1: VANNA profile horizontal bars ─────────────────────────────────
-    vanna_colors = ['#06b6d4' if v >= 0 else '#f59e0b' for v in df_s['net_vanna']]
-    fig.add_trace(go.Bar(
-        y=df_s['strike'], x=df_s['net_vanna'],
-        orientation='h',
-        marker=dict(color=vanna_colors, opacity=0.8, line=dict(color='rgba(255,255,255,0.1)', width=0.5)),
-        name='Net VANNA',
-        hovertemplate=f'Strike: %{{y:,.0f}}<br>Net VANNA: %{{x:.4f}}{unit_label}<extra></extra>',
-    ), row=1, col=1)
-
-    # Spot line on VANNA chart
-    fig.add_hline(y=spot_price, line_dash='dash', line_color='white', line_width=2.5,
-                  annotation_text=f'Spot ₹{spot_price:,.0f}',
-                  annotation=dict(font=dict(color='white', size=11, family='Arial Black'),
-                                  bgcolor='rgba(0,0,0,0.7)'),
-                  annotation_position='right', row=1, col=1)
-    fig.add_vline(x=0, line_dash='dot', line_color='rgba(255,255,255,0.3)', line_width=1.5, row=1, col=1)
-
-    # Annotate flip zones on VANNA chart
-    for z in flip_zones[:8]:    # max 8 to avoid clutter
-        fig.add_hline(
-            y=z['strike'], line_dash='dot', line_color=z['color'], line_width=2.5,
-            annotation_text=f"{z['icon']} {z['strike']:,.0f} ({z['role'].replace('_',' ')})",
-            annotation_position='left',
-            annotation=dict(font=dict(color=z['color'], size=9),
-                            bgcolor='rgba(0,0,0,0.75)', bordercolor=z['color'], borderwidth=1),
-            row=1, col=1,
-        )
-        fig.add_hrect(
-            y0=z['lower_strike'], y1=z['upper_strike'],
-            fillcolor=z['color'], opacity=0.07, line_width=0, row=1, col=1,
-        )
-
-    # ── Row 2: Spot price intraday ────────────────────────────────────────────
-    ts = iv_df['timestamp']
-    fig.add_trace(go.Scatter(
-        x=ts, y=iv_df['spot'],
-        mode='lines', line=dict(color='#3b82f6', width=2),
-        fill='tozeroy', fillcolor='rgba(59,130,246,0.06)',
-        name='Spot Price',
-        hovertemplate='%{x|%H:%M}<br>₹%{y:,.2f}<extra></extra>',
-    ), row=2, col=1)
-
-    # Flip zone horizontal lines on spot chart
-    for z in flip_zones[:8]:
-        fig.add_hline(
-            y=z['strike'], line_dash='dot', line_color=z['color'], line_width=1.8,
-            annotation_text=f"{z['icon']} {z['strike']:,.0f}",
-            annotation_position='right',
-            annotation=dict(font=dict(color=z['color'], size=9),
-                            bgcolor='rgba(0,0,0,0.6)', bordercolor=z['color'], borderwidth=1),
-            row=2, col=1,
-        )
-
-    # ── Row 3: ATM IV trend ───────────────────────────────────────────────────
-    fig.add_trace(go.Scatter(
-        x=ts, y=iv_df['call_iv'],
-        mode='lines', line=dict(color='#10b981', width=2),
-        name='Call IV (%)',
-        hovertemplate='%{x|%H:%M}<br>Call IV: %{y:.1f}%<extra></extra>',
-    ), row=3, col=1, secondary_y=False)
-
-    fig.add_trace(go.Scatter(
-        x=ts, y=iv_df['put_iv'],
-        mode='lines', line=dict(color='#ef4444', width=2),
-        name='Put IV (%)',
-        hovertemplate='%{x|%H:%M}<br>Put IV: %{y:.1f}%<extra></extra>',
-    ), row=3, col=1, secondary_y=False)
-
-    # IV skew on secondary y
-    skew_colors = ['#10b981' if s > 0 else '#ef4444' for s in iv_df['iv_skew']]
-    fig.add_trace(go.Bar(
-        x=ts, y=iv_df['iv_skew'],
-        marker=dict(color=skew_colors, opacity=0.5),
-        name='IV Skew (Call−Put)',
-        hovertemplate='%{x|%H:%M}<br>Skew: %{y:+.1f}%<extra></extra>',
-        yaxis='y6',
-    ), row=3, col=1, secondary_y=True)
-
-    fig.add_hline(y=0, line_dash='dot', line_color='rgba(255,255,255,0.2)', line_width=1, row=3, col=1)
-
-    # ── Row 4: Breakout probability horizontal bars ───────────────────────────
-    if not prob_df.empty:
-        bar_colors = [r['color'] for _, r in prob_df.iterrows()]
-        bar_labels = [f"{r['icon']} ₹{r['strike']:,.0f}" for _, r in prob_df.iterrows()]
-        fig.add_trace(go.Bar(
-            y=bar_labels,
-            x=prob_df['final_score'],
-            orientation='h',
-            marker=dict(
-                color=bar_colors,
-                opacity=0.85,
-                line=dict(color='white', width=1),
-            ),
-            text=[f"{r['signal']}  {r['final_score']:.0f}%" for _, r in prob_df.iterrows()],
-            textposition='inside',
-            textfont=dict(color='white', size=10, family='JetBrains Mono'),
-            name='Breakout Prob Score',
-            customdata=prob_df[['role_desc','iv_regime','distance_pct','magnitude']].values,
-            hovertemplate=(
-                'Strike: %{y}<br>'
-                'Score: %{x:.1f}%<br>'
-                'Role: %{customdata[0]}<br>'
-                'IV Regime: %{customdata[1]}<br>'
-                'Distance: %{customdata[2]:.2f}%<br>'
-                'VANNA Mag: %{customdata[3]:.4f}<extra></extra>'
-            ),
-        ), row=4, col=1)
-
-        # threshold lines on prob chart
-        for level, color, label in [
-            (70, 'rgba(239,68,68,0.8)',   '70% HIGH PROB'),
-            (50, 'rgba(245,158,11,0.6)',  '50% MODERATE'),
-            (30, 'rgba(100,116,139,0.5)', '30% WATCH'),
-        ]:
-            fig.add_vline(x=level, line_dash='dash', line_color=color, line_width=1.5,
-                          annotation_text=label, annotation_position='top',
-                          annotation=dict(font=dict(color=color, size=9)), row=4, col=1)
-    else:
-        fig.add_annotation(text="No VANNA flip zones detected in current strike range",
-                           xref="paper", yref="paper", x=0.5, y=0.5,
-                           showarrow=False, font=dict(color="#94a3b8", size=13), row=4, col=1)
-
-    # ── Row 5: IV regime timeline ─────────────────────────────────────────────
-    regime_color_map = {'EXPANDING': '#ef4444', 'COMPRESSING': '#10b981', 'FLAT': '#64748b'}
-    regime_y_map     = {'EXPANDING': 2, 'COMPRESSING': -2, 'FLAT': 0}
-
-    if 'iv_regime' in iv_df.columns:
-        r_colors = [regime_color_map.get(r, '#64748b') for r in iv_df['iv_regime']]
-        r_y      = [regime_y_map.get(r, 0)            for r in iv_df['iv_regime']]
-        fig.add_trace(go.Bar(
-            x=ts, y=r_y,
-            marker=dict(color=r_colors, opacity=0.75, line=dict(width=0)),
-            name='IV Regime',
-            text=iv_df['iv_regime'],
-            textposition='inside',
-            textfont=dict(color='white', size=9),
-            hovertemplate='%{x|%H:%M}<br>Regime: %{text}<br>IV Δ: %{customdata:.2f}%<extra></extra>',
-            customdata=iv_df['iv_change'],
-        ), row=5, col=1)
-
-        fig.add_trace(go.Scatter(
-            x=ts, y=iv_df['iv_slope'],
-            mode='lines', line=dict(color='#f59e0b', width=2),
-            name='IV Slope (3-bar)',
-            hovertemplate='%{x|%H:%M}<br>Slope: %{y:+.2f}%<extra></extra>',
-        ), row=5, col=1)
-
-        fig.add_hline(y=0.1,  line_dash='dash', line_color='rgba(239,68,68,0.5)',  line_width=1, row=5, col=1)
-        fig.add_hline(y=-0.1, line_dash='dash', line_color='rgba(16,185,129,0.5)', line_width=1, row=5, col=1)
-        fig.add_hline(y=0,    line_dash='dot',  line_color='rgba(255,255,255,0.2)', line_width=1, row=5, col=1)
-
-    # ── Layout ───────────────────────────────────────────────────────────────
-    latest_regime = iv_df['iv_regime'].iloc[-1] if len(iv_df) > 0 else 'FLAT'
-    latest_skew   = iv_df['iv_skew'].iloc[-1]   if len(iv_df) > 0 else 0
-    skew_dir      = 'calls expensive (upward lean)' if latest_skew > 0 else 'puts expensive (downward lean)'
-
-    fig.update_layout(
-        title=dict(
-            text=(
-                f'<b>⚡ VANNA Flip Zones & Breakout Probability</b><br>'
-                f'<sub>'
-                f'🔴 Resistance Ceiling = IV↑ drives breakdown | '
-                f'🚀 Vacuum Zone = IV↑ drives squeeze UP | '
-                f'⚠️ Trap Door = IV↑ accelerates DOWN | '
-                f'🛡️ Support Floor = IV↓ holds price<br>'
-                f'Current IV Regime: <b>{latest_regime}</b> | '
-                f'IV Skew: {latest_skew:+.1f}% ({skew_dir})'
-                f'</sub>'
-            ),
-            font=dict(size=14, color='white'),
-        ),
-        template='plotly_dark',
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(26,35,50,0.8)',
-        height=1220,
-        barmode='overlay',
-        hovermode='closest',
-        legend=dict(
-            orientation='h', yanchor='bottom', y=1.01, xanchor='right', x=1,
-            font=dict(color='white', size=10),
-            bgcolor='rgba(0,0,0,0.8)', bordercolor='rgba(255,255,255,0.2)', borderwidth=1,
-        ),
-        margin=dict(l=80, r=140, t=140, b=60),
-        dragmode='drawline',
-        newshape=dict(line=dict(color='#f59e0b', width=2)),
-    )
-    fig.update_layout(
-        modebar_add=['drawline','drawopenpath','drawclosedpath','drawcircle','drawrect','eraseshape'],
-        modebar=dict(bgcolor='rgba(0,0,0,0.5)', color='#94a3b8', activecolor='#f59e0b'),
-    )
-
-    # axis labels
-    fig.update_xaxes(title_text=f'Net VANNA (₹{unit_label})', row=1, col=1, gridcolor='rgba(128,128,128,0.15)')
-    fig.update_yaxes(title_text='Strike Price (₹)',            row=1, col=1, gridcolor='rgba(128,128,128,0.15)', autorange=True)
-    fig.update_xaxes(title_text='Time (IST)', gridcolor='rgba(128,128,128,0.15)', row=2, col=1)
-    fig.update_yaxes(title_text='Spot (₹)',   row=2, col=1, gridcolor='rgba(128,128,128,0.15)')
-    fig.update_xaxes(title_text='Time (IST)', gridcolor='rgba(128,128,128,0.15)', row=3, col=1)
-    fig.update_yaxes(title_text='IV (%)',     row=3, col=1, secondary_y=False, gridcolor='rgba(128,128,128,0.15)')
-    fig.update_yaxes(title_text='Skew (%)',   row=3, col=1, secondary_y=True, showgrid=False)
-    fig.update_xaxes(title_text='Probability Score (%)', gridcolor='rgba(128,128,128,0.15)', row=4, col=1, range=[0,100])
-    fig.update_yaxes(title_text='Flip Zone',  row=4, col=1, gridcolor='rgba(128,128,128,0.15)', autorange=True)
-    fig.update_xaxes(title_text='Time (IST)', gridcolor='rgba(128,128,128,0.15)', row=5, col=1)
-    fig.update_yaxes(title_text='IV Slope / Regime', row=5, col=1, gridcolor='rgba(128,128,128,0.15)')
-
-    return fig, prob_df, iv_df
-
-def detect_vacuum_breakout(
-    df: pd.DataFrame,
-    tte: float = 7/365,
-) -> pd.DataFrame:
-    """
-    Scans every timestamp to detect when spot price BREAKS and HOLDS above
-    a VACUUM ZONE (NEG_TO_POS flip above spot).
-
-    Breakout states per timestamp:
-      NO_ZONE       — no vacuum zone found at this bar
-      BELOW         — spot below vacuum zone (normal state)
-      ATTEMPTED     — spot first crossed above zone this bar (1 bar only so far)
-      CONFIRMED     — spot held above zone for ≥2 consecutive bars
-      FALSE         — spot crossed back below after attempted breakout
-      EXTENDED      — confirmed + IV regime turned EXPANDING (maximum conviction)
-
-    Returns DataFrame with columns:
-      timestamp, spot, vacuum_strike, state, state_color, bull_override,
-      bull_pct_override, bear_pct_override, label, hover
-    """
-    all_ts = sorted(df['timestamp'].unique())
-    iv_full = compute_iv_trend(df)
-
-    rows_out = []
-    prev_state         = 'NO_ZONE'
-    attempt_bar        = None   # index when ATTEMPTED started
-    last_vacuum_strike = None   # tracks last known vacuum zone strike
-
-    for idx, ts in enumerate(all_ts):
-        df_ts    = df[df['timestamp'] == ts].copy()
-        if df_ts.empty: continue
-        spot_ts  = float(df_ts['spot_price'].iloc[0])
-        iv_slice = iv_full[iv_full['timestamp'] <= ts]
-        if iv_slice.empty: iv_slice = iv_full.iloc[:1]
-
-        zones        = identify_vanna_flip_zones(df_ts, spot_ts)
-        vacuum_zones = [z for z in zones if z['role'] == 'VACUUM_ZONE']
-
-        if not vacuum_zones:
-            # No vacuum zone visible at this bar.
-            # If spot has moved ABOVE the last known zone → zone was absorbed by price.
-            if prev_state in ('CONFIRMED', 'EXTENDED'):
-                iv_row = iv_slice.iloc[-1]
-                iv_reg = str(iv_row['iv_regime']) if 'iv_regime' in iv_row.index else 'FLAT'
-                state  = 'EXTENDED' if iv_reg == 'EXPANDING' else 'CONFIRMED'
-            elif prev_state == 'BELOW' and last_vacuum_strike is not None and spot_ts > last_vacuum_strike:
-                state = 'ATTEMPTED'   # spot jumped through zone in single bar
-                attempt_bar = idx
-            elif prev_state == 'ATTEMPTED' and last_vacuum_strike is not None and spot_ts > last_vacuum_strike:
-                state = 'CONFIRMED'   # held above — zone absorbed = confirmed
-            else:
-                state = 'NO_ZONE'
-            vacuum_strike = last_vacuum_strike   # carry last known for display
-        else:
-            # Take nearest vacuum zone
-            vz = min(vacuum_zones, key=lambda z: z['distance_pct'])
-            vacuum_strike = vz['strike']
-            last_vacuum_strike = vacuum_strike   # update tracker
-            above = spot_ts > vacuum_strike
-
-            if not above:
-                # Spot below zone
-                if prev_state in ('ATTEMPTED', 'CONFIRMED', 'EXTENDED'):
-                    state = 'FALSE'   # was above, now back below
-                    attempt_bar = None
-                else:
-                    state = 'BELOW'
-                    attempt_bar = None
-            else:
-                # Spot above zone
-                if prev_state in ('BELOW', 'FALSE', 'NO_ZONE'):
-                    state = 'ATTEMPTED'
-                    attempt_bar = idx
-                elif prev_state == 'ATTEMPTED':
-                    state = 'CONFIRMED'
-                elif prev_state in ('CONFIRMED', 'EXTENDED'):
-                    iv_row = iv_slice.iloc[-1]
-                    iv_reg = str(iv_row['iv_regime']) if 'iv_regime' in iv_row.index else 'FLAT'
-                    state  = 'EXTENDED' if iv_reg == 'EXPANDING' else 'CONFIRMED'
-                else:
-                    state = 'ATTEMPTED'
-
-        # ── Bull override scores based on state ──────────────────────────
-        override_map = {
-            'NO_ZONE'  : (None,  None,  False),
-            'BELOW'    : (None,  None,  False),
-            'ATTEMPTED': (72,    28,    True),   # tentative breakout
-            'CONFIRMED': (85,    15,    True),   # confirmed — strong bull
-            'FALSE'    : (None,  None,  False),  # no override — let normal signals work
-            'EXTENDED' : (95,    5,     True),   # IV expanding above zone — maximum conviction
+    /* Mobile: move button to bottom-right for thumb reach */
+    @media (max-width: 600px) {
+        #custom-sidebar-toggle {
+            top: auto !important;
+            left: auto !important;
+            bottom: 1.2rem !important;
+            right: 1.2rem !important;
+            width: 3rem !important;
+            height: 3rem !important;
+            box-shadow: 0 6px 24px rgba(124,58,237,0.7) !important;
         }
-        bull_ov, bear_ov, do_override = override_map.get(state, (None, None, False))
-
-        state_colors = {
-            'NO_ZONE'  : '#64748b',
-            'BELOW'    : '#94a3b8',
-            'ATTEMPTED': '#f59e0b',
-            'CONFIRMED': '#10b981',
-            'FALSE'    : '#ef4444',
-            'EXTENDED' : '#06b6d4',
-        }
-        state_icons = {
-            'NO_ZONE'  : '⬜',
-            'BELOW'    : '⬇️',
-            'ATTEMPTED': '⚡',
-            'CONFIRMED': '🚀',
-            'FALSE'    : '❌',
-            'EXTENDED' : '🔥',
-        }
-
-        label = f"{state_icons.get(state,'')} {state}"
-        hover = (
-            f"{ts.strftime('%H:%M')} | Spot ₹{spot_ts:,.0f}<br>"
-            f"Zone: {'₹' + f'{vacuum_strike:,.0f}' if vacuum_strike else 'none'}<br>"
-            f"Breakout State: <b>{state}</b><br>"
-            + (f"Bull Override: {bull_ov}% | Bear Override: {bear_ov}%" if do_override else "No override")
-        )
-
-        rows_out.append({
-            'timestamp'        : ts,
-            'spot'             : spot_ts,
-            'vacuum_strike'    : vacuum_strike,
-            'state'            : state,
-            'state_color'      : state_colors.get(state, '#64748b'),
-            'state_icon'       : state_icons.get(state, ''),
-            'bull_override'    : do_override,
-            'bull_pct_override': bull_ov,
-            'bear_pct_override': bear_ov,
-            'label'            : label,
-            'hover'            : hover,
-        })
-        prev_state = state
-
-    return pd.DataFrame(rows_out)
-
-
-def create_bias_transition_chart(
-    df: pd.DataFrame,
-    spot_price: float,
-    selected_ts,
-    tte: float = 7/365,
-) -> go.Figure:
-    """
-    Plots Bull% and Bear% (from compute_session_bias) across every timestamp
-    in the session. Marks:
-      🔄 CROSSOVER  — lines cross (Bull overtakes Bear or vice versa)
-      ⚡ FLIP       — bias label changes (BULLISH→BEARISH or reverse)
-      🔥 SURGE      — either line moves >10% in a single bar
-      ▼  Selected   — vertical line at the currently-selected timestamp
-    """
-    all_ts = sorted(df['timestamp'].unique())
-    if len(all_ts) < 2:
-        fig = go.Figure()
-        fig.update_layout(template='plotly_dark', height=300,
-                          title='Not enough timestamps for transition chart')
-        return fig
-
-    iv_full = compute_iv_trend(df)
-
-    # Detect vacuum zone breakout states across the full session
-    bk_df = detect_vacuum_breakout(df, tte)
-    bk_map = {}
-    if not bk_df.empty:
-        for _, row in bk_df.iterrows():
-            bk_map[row['timestamp']] = row
-
-    times, bulls, bears, regimes, skews, biases = [], [], [], [], [], []
-    breakout_states = []   # parallel list for override info
-    prev_bias = None
-
-    for ts in all_ts:
-        df_ts = df[df['timestamp'] == ts].copy()
-        if df_ts.empty:
-            continue
-        spot_ts = float(df_ts['spot_price'].iloc[0])
-
-        # iv sliced up to this ts (same logic as tab 5)
-        iv_slice = iv_full[iv_full['timestamp'] <= ts]
-        if iv_slice.empty:
-            iv_slice = iv_full.iloc[:1]
-
-        zones = identify_vanna_flip_zones(df_ts, spot_ts)
-        bd    = compute_session_bias(zones, iv_slice, df_ts, spot_ts)
-
-        # Apply breakout override if active at this timestamp
-        bk = bk_map.get(ts)
-        if bk is not None and bk['bull_override']:
-            bull_val = float(bk['bull_pct_override'])
-            bear_val = float(bk['bear_pct_override'])
-            bias_val = 'BULLISH'
-        else:
-            bull_val = bd['bull_pct']
-            bear_val = bd['bear_pct']
-            bias_val = bd['bias']
-
-        times.append(ts)
-        bulls.append(bull_val)
-        bears.append(bear_val)
-        regimes.append(bd['iv_regime'])
-        skews.append(bd['iv_skew'])
-        biases.append(bias_val)
-        breakout_states.append(bk['state'] if bk is not None else 'NO_ZONE')
-
-    if not times:
-        fig = go.Figure()
-        fig.update_layout(template='plotly_dark', height=300)
-        return fig
-
-    times_str = [t.strftime('%H:%M') for t in times]
-
-    # ── Detect transition events ─────────────────────────────────────────
-    # ── Significant event detection (filtered) ──────────────────────────
-    # Rules designed to keep <5 events per chart:
-    #   CROSSOVER: lines must cross AND gap must be ≥8% before & after,
-    #              AND a minimum of 3 bars cooldown from last crossover
-    #   FLIP:      bias label changes BULLISH↔BEARISH (CONFLICTED doesn't count),
-    #              AND the new bias is held for ≥2 bars (not a one-bar flicker)
-    #   SURGE:     single-bar move ≥15% on either line, NOT immediately reversed
-    #              (next bar move is < half the surge size)
-    MIN_GAP_BARS   = 3    # minimum bars between same-type events
-    MIN_CROSS_DIFF = 8.0  # lines must diverge by ≥8% to qualify as meaningful cross
-    SURGE_THRESH   = 15.0 # minimum single-bar move to qualify as surge
-
-    crossovers, flips, surges = [], [], []
-    last_cross = -MIN_GAP_BARS
-
-    for i in range(1, len(times)):
-        prev_b, curr_b = bulls[i-1], bulls[i]
-        prev_r, curr_r = bears[i-1], bears[i]
-
-        # CROSSOVER — must actually cross AND diverge meaningfully after
-        prev_bull_lead = prev_b > prev_r
-        curr_bull_lead = curr_b > curr_r
-        gap_after = abs(curr_b - curr_r)
-        if (prev_bull_lead != curr_bull_lead
-                and gap_after >= MIN_CROSS_DIFF
-                and (i - last_cross) >= MIN_GAP_BARS):
-            crossovers.append(i)
-            last_cross = i
-
-        # FLIP — BULLISH↔BEARISH only (skip CONFLICTED), held ≥2 bars
-        is_directional_flip = (
-            biases[i] in ('BULLISH', 'BEARISH')
-            and biases[i-1] in ('BEARISH', 'BULLISH')
-            and biases[i] != biases[i-1]
-        )
-        if is_directional_flip:
-            # Check it holds for ≥2 bars
-            held = (i + 1 < len(biases) and biases[i+1] == biases[i])
-            if held:
-                flips.append(i)
-
-        # SURGE — ≥15% move NOT immediately reversed
-        bull_move = abs(curr_b - prev_b)
-        bear_move = abs(curr_r - prev_r)
-        max_move  = max(bull_move, bear_move)
-        if max_move >= SURGE_THRESH:
-            # not immediately reversed
-            if i + 1 < len(times):
-                next_bull_move = abs(bulls[i+1] - curr_b) if i+1 < len(bulls) else 0
-                if next_bull_move < max_move * 0.5:   # reversal < half surge
-                    surges.append(i)
-            else:
-                surges.append(i)
-
-    fig = go.Figure()
-
-    # ── Bull% line ────────────────────────────────────────────────────────
-    fig.add_trace(go.Scatter(
-        x=times_str, y=bulls,
-        mode='lines',
-        name='🟢 Bull%',
-        line=dict(color='#10b981', width=2.5),
-        fill='tozeroy',
-        fillcolor='rgba(16,185,129,0.07)',
-        hovertemplate='%{x}<br>🟢 Bull: <b>%{y:.1f}%</b><extra></extra>',
-    ))
-
-    # ── Bear% line ────────────────────────────────────────────────────────
-    fig.add_trace(go.Scatter(
-        x=times_str, y=bears,
-        mode='lines',
-        name='🔴 Bear%',
-        line=dict(color='#ef4444', width=2.5),
-        fill='tozeroy',
-        fillcolor='rgba(239,68,68,0.07)',
-        hovertemplate='%{x}<br>🔴 Bear: <b>%{y:.1f}%</b><extra></extra>',
-    ))
-
-    # ── 50% neutral reference ─────────────────────────────────────────────
-    fig.add_hline(
-        y=50, line_dash='dot', line_color='rgba(148,163,184,0.35)', line_width=1.5,
-        annotation_text='50% neutral',
-        annotation=dict(font=dict(color='#64748b', size=9)),
-        annotation_position='right',
-    )
-
-    # ── CROSSOVER markers — single consolidated trace ─────────────────────
-    # Bull-cross and Bear-cross as two separate traces (different colours)
-    bull_cross_x, bull_cross_y, bull_cross_txt = [], [], []
-    bear_cross_x, bear_cross_y, bear_cross_txt = [], [], []
-    for i in crossovers:
-        mid_y = (bulls[i] + bears[i]) / 2
-        if bulls[i] > bears[i]:
-            bull_cross_x.append(times_str[i])
-            bull_cross_y.append(mid_y)
-            bull_cross_txt.append(f'🟢 CROSS<br>Bull {bulls[i]:.0f}% overtakes')
-        else:
-            bear_cross_x.append(times_str[i])
-            bear_cross_y.append(mid_y)
-            bear_cross_txt.append(f'🔴 CROSS<br>Bear {bears[i]:.0f}% overtakes')
-
-    if bull_cross_x:
-        fig.add_trace(go.Scatter(
-            x=bull_cross_x, y=bull_cross_y,
-            mode='markers+text',
-            marker=dict(symbol='star', size=18, color='#10b981',
-                        line=dict(color='white', width=1.5)),
-            text=['BULL CROSS'] * len(bull_cross_x),
-            textposition='top center',
-            textfont=dict(color='#10b981', size=9, family='JetBrains Mono'),
-            name='🟢 Bull Cross',
-            hovertemplate='%{x}<br>%{customdata}<extra></extra>',
-            customdata=bull_cross_txt,
-        ))
-    if bear_cross_x:
-        fig.add_trace(go.Scatter(
-            x=bear_cross_x, y=bear_cross_y,
-            mode='markers+text',
-            marker=dict(symbol='star', size=18, color='#ef4444',
-                        line=dict(color='white', width=1.5)),
-            text=['BEAR CROSS'] * len(bear_cross_x),
-            textposition='top center',
-            textfont=dict(color='#ef4444', size=9, family='JetBrains Mono'),
-            name='🔴 Bear Cross',
-            hovertemplate='%{x}<br>%{customdata}<extra></extra>',
-            customdata=bear_cross_txt,
-        ))
-
-    # ── FLIP markers — single consolidated trace ──────────────────────────
-    bull_flip_x, bull_flip_y = [], []
-    bear_flip_x, bear_flip_y = [], []
-    bull_flip_txt, bear_flip_txt = [], []
-    for i in flips:
-        if biases[i] == 'BULLISH':
-            bull_flip_x.append(times_str[i])
-            bull_flip_y.append(bulls[i] + 3)
-            bull_flip_txt.append(f'⚡ BULL FLIP<br>{bears[i-1]:.0f}%→{bulls[i]:.0f}% Bull')
-        else:
-            bear_flip_x.append(times_str[i])
-            bear_flip_y.append(bears[i] + 3)
-            bear_flip_txt.append(f'⚡ BEAR FLIP<br>{bulls[i-1]:.0f}%→{bears[i]:.0f}% Bear')
-
-    if bull_flip_x:
-        fig.add_trace(go.Scatter(
-            x=bull_flip_x, y=bull_flip_y,
-            mode='markers+text',
-            marker=dict(symbol='triangle-up', size=15, color='#10b981',
-                        line=dict(color='white', width=1.5)),
-            text=['⚡ BULL FLIP'] * len(bull_flip_x),
-            textposition='top center',
-            textfont=dict(color='#10b981', size=9, family='JetBrains Mono'),
-            name='⚡ Bull Flip',
-            hovertemplate='%{x}<br>%{customdata}<extra></extra>',
-            customdata=bull_flip_txt,
-        ))
-    if bear_flip_x:
-        fig.add_trace(go.Scatter(
-            x=bear_flip_x, y=bear_flip_y,
-            mode='markers+text',
-            marker=dict(symbol='triangle-down', size=15, color='#ef4444',
-                        line=dict(color='white', width=1.5)),
-            text=['⚡ BEAR FLIP'] * len(bear_flip_x),
-            textposition='bottom center',
-            textfont=dict(color='#ef4444', size=9, family='JetBrains Mono'),
-            name='⚡ Bear Flip',
-            hovertemplate='%{x}<br>%{customdata}<extra></extra>',
-            customdata=bear_flip_txt,
-        ))
-
-    # ── SURGE markers — single consolidated trace ─────────────────────────
-    surge_x, surge_y, surge_txt = [], [], []
-    for i in surges:
-        bull_move = abs(bulls[i] - bulls[i-1])
-        bear_move = abs(bears[i] - bears[i-1])
-        is_bull_surge = bull_move >= bear_move
-        surge_x.append(times_str[i])
-        surge_y.append(bulls[i] if is_bull_surge else bears[i])
-        surge_txt.append(
-            f'🔥 {"BULL" if is_bull_surge else "BEAR"} SURGE<br>'
-            f'{("+" if bulls[i]>bulls[i-1] else "")}{bulls[i]-bulls[i-1]:.0f}% Bull  '
-            f'{("+" if bears[i]>bears[i-1] else "")}{bears[i]-bears[i-1]:.0f}% Bear'
-        )
-    if surge_x:
-        fig.add_trace(go.Scatter(
-            x=surge_x, y=surge_y,
-            mode='markers',
-            marker=dict(symbol='diamond', size=13, color='#f59e0b',
-                        line=dict(color='white', width=1.5)),
-            name='🔥 Surge (≥15%)',
-            hovertemplate='%{x}<br>%{customdata}<extra></extra>',
-            customdata=surge_txt,
-        ))
-
-    # ── Shaded background via fillcolor on the scatter fills above ───────
-    # (already done via fill='tozeroy' on bull/bear lines — no vrect needed)
-
-    # ── Selected timestamp vertical line ──────────────────────────────────
-    sel_str = selected_ts.strftime('%H:%M')
-    if sel_str in times_str:
-        sel_idx   = times_str.index(sel_str)
-        sel_bull  = bulls[sel_idx]
-        sel_bear  = bears[sel_idx]
-        sel_bias  = biases[sel_idx]
-        sel_color = '#10b981' if sel_bias=='BULLISH' else ('#ef4444' if sel_bias=='BEARISH' else '#f59e0b')
-        # add_vline fails on categorical x-axis — use add_shape + scatter annotation
-        fig.add_shape(
-            type='line', xref='x', yref='paper',
-            x0=sel_str, x1=sel_str, y0=0, y1=1,
-            line=dict(color=sel_color, width=2.5, dash='dash'),
-        )
-        fig.add_trace(go.Scatter(
-            x=[sel_str], y=[102],
-            mode='text',
-            text=[f'▼ NOW  🟢{sel_bull:.0f}% 🔴{sel_bear:.0f}%'],
-            textfont=dict(color=sel_color, size=11, family='Arial Black'),
-            textposition='bottom center',
-            showlegend=False,
-            hoverinfo='skip',
-        ))
-
-    # ── VACUUM ZONE BREAKOUT markers ─────────────────────────────────────
-    # Three distinct event types: ATTEMPTED (⚡ amber), CONFIRMED (🚀 green), EXTENDED (🔥 cyan)
-    # FALSE (❌ red)
-    bk_events = {
-        'ATTEMPTED': {'x':[], 'y':[], 'txt':[], 'color':'#f59e0b', 'symbol':'triangle-up',    'size':16, 'name':'⚡ Breakout Attempt'},
-        'CONFIRMED': {'x':[], 'y':[], 'txt':[], 'color':'#10b981', 'symbol':'star',            'size':22, 'name':'🚀 Breakout Confirmed'},
-        'EXTENDED' : {'x':[], 'y':[], 'txt':[], 'color':'#06b6d4', 'symbol':'star',            'size':24, 'name':'🔥 Breakout Extended (IV↑)'},
-        'FALSE'    : {'x':[], 'y':[], 'txt':[], 'color':'#ef4444', 'symbol':'x',               'size':14, 'name':'❌ False Breakout'},
+        #custom-sidebar-toggle svg { width: 1.3rem !important; height: 1.3rem !important; }
+        .main .block-container { padding-top: 0.75rem !important; padding-bottom: 5.5rem !important; }
     }
-
-    # Add green shaded background from first CONFIRMED bar onward
-    confirmed_start = None
-    false_end       = None
-    for i, (ts_s, state) in enumerate(zip(times_str, breakout_states)):
-        if state == 'CONFIRMED' and confirmed_start is None:
-            confirmed_start = ts_s
-        if state == 'FALSE' and confirmed_start is not None:
-            false_end = ts_s
-            break
-
-    if confirmed_start is not None:
-        end_ts = false_end if false_end else times_str[-1]
-        fig.add_shape(
-            type='rect', xref='x', yref='paper',
-            x0=confirmed_start, x1=end_ts, y0=0, y1=1,
-            fillcolor='rgba(16,185,129,0.06)',
-            line=dict(color='rgba(16,185,129,0.3)', width=1, dash='dot'),
-        )
-        fig.add_annotation(
-            x=confirmed_start, y=98, xref='x', yref='y',
-            text='🚀 BREAKOUT ZONE',
-            showarrow=False,
-            font=dict(color='#10b981', size=9, family='JetBrains Mono'),
-            xanchor='left', bgcolor='rgba(16,185,129,0.15)',
-            bordercolor='rgba(16,185,129,0.4)', borderwidth=1,
-        )
-
-    # Plot each event state
-    for i, (ts_s, state) in enumerate(zip(times_str, breakout_states)):
-        if state not in bk_events: continue
-        bucket = bk_events[state]
-        y_val  = bulls[i] + 4 if state in ('CONFIRMED','EXTENDED','ATTEMPTED') else bears[i] + 4
-        bucket['x'].append(ts_s)
-        bucket['y'].append(y_val)
-        # Get hover from bk_map
-        ts_obj = times[i]
-        bk_row = bk_map.get(ts_obj)
-        bucket['txt'].append(bk_row['hover'] if bk_row is not None else state)
-
-    for state_key, bdata in bk_events.items():
-        if not bdata['x']: continue
-        show_text = state_key in ('CONFIRMED', 'EXTENDED', 'FALSE')
-        fig.add_trace(go.Scatter(
-            x=bdata['x'], y=bdata['y'],
-            mode='markers+text' if show_text else 'markers',
-            marker=dict(symbol=bdata['symbol'], size=bdata['size'],
-                        color=bdata['color'], line=dict(color='white', width=1.5)),
-            text=[bdata['name'].split(' ',1)[1] if show_text else ''] * len(bdata['x']),
-            textposition='top center',
-            textfont=dict(color=bdata['color'], size=9, family='JetBrains Mono'),
-            name=bdata['name'],
-            hovertemplate='%{customdata}<extra></extra>',
-            customdata=bdata['txt'],
-        ))
-
-    # ── IV Regime as coloured scatter dots along the bottom ─────────────────
-    regime_colors = {'EXPANDING':'#ef4444','COMPRESSING':'#10b981','FLAT':'#94a3b8'}
-    regime_vals   = [2] * len(times_str)   # fixed y near bottom
-    reg_colors    = [regime_colors.get(r, '#64748b') for r in regimes]
-    fig.add_trace(go.Scatter(
-        x=times_str, y=regime_vals,
-        mode='markers',
-        marker=dict(color=reg_colors, size=8, symbol='square'),
-        name='IV Regime',
-        hovertemplate='%{x}<br>IV: %{text}<extra></extra>',
-        text=regimes,
-        showlegend=True,
-    ))
-
-    # ── Summary stats for title ───────────────────────────────────────────
-    n_cross = len(crossovers)
-    n_flip  = len(flips)
-    n_surge = len(surges)
-    final_b = bulls[-1]; final_r = bears[-1]
-    final_bias_label = biases[-1]
-    fb_color = '#10b981' if final_bias_label=='BULLISH' else ('#ef4444' if final_bias_label=='BEARISH' else '#f59e0b')
-
-    # Breakout status summary for title
-    bk_states_list = list(breakout_states)
-    n_confirmed = bk_states_list.count('CONFIRMED') + bk_states_list.count('EXTENDED')
-    n_false     = bk_states_list.count('FALSE')
-    bk_status   = ''
-    if n_confirmed > 0 and n_false == 0:
-        bk_status = f' | 🚀 VACUUM BREAKOUT CONFIRMED ({n_confirmed} bars above zone)'
-    elif n_confirmed > 0 and n_false > 0:
-        bk_status = f' | ❌ FALSE BREAKOUT ({n_confirmed} bars above, then reversed)'
-    elif bk_states_list.count('ATTEMPTED') > 0:
-        bk_status = ' | ⚡ BREAKOUT ATTEMPTED (not yet confirmed)'
-
-    fig.update_layout(
-        title=dict(
-            text=(
-                f'<b>📊 Bull vs Bear Probability Transition — Full Session</b><br>'
-                f'<sub>'
-                f'Significant events only — '
-                f'★ {n_cross} cross{"" if n_cross==1 else "es"} (gap≥8%) | '
-                f'⚡ {n_flip} directional flip{"" if n_flip==1 else "s"} (held≥2 bars) | '
-                f'◆ {n_surge} surge{"" if n_surge==1 else "s"} (≥15% move) | '
-                f'Latest: 🟢 {final_b:.0f}% vs 🔴 {final_r:.0f}% → <b>{final_bias_label}</b>'
-                f'{bk_status} | '
-                f'Dots = IV Regime (🟢 Compress · 🔴 Expand · ⬜ Flat)'
-                f'</sub>'
-            ),
-            font=dict(size=14, color='white'),
-        ),
-        template='plotly_dark',
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(26,35,50,0.8)',
-        height=420,
-        hovermode='x unified',
-        legend=dict(
-            orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1,
-            font=dict(color='white', size=10),
-            bgcolor='rgba(0,0,0,0.7)', bordercolor='rgba(255,255,255,0.2)', borderwidth=1,
-        ),
-        xaxis=dict(
-            title='Time (IST)',
-            gridcolor='rgba(128,128,128,0.15)',
-            tickfont=dict(size=10),
-        ),
-        yaxis=dict(
-            title='Probability %',
-            range=[0, 105],
-            gridcolor='rgba(128,128,128,0.15)',
-            ticksuffix='%',
-        ),
-        margin=dict(l=60, r=60, t=110, b=50),
-        dragmode='drawline',
-        newshape=dict(line=dict(color='#f59e0b', width=2)),
-    )
-    fig.update_layout(
-        modebar_add=['drawline','drawopenpath','drawcircle','drawrect','eraseshape'],
-        modebar=dict(bgcolor='rgba(0,0,0,0.5)', color='#94a3b8', activecolor='#f59e0b'),
-    )
-    return fig
-
-
-def create_dex_chart(df: pd.DataFrame, spot_price: float, unit_label: str = "B") -> go.Figure:
-    df_sorted = df.sort_values('strike').reset_index(drop=True)
-    colors = ['#10b981' if x > 0 else '#ef4444' for x in df_sorted['net_dex']]
-    fig = go.Figure()
-    fig.add_trace(go.Bar(y=df_sorted['strike'], x=df_sorted['net_dex'], orientation='h',
-                         marker_color=colors, name='Net DEX', showlegend=True,
-                         hovertemplate=f'Strike: %{{y:,.0f}}<br>Net DEX: %{{x:.4f}}{unit_label}<extra></extra>'))
-    fig = _add_volume_overlay_horizontal(fig, df_sorted)
-    fig.add_hline(y=spot_price, line_dash='dash', line_color='#06b6d4', line_width=3,
-                  annotation_text=f'Spot: {spot_price:,.2f}', annotation_position='top right')
-    fig.update_layout(
-        title=dict(text='<b>📊 Delta Exposure (DEX)</b><br><sub>🟩🟥 = Call/Put Volume overlay (top axis)</sub>', font=dict(size=18, color='white')),
-        xaxis_title=f'DEX (₹ {unit_label})', yaxis_title='Strike Price',
-        template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(26,35,50,0.8)',
-        height=700, barmode='overlay',
-        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1,
-                    font=dict(color='white', size=11), bgcolor='rgba(0,0,0,0.8)', bordercolor='white', borderwidth=1),
-        hovermode='closest', dragmode='drawline', newshape=dict(line=dict(color='#f59e0b', width=2)),
-    )
-    fig = _configure_volume_xaxis2(fig, df_sorted)
-    fig.update_layout(modebar_add=['drawline','drawopenpath','drawclosedpath','drawcircle','drawrect','eraseshape'])
-    return fig
-
-
-def create_oi_distribution_chart(df: pd.DataFrame, spot_price: float) -> go.Figure:
-    df_sorted = df.sort_values('strike').reset_index(drop=True)
-    fig = go.Figure()
-    fig.add_trace(go.Bar(y=df_sorted['strike'], x=df_sorted['call_oi'], orientation='h',
-                         name='Call OI', marker_color='#10b981', opacity=0.7))
-    fig.add_trace(go.Bar(y=df_sorted['strike'], x=-df_sorted['put_oi'], orientation='h',
-                         name='Put OI', marker_color='#ef4444', opacity=0.7))
-    if 'total_volume' in df_sorted.columns:
-        oi_max  = max(df_sorted['call_oi'].max(), df_sorted['put_oi'].max(), 1)
-        vol_max = df_sorted['total_volume'].fillna(0).max() or 1
-        scale   = oi_max / vol_max
-        fig.add_trace(go.Scatter(y=df_sorted['strike'], x=df_sorted['total_volume'].fillna(0)*scale,
-                                 mode='lines', line=dict(color='rgba(245,158,11,0.7)', width=2, dash='dot'),
-                                 name='Total Volume (scaled)', fill='tozerox', fillcolor='rgba(245,158,11,0.08)',
-                                 hovertemplate='Strike: %{y:,.0f}<br>Total Vol: %{customdata:,.0f}<extra></extra>',
-                                 customdata=df_sorted['total_volume'].fillna(0)))
-    fig.add_hline(y=spot_price, line_dash='dash', line_color='#06b6d4', line_width=2)
-    fig.update_layout(
-        title=dict(text='<b>📋 Open Interest Distribution</b><br><sub>🟡 Dotted = Total Volume (scaled to OI axis)</sub>', font=dict(size=18, color='white')),
-        template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(26,35,50,0.8)',
-        height=600, barmode='overlay', xaxis_title='Open Interest (Contracts)', yaxis_title='Strike Price',
-        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1,
-                    font=dict(color='white', size=11), bgcolor='rgba(0,0,0,0.8)', bordercolor='white', borderwidth=1),
-    )
-    return fig
-
-# ============================================================================
-# UNIFIED DATA FETCHER
-# ============================================================================
-
-class UnifiedOptionsFetcher:
-    def __init__(self, config: DhanConfig):
-        self.config  = config
-        self.headers = {'access-token': config.access_token, 'client-id': config.client_id, 'Content-Type': 'application/json'}
-        self.base_url = "https://api.dhan.co/v2"
-        self.bs_calc  = BlackScholesCalculator()
-        self.risk_free_rate = 0.07
-
-    def get_instrument_type(self, symbol):
-        if symbol in DHAN_INDEX_SECURITY_IDS: return "INDEX"
-        if symbol in DHAN_STOCK_SECURITY_IDS:  return "STOCK"
-        return "UNKNOWN"
-
-    def get_security_id(self, symbol):
-        return DHAN_INDEX_SECURITY_IDS.get(symbol) or DHAN_STOCK_SECURITY_IDS.get(symbol)
-
-    def get_contract_size(self, symbol):
-        cfg = SYMBOL_CONFIG.get(symbol, {})
-        return cfg.get('contract_size', cfg.get('lot_size', 50))
-
-    def fetch_rolling_data(self, symbol, from_date, to_date, strike_type='ATM', option_type='CALL',
-                           interval='60', expiry_code=1, expiry_flag='WEEK'):
-        try:
-            sec_id     = self.get_security_id(symbol)
-            if sec_id is None: return None
-            instrument = "OPTIDX" if self.get_instrument_type(symbol) == "INDEX" else "OPTSTK"
-            payload = {
-                "exchangeSegment": "NSE_FNO", "interval": interval,
-                "securityId": sec_id, "instrument": instrument,
-                "expiryFlag": expiry_flag, "expiryCode": expiry_code,
-                "strike": strike_type, "drvOptionType": option_type,
-                "requiredData": ["open","high","low","close","volume","oi","iv","strike","spot"],
-                "fromDate": from_date, "toDate": to_date,
-            }
-            resp = requests.post(f"{self.base_url}/charts/rollingoption",
-                                 headers=self.headers, json=payload, timeout=30)
-            if resp.status_code == 200:
-                return resp.json().get('data', {})
-            return None
-        except Exception as e:
-            st.error(f"API Error: {e}")
-            return None
-
-    def process_historical_data(self, symbol, target_date, strikes, interval='60',
-                                expiry_code=1, expiry_flag='WEEK',
-                                from_timestamp=None, incremental=False):
-        target_dt = datetime.strptime(target_date, '%Y-%m-%d')
-        from_date = (from_timestamp.strftime('%Y-%m-%d') if incremental and from_timestamp
-                     else (target_dt - timedelta(days=2)).strftime('%Y-%m-%d'))
-        to_date   = (target_dt + timedelta(days=2)).strftime('%Y-%m-%d')
-
-        instrument_type = self.get_instrument_type(symbol)
-        contract_size   = self.get_contract_size(symbol)
-        tte             = 7/365 if expiry_flag == 'WEEK' else 30/365
-        scaling_factor  = 1e9 if instrument_type == 'INDEX' else 1e7
-        unit_label      = 'B'  if instrument_type == 'INDEX' else 'Cr'
-
-        all_data = []
-        progress_bar = st.progress(0)
-        status_text  = st.empty()
-        total_steps  = len(strikes) * 2
-        current_step = 0
-
-        for strike_type in strikes:
-            mode = "Incremental" if incremental else "Fetching"
-            status_text.text(f"[{mode}] {symbol} {strike_type} ({expiry_flag} {expiry_code})...")
-            call_data = self.fetch_rolling_data(symbol, from_date, to_date, strike_type, 'CALL', interval, expiry_code, expiry_flag)
-            current_step += 1; progress_bar.progress(current_step / total_steps); time.sleep(0.3)
-            put_data  = self.fetch_rolling_data(symbol, from_date, to_date, strike_type, 'PUT',  interval, expiry_code, expiry_flag)
-            current_step += 1; progress_bar.progress(current_step / total_steps); time.sleep(0.3)
-            if not call_data or not put_data: continue
-            ce = call_data.get('ce', {}); pe = put_data.get('pe', {})
-            if not ce: continue
-            for i, ts in enumerate(ce.get('timestamp', [])):
-                try:
-                    dt_ist = datetime.fromtimestamp(ts, tz=pytz.UTC).astimezone(IST)
-                    if dt_ist.date() != target_dt.date(): continue
-                    if incremental and from_timestamp and dt_ist <= from_timestamp: continue
-                    spot   = ce.get('spot',   [0])[i] if i < len(ce.get('spot',   [])) else 0
-                    strike = ce.get('strike', [0])[i] if i < len(ce.get('strike', [])) else 0
-                    if spot == 0 or strike == 0: continue
-                    call_oi  = ce.get('oi',    [0])[i] if i < len(ce.get('oi',    [])) else 0
-                    put_oi   = pe.get('oi',    [0])[i] if i < len(pe.get('oi',    [])) else 0
-                    call_vol = ce.get('volume',[0])[i] if i < len(ce.get('volume', [])) else 0
-                    put_vol  = pe.get('volume',[0])[i] if i < len(pe.get('volume', [])) else 0
-                    call_iv  = ce.get('iv',   [15])[i] if i < len(ce.get('iv',   [])) else 15
-                    put_iv   = pe.get('iv',   [15])[i] if i < len(pe.get('iv',   [])) else 15
-                    civ_d = call_iv/100 if call_iv > 1 else call_iv
-                    piv_d = put_iv /100 if put_iv  > 1 else put_iv
-                    cg  = self.bs_calc.calculate_gamma(spot, strike, tte, self.risk_free_rate, civ_d)
-                    pg  = self.bs_calc.calculate_gamma(spot, strike, tte, self.risk_free_rate, piv_d)
-                    cd  = self.bs_calc.calculate_call_delta(spot, strike, tte, self.risk_free_rate, civ_d)
-                    pd_ = self.bs_calc.calculate_put_delta( spot, strike, tte, self.risk_free_rate, piv_d)
-                    cv  = self.bs_calc.calculate_vanna(spot, strike, tte, self.risk_free_rate, civ_d)
-                    pv  = self.bs_calc.calculate_vanna(spot, strike, tte, self.risk_free_rate, piv_d)
-                    cc  = self.bs_calc.calculate_charm(spot, strike, tte, self.risk_free_rate, civ_d, 'call')
-                    pc  = self.bs_calc.calculate_charm(spot, strike, tte, self.risk_free_rate, piv_d, 'put')
-                    all_data.append({
-                        'timestamp': dt_ist, 'time': dt_ist.strftime('%H:%M IST'),
-                        'spot_price': spot, 'strike': strike, 'strike_type': strike_type,
-                        'call_oi': call_oi, 'put_oi': put_oi,
-                        'call_volume': call_vol, 'put_volume': put_vol, 'total_volume': call_vol + put_vol,
-                        'call_iv': call_iv, 'put_iv': put_iv,
-                        'call_gex': (call_oi*cg*spot**2*contract_size)/scaling_factor,
-                        'put_gex':  -(put_oi*pg*spot**2*contract_size)/scaling_factor,
-                        'net_gex':  (call_oi*cg - put_oi*pg)*spot**2*contract_size/scaling_factor,
-                        'call_dex': (call_oi*cd*spot*contract_size)/scaling_factor,
-                        'put_dex':  (put_oi*pd_*spot*contract_size)/scaling_factor,
-                        'net_dex':  (call_oi*cd + put_oi*pd_)*spot*contract_size/scaling_factor,
-                        'call_vanna': (call_oi*cv*spot*contract_size)/scaling_factor,
-                        'put_vanna':  (put_oi*pv*spot*contract_size)/scaling_factor,
-                        'net_vanna':  (call_oi*cv + put_oi*pv)*spot*contract_size/scaling_factor,
-                        'call_charm': (call_oi*cc*spot*contract_size)/scaling_factor,
-                        'put_charm':  (put_oi*pc*spot*contract_size)/scaling_factor,
-                        'net_charm':  (call_oi*cc + put_oi*pc)*spot*contract_size/scaling_factor,
-                    })
-                except: continue
-        progress_bar.empty(); status_text.empty()
-        if not all_data: return None, None
-        df = pd.DataFrame(all_data).sort_values(['strike','timestamp']).reset_index(drop=True)
-        # flow columns
-        for col in ['call_gex_flow','put_gex_flow','net_gex_flow','call_dex_flow','put_dex_flow','net_dex_flow',
-                    'call_oi_change','put_oi_change','call_oi_gex','put_oi_gex','net_oi_gex']:
-            df[col] = 0.0
-        for strike in df['strike'].unique():
-            m = df['strike'] == strike
-            sd = df[m]
-            if len(sd) > 1:
-                for base, flow in [('call_gex','call_gex_flow'),('put_gex','put_gex_flow'),('net_gex','net_gex_flow'),
-                                   ('call_dex','call_dex_flow'),('put_dex','put_dex_flow'),('net_dex','net_dex_flow'),
-                                   ('call_oi','call_oi_change'),('put_oi','put_oi_change')]:
-                    df.loc[m, flow] = sd[base].diff().fillna(0)
-        max_gex = df['net_gex'].abs().max()
-        df['hedging_pressure'] = (df['net_gex'] / max_gex * 100) if max_gex > 0 else 0
-        latest     = df.sort_values('timestamp').iloc[-1]
-        spot_prices = df['spot_price'].unique()
-        meta = {
-            'symbol': symbol, 'instrument_type': instrument_type, 'date': target_date,
-            'spot_price': latest['spot_price'],
-            'spot_price_min': spot_prices.min(), 'spot_price_max': spot_prices.max(),
-            'spot_variation_pct': (spot_prices.max()-spot_prices.min())/spot_prices.mean()*100,
-            'total_records': len(df),
-            'time_range': f"{df['time'].min()} - {df['time'].max()}",
-            'strikes_count': df['strike'].nunique(),
-            'interval': f"{interval} minutes" if interval != '1' else '1 minute',
-            'expiry_code': expiry_code, 'expiry_flag': expiry_flag,
-            'contract_size': contract_size, 'unit_label': unit_label,
-            'fetch_time': datetime.now(IST).strftime('%H:%M:%S IST'),
-            'is_incremental': incremental,
+    </style>
+    <button id="custom-sidebar-toggle" aria-label="Toggle sidebar">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="2" rx="1"/><rect x="3" y="11" width="18" height="2" rx="1"/><rect x="3" y="17" width="18" height="2" rx="1"/></svg>
+    </button>
+    <script>
+    (function(){
+        var btn = document.getElementById('custom-sidebar-toggle');
+        if (!btn) return;
+        function clickNativeToggle() {
+            var collapsed = document.querySelector('[data-testid="collapsedControl"]');
+            if (collapsed) { collapsed.click(); return; }
+            var closeBtn = document.querySelector('[data-testid="stSidebarCollapseButton"] button');
+            if (closeBtn) { closeBtn.click(); return; }
         }
-        return df, meta
-
-# ============================================================================
-# SMART DATA FETCHER
-# ============================================================================
-
-def fetch_data_with_smart_cache(symbol, target_date, strikes, interval, expiry_code, expiry_flag,
-                                 force_refresh=False):
-    fetcher          = UnifiedOptionsFetcher(DhanConfig())
-    instrument_type  = fetcher.get_instrument_type(symbol)
-    is_current_day   = cache_manager.is_current_trading_day(target_date)
-    is_market_open   = cache_manager.is_market_hours()
-    cached_df, cached_meta, last_ts = cache_manager.get_cached_data(
-        symbol, target_date, strikes, interval, expiry_code, expiry_flag, instrument_type)
-
-    if not is_current_day:
-        if cached_df is not None and not force_refresh:
-            cached_meta['fetch_mode'] = 'cached'
-            cached_meta['fetch_time'] = datetime.now(IST).strftime('%H:%M:%S IST')
-            return cached_df, cached_meta, 'cached'
-        df, meta = fetcher.process_historical_data(symbol, target_date, strikes, interval, expiry_code, expiry_flag)
-        if df is not None:
-            cache_manager.save_to_cache(df, meta, symbol, target_date, strikes, interval, expiry_code, expiry_flag, instrument_type)
-        return df, meta, 'full_fetch'
-
-    if not is_market_open and cached_df is not None and not force_refresh:
-        cached_meta['fetch_mode'] = 'cached'
-        cached_meta['fetch_time'] = datetime.now(IST).strftime('%H:%M:%S IST')
-        return cached_df, cached_meta, 'cached'
-
-    if cached_df is not None and last_ts is not None and not force_refresh:
-        new_df, new_meta = fetcher.process_historical_data(
-            symbol, target_date, strikes, interval, expiry_code, expiry_flag,
-            from_timestamp=last_ts, incremental=True)
-        if new_df is not None and len(new_df) > 0:
-            merged = cache_manager.merge_incremental_data(cached_df, new_df)
-            merged_meta = new_meta.copy()
-            merged_meta.update({'total_records': len(merged),
-                                'time_range': f"{merged['time'].min()} - {merged['time'].max()}",
-                                'fetch_mode': 'incremental', 'new_records': len(new_df)})
-            cache_manager.save_to_cache(merged, merged_meta, symbol, target_date, strikes, interval, expiry_code, expiry_flag, instrument_type)
-            return merged, merged_meta, 'incremental'
-        cached_meta['fetch_mode'] = 'cached'
-        cached_meta['fetch_time'] = datetime.now(IST).strftime('%H:%M:%S IST')
-        return cached_df, cached_meta, 'cached'
-
-    df, meta = fetcher.process_historical_data(symbol, target_date, strikes, interval, expiry_code, expiry_flag)
-    if df is not None:
-        cache_manager.save_to_cache(df, meta, symbol, target_date, strikes, interval, expiry_code, expiry_flag, instrument_type)
-    return df, meta, 'full_fetch'
-
-# ============================================================================
-# MAIN APP
-# ============================================================================
-
-def main():
-    current_time   = datetime.now(IST).strftime('%H:%M:%S IST')
-    is_market_open = cache_manager.is_market_hours()
-    market_status  = "🟢 MARKET OPEN" if is_market_open else "🔴 MARKET CLOSED"
-    market_color   = "#10b981" if is_market_open else "#ef4444"
-
-    st.markdown(f"""
-    <div class="main-header">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div>
-                <h1 class="main-title">📊 NYZTrade UNIFIED Dashboard</h1>
-                <p class="sub-title">INDEX + STOCK Options | GEX/DEX/VANNA/CHARM | Smart Caching | Volume Spike Detection</p>
-            </div>
-            <div style="display:flex;gap:12px;align-items:center;">
-                <div class="live-indicator">
-                    <div class="live-dot"></div>
-                    <span style="color:#ef4444;font-family:'JetBrains Mono',monospace;font-size:0.8rem;">{current_time}</span>
-                </div>
-                <div style="padding:6px 14px;background:rgba(30,30,30,0.5);border:1px solid {market_color}40;border-radius:20px;">
-                    <span style="color:{market_color};font-family:'JetBrains Mono',monospace;font-size:0.75rem;">{market_status}</span>
-                </div>
-            </div>
-        </div>
-    </div>
+        btn.addEventListener('click', function(e){ e.stopPropagation(); clickNativeToggle(); });
+        function ensureButton(){ if (!document.getElementById('custom-sidebar-toggle')) document.body.appendChild(btn); }
+        new MutationObserver(ensureButton).observe(document.body, {childList:true, subtree:false});
+    })();
+    </script>
     """, unsafe_allow_html=True)
 
-    # ── Sidebar ───────────────────────────────────────────────────────────────
+    user = st.session_state.get("user")
     with st.sidebar:
-        st.markdown("### ⚙️ Configuration")
-        instrument_type = st.radio("📈 Instrument Type", ["Index Options","Stock Options"], index=0, horizontal=True)
-        st.markdown("---")
-
-        if instrument_type == "Index Options":
-            symbol = st.selectbox("🎯 Select Index", list(DHAN_INDEX_SECURITY_IDS.keys()), index=0)
-            cfg    = INDEX_CONFIG.get(symbol, INDEX_CONFIG["NIFTY"])
-            st.markdown(f'<div class="index-badge">📊 INDEX | Lot: {cfg["contract_size"]} | Strike: ₹{cfg["strike_interval"]}</div>', unsafe_allow_html=True)
-            default_expiry_type = "Weekly"
-        else:
-            category = st.selectbox("📂 Stock Category", list(STOCK_CATEGORIES.keys()), index=0)
-            symbol   = st.selectbox("🎯 Select Stock", STOCK_CATEGORIES[category], index=0)
-            cfg      = STOCK_CONFIG.get(symbol, {"lot_size": 500, "strike_interval": 10})
-            st.markdown(f'<div class="stock-badge">📈 STOCK | Lot: {cfg["lot_size"]} | Strike: ₹{cfg["strike_interval"]}</div>', unsafe_allow_html=True)
-            default_expiry_type = "Monthly"
-
-        st.markdown("---")
-        target_date = st.date_input("📅 Select Date", value=datetime.now(), max_value=datetime.now()).strftime('%Y-%m-%d')
-        is_current_day = cache_manager.is_current_trading_day(target_date)
-        if is_current_day:
-            st.info("📡 **LIVE MODE**: Incremental updates")
-        else:
-            st.success("📦 **HISTORICAL**: Cached after first fetch")
-        st.markdown("---")
-
-        expiry_type = st.selectbox("📆 Expiry Type", ["Weekly","Monthly"], index=0 if default_expiry_type=="Weekly" else 1)
-        expiry_flag = "WEEK" if expiry_type == "Weekly" else "MONTH"
-        expiry_code = st.selectbox("Expiry Code", [1,2,3], index=0,
-                                   format_func=lambda x: {1:"Current Expiry",2:"Next Expiry",3:"Far Expiry"}[x])
-        st.markdown("---")
-
-        all_strikes = ["ATM"] + [f"ATM+{i}" for i in range(1,11)] + [f"ATM-{i}" for i in range(1,11)]
-        strikes = st.multiselect("⚡ Select Strikes", all_strikes, default=all_strikes)
-        interval = st.selectbox("⏱️ Interval", ["1","5","15","60"], index=1,
-                                format_func=lambda x: f"{x} minute" if x=="1" else f"{x} minutes")
-        st.markdown("---")
-
-        st.markdown("### 🔄 Live Controls")
-        auto_refresh_enabled = is_current_day and is_market_open
-        auto_refresh, refresh_interval = False, 60
-        if auto_refresh_enabled:
-            auto_refresh = st.checkbox("🔄 Enable Auto-Refresh", value=False)
-            if auto_refresh:
-                refresh_interval = st.slider("Refresh Interval (s)", 10, 300, 60, 10)
-                st.info(f"⏱️ Incremental update every {refresh_interval}s")
-        else:
-            st.info("ℹ️ Auto-refresh disabled" + (" for historical data" if not is_current_day else " (market closed)"))
-
-        col1, col2 = st.columns(2)
-        with col1: fetch_button   = st.button("🚀 Fetch Data", use_container_width=True, type="primary")
-        with col2: refresh_button = st.button("🔄 Update" if is_current_day else "🔄 Refresh", use_container_width=True)
-        force_refresh = st.checkbox("🔥 Force Full Refresh", value=False, help="Ignore cache")
-
-        st.markdown("---")
-        st.markdown("### 📊 Cache Status")
-        cs = cache_manager.get_cache_stats()
-        st.markdown(f"- **Entries**: {cs['num_entries']}\n- **Size**: {cs['total_size_mb']:.2f} MB")
-        if st.button("🗑️ Clear All Cache", use_container_width=True):
-            cache_manager.clear_cache(); st.success("Cache cleared!"); st.rerun()
-
-        st.markdown("---")
-        st.markdown("### ✏️ Drawing Tools")
-        st.markdown("""<div style="font-size:0.8rem;color:#94a3b8;">Hover on any chart to see toolbar:<ul style="margin:4px 0;padding-left:16px;">
-        <li>📏 Line | ✍️ Open Path | 🔷 Closed Path</li>
-        <li>⭕ Circle | ⬜ Rectangle | 🧹 Eraser</li></ul><i>Drawings are session-only</i></div>""", unsafe_allow_html=True)
-
-    # ── Session state ─────────────────────────────────────────────────────────
-    if 'last_refresh_time' not in st.session_state:
-        st.session_state.last_refresh_time = None
-
-    if fetch_button or refresh_button:
-        st.session_state.fetch_config = {
-            'symbol': symbol, 'target_date': target_date, 'strikes': strikes,
-            'interval': interval, 'expiry_code': expiry_code, 'expiry_flag': expiry_flag,
-            'force_refresh': force_refresh,
-        }
-        st.session_state.data_fetched     = False
-        st.session_state.last_refresh_time = datetime.now()
-
-    if auto_refresh and auto_refresh_enabled:
-        if st.session_state.last_refresh_time is None:
-            st.session_state.last_refresh_time = datetime.now()
-        elapsed   = (datetime.now() - st.session_state.last_refresh_time).total_seconds()
-        remaining = max(0, int(refresh_interval - elapsed))
-        if remaining > 0:
-            st.sidebar.success(f"⏳ Next update in: **{remaining}s**")
-        else:
-            st.sidebar.warning("🔄 Updating...")
-        if elapsed >= refresh_interval and hasattr(st.session_state, 'fetch_config'):
-            st.session_state.fetch_config['force_refresh'] = False
-            st.session_state.data_fetched = False
-            st.session_state.last_refresh_time = datetime.now()
-        time.sleep(1); st.rerun()
-
-    # ── Main content ──────────────────────────────────────────────────────────
-    if fetch_button or refresh_button or (hasattr(st.session_state, 'fetch_config') and st.session_state.get('data_fetched', False)):
-        if hasattr(st.session_state, 'fetch_config'):
-            fc = st.session_state.fetch_config
-            symbol       = fc['symbol'];       target_date  = fc['target_date']
-            strikes      = fc['strikes'];      interval     = fc['interval']
-            expiry_code  = fc.get('expiry_code', 1)
-            expiry_flag  = fc.get('expiry_flag', 'WEEK')
-            force_refresh = fc.get('force_refresh', False)
-
-        if not strikes:
-            st.error("❌ Please select at least one strike"); return
-
-        need_fetch = (not st.session_state.get('data_fetched', False) or
-                      'df_data' not in st.session_state or fetch_button or refresh_button)
-        if need_fetch:
-            try:
-                df, meta, fetch_mode = fetch_data_with_smart_cache(
-                    symbol, target_date, strikes, interval, expiry_code, expiry_flag, force_refresh)
-                if df is None or len(df) == 0:
-                    st.error("❌ No data available for the selected date/time."); return
-                st.session_state.df_data    = df
-                st.session_state.meta_data  = meta
-                st.session_state.fetch_mode = fetch_mode
-                st.session_state.data_fetched = True
-                if not auto_refresh: st.rerun()
-            except Exception as e:
-                st.error(f"❌ Error: {e}"); return
-
-        df         = st.session_state.df_data
-        meta       = st.session_state.meta_data
-        fetch_mode = st.session_state.get('fetch_mode', 'unknown')
-        unit_label = meta.get('unit_label', 'B')
-
-        all_timestamps = sorted(df['timestamp'].unique())
-        if 'timestamp_idx' not in st.session_state:
-            st.session_state.timestamp_idx = len(all_timestamps) - 1
-
-        selected_ts_idx = st.slider("⏱️ Select Time Point", 0, len(all_timestamps)-1,
-                                    min(st.session_state.timestamp_idx, len(all_timestamps)-1))
-        selected_ts   = all_timestamps[selected_ts_idx]
-        df_selected   = df[df['timestamp'] == selected_ts].copy()
-        spot_price    = df_selected['spot_price'].iloc[0] if len(df_selected) > 0 else 0
-
-        # Status bar
-        mode_cfg = {'cached':('📦 CACHED','#10b981'), 'incremental':(f"📡 INCREMENTAL (+{meta.get('new_records',0)} new)",'#06b6d4'),
-                    'full_fetch':('🚀 FULL FETCH','#8b5cf6')}
-        mode_badge, mode_color = mode_cfg.get(fetch_mode, ('❓ UNKNOWN','#64748b'))
-        inst_badge = (f'<span class="index-badge">📊 INDEX</span>' if meta.get('instrument_type') == 'INDEX'
-                      else f'<span class="stock-badge">📈 STOCK</span>')
+        # Brand
+        initials = ""
+        if user:
+            initials = "".join(w[0].upper() for w in user.get("name","U").split()[:2])
         st.markdown(f"""
-        <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
-            {inst_badge}
-            <span style="padding:6px 12px;background:{mode_color}20;border:1px solid {mode_color}40;border-radius:8px;
-                  color:{mode_color};font-family:'JetBrains Mono',monospace;font-size:0.8rem;">{mode_badge}</span>
-            <span style="color:#94a3b8;font-family:'JetBrains Mono',monospace;font-size:0.85rem;">
-                {meta.get('symbol',symbol)} | {selected_ts.strftime('%H:%M:%S IST')} | ₹{spot_price:,.2f} | Records: {meta.get('total_records',0)}
-            </span>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # KPI strip
-        net_gex     = df_selected['net_gex'].sum()
-        net_dex     = df_selected['net_dex'].sum()
-        net_vanna   = df_selected['net_vanna'].sum()
-        total_vol   = df_selected['total_volume'].sum() if 'total_volume' in df_selected.columns else 0
-        flip_zones  = identify_gamma_flip_zones(df_selected, spot_price)
-
-        c1,c2,c3,c4,c5,c6 = st.columns(6)
-        for col, label, val, sub, clr in [
-            (c1,'NET GEX',    f'{net_gex:.4f}{unit_label}',  '🟢 Bullish' if net_gex>0 else '🔴 Bearish',   'positive' if net_gex>0 else 'negative'),
-            (c2,'NET DEX',    f'{net_dex:.4f}{unit_label}',  '📈 Long' if net_dex>0 else '📉 Short',         'positive' if net_dex>0 else 'negative'),
-            (c3,'NET VANNA',  f'{net_vanna:.4f}{unit_label}','Vol Sensitivity',                               'positive' if net_vanna>0 else 'negative'),
-            (c4,'SPOT PRICE', f'₹{spot_price:,.2f}',         meta.get('symbol',symbol),                      'neutral'),
-            (c5,'TOTAL VOL',  f'{total_vol:,.0f}',           '📊 Contracts',                                 'neutral'),
-            (c6,'FLIP ZONES', str(len(flip_zones)),          'Gamma Crossovers',                             'neutral'),
-        ]:
-            with col:
-                st.markdown(f'<div class="metric-card {clr}"><div class="metric-label">{label}</div>'
-                            f'<div class="metric-value {clr}">{val}</div>'
-                            f'<div class="metric-delta">{sub}</div></div>', unsafe_allow_html=True)
+        <div class="sidebar-brand">
+            <div style="font-size:1.8rem;">🎓</div>
+            <div>
+                <div class="brand-title">NET Guru</div>
+                <div class="brand-subtitle">UGC NET · Paper 1</div>
+            </div>
+        </div>""", unsafe_allow_html=True)
 
         st.markdown("---")
 
-        # ── Tabs ──────────────────────────────────────────────────────────────
-        tabs = st.tabs([
-            "📈 Intraday + Spike Detection",
-            "🎯 Standard GEX",
-            "🚀 Enhanced GEX Overlay",
-            "🎯 Significant GEX",
-            "🌊 Standard VANNA",
-            "🌊 VANNA + ⚡ Flip Breakout",
-            "📊 DEX Analysis",
-            "📋 OI Distribution",
-            "📁 Data Table",
-        ])
+        # Main nav
+        pages_public = [("🏛️","Home","home"),("📅","PYQ Yearwise","pyq"),("📝","Practice","quiz"),("🧪","Mock Tests","mock"),("🏆","Leaderboard","leaderboard")]
+        pages_private = [("🤖","AI Predict","ai"),("📊","Analytics","analytics"),("🔖","Bookmarks","bookmarks")]
 
-        # ── TAB 0: Intraday + Volume Spike Detection ──────────────────────────
-        with tabs[0]:
-            st.markdown("### 📈 Intraday Evolution + Volume Spike Detection")
+        all_pages = pages_public + (pages_private if user else [])
+        for icon, label, key in all_pages:
+            active = st.session_state.page == key
+            if st.button(f"{icon}  {label}", key=f"nav_{key}",
+                         use_container_width=True,
+                         type="primary" if active else "secondary"):
+                st.session_state.page = key
+                st.session_state.quiz_active = False
+                st.rerun()
 
-            col_z, col_info = st.columns([1, 3])
-            with col_z:
-                z_thresh = st.slider(
-                    "Spike Sensitivity (σ threshold)",
-                    min_value=1.0, max_value=4.0, value=2.0, step=0.25,
-                    help="Lower = more spikes detected. 2σ ≈ top 5% of bars.",
-                    key="z_thresh_slider",
-                )
-            with col_info:
+        st.markdown("---")
+
+        # Login / Profile
+        if user:
+            if st.button(f"👤  {user.get('name','').split()[0]} (Profile)", key="nav_profile",
+                         use_container_width=True, type="primary" if st.session_state.page == "login" else "secondary"):
+                st.session_state.page = "login"
+                st.rerun()
+            if st.button("🚪  Logout", key="nav_logout", use_container_width=True):
+                st.session_state.user = None
+                st.session_state.username = None
+                st.session_state.page = "home"
+                st.rerun()
+        else:
+            if st.button("👤  Login / Register", key="nav_login",
+                         use_container_width=True,
+                         type="primary" if st.session_state.page == "login" else "secondary"):
+                st.session_state.page = "login"
+                st.rerun()
+
+        st.markdown("---")
+
+        # Developer mode
+        if st.session_state.get("dev_mode"):
+            st.markdown(
+                '<div style="background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.4);'
+                'border-radius:10px;padding:0.5rem 0.75rem;margin-bottom:0.6rem;font-size:0.78rem;'
+                'color:#fbbf24;font-weight:700;text-align:center;">🔧 DEVELOPER MODE</div>',
+                unsafe_allow_html=True
+            )
+            if st.button("📄  PDF Upload", key="nav_pdf", use_container_width=True,
+                         type="primary" if st.session_state.page == "pdf_upload" else "secondary"):
+                st.session_state.page = "pdf_upload"
+                st.rerun()
+            if st.button("🔒  Exit Dev Mode", key="nav_exitdev", use_container_width=True):
+                st.session_state.dev_mode = False
+                if st.session_state.page == "pdf_upload":
+                    st.session_state.page = "home"
+                st.rerun()
+        else:
+            with st.expander("🔧 Developer", expanded=False):
+                pin = st.text_input("PIN", type="password", key="dev_pin_input", placeholder="Enter PIN")
+                if st.button("Unlock", key="dev_unlock", use_container_width=True, type="primary"):
+                    if pin == DEVELOPER_PIN:
+                        st.session_state.dev_mode = True
+                        st.rerun()
+                    else:
+                        st.error("❌ Incorrect PIN")
+
+        st.markdown("---")
+
+        # Stats strip
+        attempted = st.session_state.total_attempted
+        accuracy  = round(st.session_state.total_correct / attempted * 100) if attempted > 0 else 0
+        streak    = st.session_state.streak
+        st.markdown(f"""
+        <div class="sidebar-stats">
+            <div class="stat-mini"><span class="stat-mini-val">{attempted}</span><span class="stat-mini-lbl">Done</span></div>
+            <div class="stat-mini"><span class="stat-mini-val">{accuracy}%</span><span class="stat-mini-lbl">Accuracy</span></div>
+            <div class="stat-mini"><span class="stat-mini-val">{streak}🔥</span><span class="stat-mini-lbl">Streak</span></div>
+        </div>""", unsafe_allow_html=True)
+
+        st.markdown(
+            '<div style="text-align:center;opacity:0.4;font-size:0.72rem;padding:0.75rem 0.5rem 0;">'
+            'NYZTrade Education<br><span style="color:#a855f7;">Built for NET Aspirants</span></div>',
+            unsafe_allow_html=True
+        )
+
+
+# Keep topbar as alias for backwards compat with any old callers
+def topbar():
+    render_sidebar()
+
+
+def page_home():
+    qb = QuestionBank()
+    total = len(qb.get_all())
+    years = qb.get_years()
+    user  = st.session_state.user
+
+    # ── Hero ──────────────────────────────────────
+    st.markdown(f"""
+    <div class="hero">
+      <div class="hero-badge">🏛️ UGC NET &nbsp;·&nbsp; Paper 1 &nbsp;·&nbsp; NYZTrade Education</div>
+      <h1 class="hero-title">Master NET with<br><em>Intelligent Practice</em></h1>
+      <div class="hero-features">
+        <span class="hero-pill"><span class="pill-icon">📅</span> PYQ Year-wise Tests</span>
+        <span class="hero-pill"><span class="pill-icon">🧪</span> Mock &amp; Exam Simulation</span>
+        <span class="hero-pill"><span class="pill-icon">🏆</span> Live Leaderboard</span>
+        <span class="hero-pill"><span class="pill-icon">📊</span> Analytics Dashboard</span>
+        <span class="hero-pill"><span class="pill-icon">🔖</span> Bookmarks &amp; Review</span>
+        <span class="hero-pill"><span class="pill-icon">⚡</span> Instant Feedback</span>
+      </div>
+    </div>""", unsafe_allow_html=True)
+
+    # ── Stat strip ────────────────────────────────
+    user_attempts = st.session_state.total_attempted
+    user_accuracy = round(st.session_state.total_correct / user_attempts * 100) if user_attempts else 0
+    streak = st.session_state.get("streak", 0)
+    st.markdown(f"""
+    <div class="stat-strip">
+      <div class="stat-cell">
+        <span class="stat-icon">📚</span>
+        <span class="stat-val">{total}+</span>
+        <span class="stat-lbl">Questions</span>
+      </div>
+      <div class="stat-cell">
+        <span class="stat-icon">📅</span>
+        <span class="stat-val">{len(years)}</span>
+        <span class="stat-lbl">PYQ Years</span>
+      </div>
+      <div class="stat-cell">
+        <span class="stat-icon">🎯</span>
+        <span class="stat-val">10</span>
+        <span class="stat-lbl">Topics</span>
+      </div>
+      <div class="stat-cell">
+        <span class="stat-icon">✏️</span>
+        <span class="stat-val">{user_attempts}</span>
+        <span class="stat-lbl">Attempted</span>
+      </div>
+      <div class="stat-cell">
+        <span class="stat-icon">🎯</span>
+        <span class="stat-val">{user_accuracy}%</span>
+        <span class="stat-lbl">Accuracy</span>
+      </div>
+      <div class="stat-cell">
+        <span class="stat-icon">🔥</span>
+        <span class="stat-val">{streak}</span>
+        <span class="stat-lbl">Streak</span>
+      </div>
+    </div>""", unsafe_allow_html=True)
+
+    # ── Quick-start cards ─────────────────────────
+    st.markdown('<div class="section-label">Quick Start <span class="pill">choose a mode</span></div>', unsafe_allow_html=True)
+
+    cards = [
+        ("📅", "PYQ Yearwise",   "15-Q tests by year, season & topic",  "pyq",   "var(--amber)",   "amber",   "2023 · 2022 · 15 Qs each"),
+        ("🧪", "Mock Tests",     "15-Q sprints, full mocks & exam sim", "mock",  "var(--indigo)",  "indigo",  "⚡ 15-Q · 🎓 Exam Sim"),
+        ("🤖", "AI Predicted",   "Smart questions for upcoming exams",  "ai",    "var(--teal)",    "teal",    "June 2025 focus"),
+        ("⚡", "Quick Drill",    "15 questions, 15 min sprint",         "quick", "var(--emerald)", "emerald", "All topics mixed"),
+    ]
+    # On mobile Streamlit columns stack naturally — use 2 cols for better mobile layout
+    import streamlit as _st
+    _is_mobile_hint = False  # Streamlit doesn't expose screen width; CSS handles stacking
+    c1, c2 = st.columns(2)
+    c3, c4 = st.columns(2)
+    for col, (icon, title, desc, dest, accent, chip_cls, meta) in zip([c1,c2,c3,c4], cards):
+        with col:
+            st.markdown(f"""<div class="card">
+              <div class="card-accent-top" style="background:{accent};"></div>
+              <div class="card-glow" style="background:{accent};"></div>
+              <span class="card-icon">{icon}</span>
+              <div class="card-title">{title}</div>
+              <div class="card-desc">{desc}</div>
+              <div class="card-meta"><span class="chip {chip_cls}">{meta}</span></div>
+            </div>""", unsafe_allow_html=True)
+            if st.button("Start →", key=f"home_{dest}", use_container_width=True, type="primary"):
+                if dest == "quick":
+                    _start_quiz(QuestionBank().get_filtered(n=15, shuffle=True), "practice", "Quick Drill (15 Qs)", 15*60)
+                else:
+                    st.session_state.page = dest
+                st.rerun()
+
+    # ── PYQ Year Grid ─────────────────────────────
+    st.markdown('<div class="section-label">PYQ Years <span class="pill">click to practice</span></div>', unsafe_allow_html=True)
+    all_q = qb.get_all()
+    n_years = min(len(years), 9)
+    if n_years:
+        year_cols = st.columns(n_years)
+        for i, yr in enumerate(years[:n_years]):
+            cnt = len([q for q in all_q if str(q.get("year","")) == str(yr)])
+            with year_cols[i]:
+                st.markdown(f"""<div class="year-card">
+                  <span class="year-num">{yr}</span>
+                  <div class="year-count">{cnt} Qs</div>
+                </div>""", unsafe_allow_html=True)
+                if st.button(str(yr), key=f"home_yr_{yr}", use_container_width=True):
+                    qs = qb.get_filtered(years=[yr], n=50)
+                    _start_quiz(qs, "practice", f"PYQ {yr}", 60*60)
+                    st.rerun()
+
+    # ── Leaderboard preview ───────────────────────
+    st.markdown('<div class="section-label">Top Rankers <span class="pill">leaderboard</span></div>', unsafe_allow_html=True)
+    lb = get_leaderboard(limit=5)
+    if lb:
+        for i, row in enumerate(lb):
+            rank_cls = ["gold","silver","bronze","rest","rest"][i]
+            medal    = ["🥇","🥈","🥉","4","5"][i]
+            initials = "".join(w[0].upper() for w in row["name"].split()[:2])
+            is_me    = row["username"] == st.session_state.username
+            me_cls   = "lb-row me" if is_me else "lb-row"
+            ts_str   = datetime.fromisoformat(row["ts"]).strftime("%d %b") if row.get("ts") else ""
+            st.markdown(f"""<div class="{me_cls}">
+              <div class="lb-rank {rank_cls}">{medal}</div>
+              <div class="lb-avatar">{initials}</div>
+              <div style="flex:1">
+                <div class="lb-name">{row["name"]} {"⭐" if is_me else ""}</div>
+                <div class="lb-detail">{row.get("mode","—")} · {ts_str}</div>
+              </div>
+              <div class="lb-score">{row["pct"]}%
+                <div style="color:var(--t3);font-size:0.68rem;">{row["score"]}/{row["total"]}</div>
+              </div>
+            </div>""", unsafe_allow_html=True)
+    else:
+        st.markdown("""<div class="empty-state">
+          <span class="icon">🏆</span>
+          <h3>No scores yet</h3>
+          <p>Complete a quiz to appear on the leaderboard!</p>
+        </div>""", unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════
+# PYQ PAGE
+# ═══════════════════════════════════════════════
+def _pyq_card_btn(label, key, count, on_click_fn, tag_color="#e8a020"):
+    """Helper to render a mini PYQ launch card."""
+    disabled = count == 0
+    badge = f'<span style="font-size:0.65rem;background:{"rgba(16,185,129,0.15)" if count>0 else "rgba(78,98,133,0.2)"};color:{"var(--emerald)" if count>0 else "var(--t3)"};padding:0.1rem 0.5rem;border-radius:20px;font-family:Fira Code,monospace;">{count}q</span>'
+    st.markdown(f'<div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.25rem;">{badge}</div>', unsafe_allow_html=True)
+    if st.button(label, key=key, use_container_width=True,
+                 type="primary" if count > 0 else "secondary", disabled=disabled):
+        on_click_fn()
+
+def page_pyq():
+    qb = QuestionBank()
+    all_q = qb.get_all()
+
+    st.markdown("""<div class="page-header">
+      <h1>📅 PYQ Yearwise Tests</h1>
+      <p>Previous Year Questions organized by year — <strong>15 questions per session</strong> · 30 minutes · Auto-scored · Ranked on leaderboard.</p>
+    </div>""", unsafe_allow_html=True)
+
+    available_years = qb.get_years()
+
+    # ── Hero: Yearwise Test Grid ─────────────────
+    st.markdown('<div class="section-label">📅 Pick a Year <span class="pill">15 Qs · 30 min · click to launch</span></div>', unsafe_allow_html=True)
+
+    if not available_years:
+        st.markdown("""<div class="card" style="text-align:center;padding:3rem;border-color:rgba(232,160,32,0.25);">
+          <div style="font-size:3rem;margin-bottom:1rem;">📂</div>
+          <div style="font-family:'Playfair Display',serif;font-weight:800;font-size:1.1rem;color:var(--t2);">No PYQ data yet</div>
+          <div style="color:var(--t3);font-size:0.85rem;margin-top:0.5rem;max-width:320px;margin-left:auto;margin-right:auto;">Upload PDF question papers via Developer mode to populate year-wise questions. Questions will auto-appear here.</div>
+        </div>""", unsafe_allow_html=True)
+    else:
+        # ── Year cards — 3 per row, rich design ──
+        yr_rows = [available_years[i:i+3] for i in range(0, len(available_years), 3)]
+        for row in yr_rows:
+            yr_cols = st.columns(len(row))
+            for col_i, yr in enumerate(row):
+                yr_q      = [q for q in all_q if str(q.get("year",""))==str(yr)]
+                june_cnt  = len([q for q in yr_q if q.get("season")=="June"])
+                dec_cnt   = len([q for q in yr_q if q.get("season")=="December"])
+                total_cnt = len(yr_q)
+                easy_c  = len([q for q in yr_q if q.get("difficulty")=="Easy"])
+                med_c   = len([q for q in yr_q if q.get("difficulty")=="Medium"])
+                hard_c  = len([q for q in yr_q if q.get("difficulty")=="Hard"])
+                avail_15 = total_cnt >= 15
+
+                with yr_cols[col_i]:
+                    st.markdown(f"""<div class="card" style="border-color:rgba(232,160,32,{'0.4' if avail_15 else '0.15'});margin-bottom:0.25rem;position:relative;overflow:hidden;">
+                      <div style="position:absolute;top:0;right:0;width:60px;height:60px;
+                        background:radial-gradient(circle at top right,rgba(232,160,32,0.12),transparent 70%);"></div>
+                      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">
+                        <span style="font-family:'Playfair Display',serif;font-weight:900;font-size:1.6rem;
+                          color:{'var(--amber)' if avail_15 else 'var(--t3)'};">{yr}</span>
+                        <span style="font-size:0.65rem;background:{'rgba(232,160,32,0.15)' if avail_15 else 'rgba(78,98,133,0.15)'};
+                          color:{'var(--amber2)' if avail_15 else 'var(--t3)'};padding:0.2rem 0.5rem;border-radius:20px;
+                          font-family:'Fira Code',monospace;">{total_cnt}q total</span>
+                      </div>
+                      <div style="display:flex;gap:0.5rem;margin-bottom:0.6rem;flex-wrap:wrap;">
+                        <span style="font-size:0.65rem;color:var(--t3);">☀️ {june_cnt}</span>
+                        <span style="font-size:0.65rem;color:var(--t3);">❄️ {dec_cnt}</span>
+                        <span style="font-size:0.65rem;color:var(--emerald);">E:{easy_c}</span>
+                        <span style="font-size:0.65rem;color:var(--amber);">M:{med_c}</span>
+                        <span style="font-size:0.65rem;color:var(--rose);">H:{hard_c}</span>
+                      </div>
+                    </div>""", unsafe_allow_html=True)
+
+                    # 3 launch buttons per year
+                    b1, b2, b3 = st.columns(3)
+                    with b1:
+                        if st.button(f"☀️ Jun", key=f"pyq_j_{yr}", use_container_width=True,
+                                     type="primary" if june_cnt>=15 else "secondary", disabled=june_cnt==0):
+                            qs = qb.get_filtered(years=[yr], seasons=["June"], n=15)
+                            _start_quiz(qs, "practice", f"PYQ {yr} ☀️ June", 30*60); st.rerun()
+                    with b2:
+                        if st.button(f"❄️ Dec", key=f"pyq_d_{yr}", use_container_width=True,
+                                     type="primary" if dec_cnt>=15 else "secondary", disabled=dec_cnt==0):
+                            qs = qb.get_filtered(years=[yr], seasons=["December"], n=15)
+                            _start_quiz(qs, "practice", f"PYQ {yr} ❄️ Dec", 30*60); st.rerun()
+                    with b3:
+                        if st.button(f"🎯 All", key=f"pyq_a_{yr}", use_container_width=True,
+                                     type="primary" if avail_15 else "secondary", disabled=total_cnt==0):
+                            qs = qb.get_filtered(years=[yr], n=15)
+                            _start_quiz(qs, "practice", f"PYQ {yr} (All)", 30*60); st.rerun()
+
+                    st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Season Series ──────────────────────────────────
+    st.markdown('<div class="section-label">📆 Season Series <span class="pill">15 Qs across all years</span></div>', unsafe_allow_html=True)
+    june_total = len([q for q in all_q if q.get("season")=="June"])
+    dec_total  = len([q for q in all_q if q.get("season")=="December"])
+
+    sc1, sc2 = st.columns(2)
+    with sc1:
+        st.markdown(f"""<div class="card" style="border-color:rgba(232,160,32,0.35);">
+          <div class="card-accent-top" style="background:var(--amber);"></div>
+          <div style="display:flex;align-items:center;gap:1rem;">
+            <span style="font-size:2.2rem;">☀️</span>
+            <div>
+              <div class="card-title">June Series</div>
+              <div class="card-desc">All June-session PYQs · {june_total} questions available</div>
+              <div class="card-meta" style="margin-top:0.4rem;"><span class="chip">15 Qs</span><span class="chip amber">18 min</span><span class="chip">Mixed</span></div>
+            </div>
+          </div>
+        </div>""", unsafe_allow_html=True)
+        if st.button("☀️ Start June Series →", key="pyq_june_all", use_container_width=True, type="primary", disabled=june_total==0):
+            qs = qb.get_filtered(seasons=["June"], n=15)
+            _start_quiz(qs, "practice", "June PYQ Series", 30*60); st.rerun()
+
+    with sc2:
+        st.markdown(f"""<div class="card" style="border-color:rgba(15,184,201,0.35);">
+          <div class="card-accent-top" style="background:var(--teal);"></div>
+          <div style="display:flex;align-items:center;gap:1rem;">
+            <span style="font-size:2.2rem;">❄️</span>
+            <div>
+              <div class="card-title">December Series</div>
+              <div class="card-desc">All December-session PYQs · {dec_total} questions available</div>
+              <div class="card-meta" style="margin-top:0.4rem;"><span class="chip">15 Qs</span><span class="chip teal">18 min</span><span class="chip">Mixed</span></div>
+            </div>
+          </div>
+        </div>""", unsafe_allow_html=True)
+        if st.button("❄️ Start December Series →", key="pyq_dec_all", use_container_width=True, type="primary", disabled=dec_total==0):
+            qs = qb.get_filtered(seasons=["December"], n=15)
+            _start_quiz(qs, "practice", "December PYQ Series", 30*60); st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Topic-wise PYQ ─────────────────────────────────
+    st.markdown('<div class="section-label">📚 Topic-wise PYQ <span class="pill">15 Qs · filtered by topic</span></div>', unsafe_allow_html=True)
+    topic_list = qb.get_topics()
+    t_cols = st.columns(2)
+    for ti, topic in enumerate(topic_list):
+        t_cnt = len([q for q in all_q if q.get("topic")==topic and not q.get("predicted")])
+        with t_cols[ti % 2]:
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                st.markdown(f"""<div style="background:var(--surface2);border:1px solid var(--line2);border-radius:var(--r-sm);
+                  padding:0.5rem 0.75rem;margin-bottom:0.3rem;display:flex;align-items:center;justify-content:space-between;">
+                  <span style="font-size:0.82rem;font-weight:600;color:var(--t1);">{topic}</span>
+                  <span style="font-family:'Fira Code',monospace;font-size:0.7rem;color:var(--t3);">{t_cnt}q</span>
+                </div>""", unsafe_allow_html=True)
+            with c2:
+                if st.button("▶", key=f"pyq_t_{ti}", use_container_width=True, disabled=t_cnt==0):
+                    qs = qb.get_filtered(topics=[topic], n=15)
+                    _start_quiz(qs, "practice", f"PYQ · {topic}", 30*60); st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Custom filter session ─────────────────────
+    st.markdown('<div class="section-label">🔎 Custom Filter Session</div>', unsafe_allow_html=True)
+    with st.expander("▸ Advanced Filters (year + season + topic + difficulty)", expanded=False):
+        fc1, fc2, fc3 = st.columns(3)
+        with fc1: sel_years   = st.multiselect("Year",   options=qb.get_years(),   default=[], placeholder="All years",   key="pyq_years")
+        with fc2: sel_seasons = st.multiselect("Season", options=qb.get_seasons(), default=[], placeholder="All seasons", key="pyq_seasons")
+        with fc3: sel_topics  = st.multiselect("Topics", options=qb.get_topics(),  default=[], placeholder="All topics",  key="pyq_topics")
+        fc4, fc5 = st.columns(2)
+        with fc4: sel_diff = st.selectbox("Difficulty", ["Mixed","Easy","Medium","Hard"], key="pyq_diff")
+        with fc5: sel_n    = st.select_slider("Questions", [10,15,20,25,30], value=15, key="pyq_n")
+
+        preview = qb.get_filtered(topics=sel_topics or None, difficulty=sel_diff,
+                                   years=sel_years or None, seasons=sel_seasons or None, n=9999, shuffle=False)
+        st.markdown(f'<div style="color:var(--indigo2);font-weight:700;font-size:0.84rem;margin-bottom:0.75rem;">✅ {len(preview)} match · {min(sel_n,len(preview))} will be used · {sel_n * 2} min timed</div>', unsafe_allow_html=True)
+
+        if st.button("🚀 Start Filtered PYQ Session", use_container_width=True, type="primary", key="pyq_start"):
+            qs = qb.get_filtered(topics=sel_topics or None, difficulty=sel_diff,
+                                 years=sel_years or None, seasons=sel_seasons or None, n=sel_n)
+            if not qs: st.error("No questions match your filters. Try broadening the selection.")
+            else: _start_quiz(qs, "practice", f"PYQ Custom ({sel_diff})", sel_n * 120); st.rerun()
+
+
+# ═══════════════════════════════════════════════
+# MOCK TESTS PAGE
+# ═══════════════════════════════════════════════
+MOCK_BLUEPRINTS = [
+    # 15-Q Sprints (primary category — shown first)
+    {"id":"m_15_mix","name":"15-Q Sprint — Mixed","icon":"⚡","tag":"15-Q Mock","tag_c":"gold","total":15,"mins":30,"diff":"Mixed","topics":None,"seasons":None,"desc":"15 mixed questions · 18 min · All topics · Perfect revision session","exam_sim":False},
+    {"id":"m_15_b","name":"15-Q Sprint — Set B","icon":"⚡","tag":"15-Q Mock","tag_c":"gold","total":15,"mins":30,"diff":"Mixed","topics":None,"seasons":None,"desc":"Fresh shuffle · same 30-min format · compare with Set A"},
+    {"id":"m_15_hard","name":"15-Q Hard Challenge","icon":"🔥","tag":"15-Q Mock","tag_c":"red","total":15,"mins":30,"diff":"Hard","topics":None,"seasons":None,"desc":"Hard questions only · 18 min · Tests your exam readiness"},
+    {"id":"m_15_easy","name":"15-Q Warm-Up","icon":"🌱","tag":"15-Q Mock","tag_c":"green","total":15,"mins":30,"diff":"Easy","topics":None,"seasons":None,"desc":"Easy questions · great for beginners · confidence builder"},
+    {"id":"m_15_teach","name":"15-Q Teaching Focus","icon":"🧠","tag":"15-Q Mock","tag_c":"cyan","total":15,"mins":30,"diff":"Mixed","topics":["Teaching Aptitude"],"seasons":None,"desc":"Teaching Aptitude only · 15 Qs · 30 min targeted sprint"},
+    {"id":"m_15_res","name":"15-Q Research Focus","icon":"🔬","tag":"15-Q Mock","tag_c":"cyan","total":15,"mins":30,"diff":"Mixed","topics":["Research Aptitude"],"seasons":None,"desc":"Research Aptitude only · 15 Qs · 30 min targeted sprint"},
+    # Full Mock Tests
+    {"id":"m_full1","name":"Full Mock — Set 1","icon":"🎯","tag":"Full Mock","tag_c":"indigo","total":50,"mins":100,"diff":"Mixed","topics":None,"seasons":None,"desc":"50 questions · 100 min · All topics · Full bank shuffle","exam_sim":False},
+    {"id":"m_full2","name":"Full Mock — Set 2","icon":"🎯","tag":"Full Mock","tag_c":"indigo","total":50,"mins":100,"diff":"Mixed","topics":None,"seasons":None,"desc":"Fresh shuffle · same pattern · compare your score"},
+    # Exam Simulation
+    {"id":"m_exam1","name":"Exam Simulation — Set 1","icon":"🎓","tag":"Exam Simulation","tag_c":"violet","total":50,"mins":100,"diff":"Mixed","topics":None,"seasons":None,"desc":"Full UGC NET pattern · 50 Qs · 100 min · Live countdown · Auto-submit","exam_sim":True},
+    {"id":"m_exam2","name":"Exam Simulation — Set 2","icon":"🎓","tag":"Exam Simulation","tag_c":"violet","total":50,"mins":100,"diff":"Mixed","topics":None,"seasons":None,"desc":"New shuffle · 100-min exam conditions · ranked on leaderboard","exam_sim":True},
+    # Season PYQ Mocks
+    {"id":"m_june","name":"June PYQ Mock","icon":"☀️","tag":"Season Mock","tag_c":"gold","total":15,"mins":30,"diff":"Mixed","topics":None,"seasons":["June"],"desc":"15 June-session PYQs · 18 min · real exam questions"},
+    {"id":"m_dec","name":"December PYQ Mock","icon":"❄️","tag":"Season Mock","tag_c":"gold","total":15,"mins":30,"diff":"Mixed","topics":None,"seasons":["December"],"desc":"15 December-session PYQs · 18 min · real exam questions"},
+]
+
+def page_mock():
+    qb = QuestionBank()
+
+    st.markdown("""<div class="page-header">
+      <h1>🧪 Mock Tests</h1>
+      <p>Structured tests for every level — <strong>15-Q Sprints</strong> · Full Mocks · Exam Simulation · Season PYQs. All auto-scored and ranked.</p>
+    </div>""", unsafe_allow_html=True)
+
+    # ── 15-Q Sprints — PRIMARY section ────────────
+    st.markdown('<div class="section-label">⚡ 15-Question Mock Tests <span class="pill">30 min · quick & targeted · most popular</span></div>', unsafe_allow_html=True)
+    sprint_mocks = [m for m in MOCK_BLUEPRINTS if m["tag"] == "15-Q Mock"]
+    s_cols = st.columns(3)
+    for si, m in enumerate(sprint_mocks):
+        avail = qb.get_filtered(topics=m.get("topics"), difficulty=m["diff"], seasons=m.get("seasons"), n=9999, shuffle=False)
+        cnt = len(avail); used = min(m["total"], cnt); can = cnt >= 10
+        diff_color = {"Mixed":"var(--indigo2)","Easy":"var(--emerald)","Medium":"var(--amber)","Hard":"var(--rose)"}.get(m["diff"],"var(--t2)")
+        avail_color = "var(--emerald)" if can else "var(--rose)"
+        with s_cols[si % 3]:
+            st.markdown(f"""<div class="card" style="border-color:{'rgba(232,160,32,0.4)' if m['diff']=='Mixed' else ('rgba(16,185,129,0.3)' if m['diff']=='Easy' else 'rgba(244,63,94,0.3)')};">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;">
+                <span style="font-size:1.8rem;">{m['icon']}</span>
+                <span style="font-size:0.63rem;color:{avail_color};font-weight:700;">{'✓ ' + str(cnt) + ' avail' if can else '⚠ Upload more'}</span>
+              </div>
+              <div class="card-title" style="font-size:0.88rem;">{m['name']}</div>
+              <div class="card-desc" style="font-size:0.76rem;">{m['desc']}</div>
+              <div class="card-meta" style="margin-top:0.5rem;">
+                <span class="chip" style="color:{diff_color};">⚡ {used} Qs</span>
+                <span class="chip amber">⏱ 18 min</span>
+              </div>
+            </div>""", unsafe_allow_html=True)
+            if st.button(f"▶ Start", key=f"mock_{m['id']}", use_container_width=True,
+                         type="primary" if can else "secondary", disabled=not can):
+                qs = qb.get_filtered(topics=m.get("topics"), difficulty=m["diff"], seasons=m.get("seasons"), n=m["total"])
+                _start_quiz(qs, "exam", m["name"], m["mins"]*60); st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Exam Simulation ─────────────────────────────
+    st.markdown('<div class="section-label">🎓 Exam Simulation <span class="pill">UGC NET real conditions · 50 Qs · 100 min · auto-submit · ranked</span></div>', unsafe_allow_html=True)
+    sim_mocks = [m for m in MOCK_BLUEPRINTS if m.get("exam_sim")]
+    sim_cols = st.columns(2)
+    for i, m in enumerate(sim_mocks):
+        avail = qb.get_filtered(difficulty=m["diff"], n=9999, shuffle=False)
+        cnt = len(avail); can = cnt > 0; used = min(m["total"], cnt)
+        with sim_cols[i]:
+            st.markdown(f"""<div class="card" style="border-color:rgba(99,102,241,0.5);background:linear-gradient(135deg,rgba(99,102,241,0.07),rgba(15,184,201,0.04));">
+              <div class="card-accent-top" style="background:linear-gradient(90deg,var(--indigo),var(--teal));"></div>
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;">
+                <span style="font-size:1.8rem;">{m['icon']}</span>
+                <span style="font-size:0.65rem;color:var(--indigo2);font-weight:700;">🔒 Exam Mode</span>
+              </div>
+              <div class="card-title" style="color:var(--indigo2);">{m['name']}</div>
+              <div class="card-desc">{m['desc']}</div>
+              <div class="card-meta">
+                <span class="chip" style="color:var(--indigo2);">📝 {used} Qs</span>
+                <span class="chip amber">⏱ 180 min</span>
+                <span class="chip" style="color:var(--rose);">🏆 Ranked</span>
+              </div>
+            </div>""", unsafe_allow_html=True)
+            if st.button(f"🎓 Launch Exam Simulation", key=f"mock_{m['id']}", use_container_width=True,
+                         type="primary" if can else "secondary", disabled=not can):
+                qs = qb.get_filtered(n=m["total"])
+                _start_quiz(qs, "exam_sim", m["name"], m["mins"]*60); st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Full Mocks + Season Mocks ──────────────────
+    st.markdown('<div class="section-label">🎯 Full Mock Tests <span class="pill">50 Qs · 90 min</span></div>', unsafe_allow_html=True)
+    full_mocks  = [m for m in MOCK_BLUEPRINTS if m["tag"] == "Full Mock"]
+    f_cols = st.columns(2)
+    for fi, m in enumerate(full_mocks):
+        avail = qb.get_filtered(n=9999, shuffle=False)
+        cnt = len(avail); used = min(m["total"], cnt); can = cnt > 0
+        with f_cols[fi]:
+            st.markdown(f"""<div class="card" style="border-color:rgba(99,102,241,0.3);">
+              <div class="card-accent-top" style="background:var(--indigo);"></div>
+              <div style="font-size:1.6rem;margin-bottom:0.4rem;">{m['icon']}</div>
+              <div class="card-title">{m['name']}</div>
+              <div class="card-desc">{m['desc']}</div>
+              <div class="card-meta"><span class="chip">📝 {used} Qs</span><span class="chip">⏱ 90 min</span></div>
+            </div>""", unsafe_allow_html=True)
+            if st.button(f"▶ Start {m['name']}", key=f"mock_{m['id']}", use_container_width=True,
+                         type="primary" if can else "secondary", disabled=not can):
+                qs = qb.get_filtered(n=m["total"])
+                _start_quiz(qs, "exam", m["name"], m["mins"]*60); st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Season Mocks ─────────────────────────────────
+    st.markdown('<div class="section-label">📅 Season PYQ Mocks <span class="pill">15 Qs from real exams</span></div>', unsafe_allow_html=True)
+    sea_mocks = [m for m in MOCK_BLUEPRINTS if m["tag"] == "Season Mock"]
+    sm_cols = st.columns(2)
+    for si2, m in enumerate(sea_mocks):
+        avail = qb.get_filtered(seasons=m.get("seasons"), n=9999, shuffle=False)
+        cnt = len(avail); used = min(m["total"], cnt); can = cnt > 0
+        border_c = "rgba(232,160,32,0.4)" if "June" in m["name"] else "rgba(15,184,201,0.4)"
+        with sm_cols[si2]:
+            st.markdown(f"""<div class="card" style="border-color:{border_c};">
+              <div style="font-size:1.6rem;margin-bottom:0.4rem;">{m['icon']}</div>
+              <div class="card-title">{m['name']}</div>
+              <div class="card-desc">{m['desc']} · {cnt} questions available</div>
+              <div class="card-meta"><span class="chip">📝 {used} Qs</span><span class="chip amber">⏱ 18 min</span></div>
+            </div>""", unsafe_allow_html=True)
+            if st.button(f"▶ Start {m['name']}", key=f"mock_{m['id']}", use_container_width=True,
+                         type="primary" if can else "secondary", disabled=not can):
+                qs = qb.get_filtered(seasons=m.get("seasons"), n=m["total"])
+                _start_quiz(qs, "exam", m["name"], m["mins"]*60); st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Custom Mock Builder ────────────────────────
+    st.markdown('<div class="section-label">🔧 Custom Mock Builder <span class="pill">design your own test</span></div>', unsafe_allow_html=True)
+    with st.expander("▸ Configure Custom Mock", expanded=False):
+        r1c1, r1c2, r1c3 = st.columns(3)
+        with r1c1: cy = st.multiselect("Year(s)",   qb.get_years(),   default=[], key="cb_years",   placeholder="All")
+        with r1c2: cs = st.multiselect("Season(s)", qb.get_seasons(), default=[], key="cb_seasons", placeholder="All")
+        with r1c3: ct = st.multiselect("Topic(s)",  qb.get_topics(),  default=[], key="cb_topics",  placeholder="All")
+        r2c1, r2c2, r2c3 = st.columns(3)
+        with r2c1: cn  = st.select_slider("Questions", [10,15,20,25,30,50], value=15, key="cb_n")
+        with r2c2: cd  = st.selectbox("Difficulty", ["Mixed","Easy","Medium","Hard"], key="cb_diff")
+        with r2c3: ct2 = st.select_slider("Time (min)", [10,15,18,20,30,45,60,90,120,180], value=18, key="cb_time")
+
+        prev = qb.get_filtered(topics=ct or None, difficulty=cd, years=cy or None, seasons=cs or None, n=9999, shuffle=False)
+        st.markdown(f'<div style="color:var(--indigo2);font-weight:700;font-size:0.84rem;margin-bottom:0.75rem;">✅ {len(prev)} match · {min(cn,len(prev))} will be used</div>', unsafe_allow_html=True)
+        if st.button("🚀 Launch Custom Mock", key="cb_start", use_container_width=True, type="primary"):
+            qs = qb.get_filtered(topics=ct or None, difficulty=cd, years=cy or None, seasons=cs or None, n=cn)
+            if not qs: st.error("No questions found. Adjust filters.")
+            else:
+                _start_quiz(qs, "exam", f"Custom Mock ({cd})", ct2*60); st.rerun()
+
+
+# ═══════════════════════════════════════════════
+# AI PREDICTED QUESTIONS
+# ═══════════════════════════════════════════════
+def page_ai():
+    qb = QuestionBank()
+
+    st.markdown("""<div class="page-header">
+      <h1>🤖 AI Predicted Questions</h1>
+      <p>Curated by AI analysis of exam trends, NEP 2020 reforms, and topic frequency — targeted at upcoming UGC NET exams.</p>
+    </div>""", unsafe_allow_html=True)
+
+    ai_qs = [q for q in qb.get_all() if q.get("predicted")]
+    reg_qs_total = len([q for q in qb.get_all() if not q.get("predicted")])
+
+    # ── Stats banner ────────────────────────────────
+    s1, s2, s3 = st.columns(3)
+    with s1:
+        st.markdown(f"""<div class="card" style="text-align:center;padding:1.1rem;border-color:rgba(15,184,201,0.35);border-top:3px solid var(--teal);">
+          <div style="font-family:'Fira Code',monospace;font-size:1.8rem;font-weight:800;color:var(--teal2);">{len(ai_qs)}</div>
+          <div style="font-size:0.68rem;color:var(--t3);text-transform:uppercase;margin-top:0.2rem;">AI Predictions</div>
+        </div>""", unsafe_allow_html=True)
+    with s2:
+        st.markdown("""<div class="card" style="text-align:center;padding:1.1rem;border-color:rgba(232,160,32,0.35);border-top:3px solid var(--amber);">
+          <div style="font-family:'Fira Code',monospace;font-size:1.8rem;font-weight:800;color:var(--amber2);">June 2025</div>
+          <div style="font-size:0.68rem;color:var(--t3);text-transform:uppercase;margin-top:0.2rem;">Target Exam</div>
+        </div>""", unsafe_allow_html=True)
+    with s3:
+        st.markdown("""<div class="card" style="text-align:center;padding:1.1rem;border-color:rgba(99,102,241,0.35);border-top:3px solid var(--indigo);">
+          <div style="font-family:'Fira Code',monospace;font-size:1.8rem;font-weight:800;color:var(--indigo2);">NEP 2020</div>
+          <div style="font-size:0.68rem;color:var(--t3);text-transform:uppercase;margin-top:0.2rem;">Aligned Reforms</div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Action buttons ──────────────────────────────
+    st.markdown('<div class="section-label">🚀 Practice Modes</div>', unsafe_allow_html=True)
+    ac1, ac2, ac3 = st.columns(3)
+    with ac1:
+        st.markdown("""<div class="card" style="border-color:rgba(15,184,201,0.4);text-align:center;padding:1.2rem;">
+          <div style="font-size:2rem;margin-bottom:0.5rem;">🤖</div>
+          <div style="font-weight:700;color:var(--teal2);font-size:0.9rem;margin-bottom:0.3rem;">AI Questions Only</div>
+          <div style="font-size:0.75rem;color:var(--t3);">Practice all AI-predicted questions · 18 min</div>
+        </div>""", unsafe_allow_html=True)
+        if st.button("▶ Start AI Practice", key="ai_all", use_container_width=True, type="primary"):
+            if ai_qs: _start_quiz(ai_qs, "practice", "AI Predicted Questions", len(ai_qs)*90)
+            else: st.error("No AI questions in bank yet.")
+            st.rerun()
+    with ac2:
+        st.markdown("""<div class="card" style="border-color:rgba(99,102,241,0.4);text-align:center;padding:1.2rem;">
+          <div style="font-size:2rem;margin-bottom:0.5rem;">🔀</div>
+          <div style="font-weight:700;color:var(--indigo2);font-size:0.9rem;margin-bottom:0.3rem;">AI + PYQ Mix</div>
+          <div style="font-size:0.75rem;color:var(--t3);">AI picks blended with real PYQs · 20 Qs</div>
+        </div>""", unsafe_allow_html=True)
+        if st.button("▶ Start Mix Mock", key="ai_mock", use_container_width=True):
+            reg = qb.get_filtered(n=15, shuffle=True)
+            mixed = (ai_qs + reg)[:20]; random.shuffle(mixed)
+            _start_quiz(mixed, "exam", "AI + PYQ Mix Mock", 20*90); st.rerun()
+    with ac3:
+        st.markdown("""<div class="card" style="border-color:rgba(232,160,32,0.4);text-align:center;padding:1.2rem;">
+          <div style="font-size:2rem;margin-bottom:0.5rem;">🎯</div>
+          <div style="font-weight:700;color:var(--amber2);font-size:0.9rem;margin-bottom:0.3rem;">15-Q AI Mock</div>
+          <div style="font-size:0.75rem;color:var(--t3);">AI picks · 15 Qs · 30 min timed sprint</div>
+        </div>""", unsafe_allow_html=True)
+        if st.button("▶ Start 15-Q AI Mock", key="ai_15", use_container_width=True):
+            qs15 = ai_qs[:] ; random.shuffle(qs15)
+            if not qs15: qs15 = qb.get_filtered(n=15)
+            _start_quiz(qs15[:15], "exam", "AI 15-Q Mock", 30*60); st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── AI questions preview list ────────────────────
+    st.markdown('<div class="section-label">🔍 AI-Predicted Questions Preview</div>', unsafe_allow_html=True)
+    diff_colors = {"Easy":"var(--emerald)","Medium":"var(--amber)","Hard":"var(--rose)"}
+    topic_icons = {"Teaching Aptitude":"🧠","Research Aptitude":"🔬","ICT":"💻","Environment & Ecology":"🌿",
+                   "Higher Education":"🎓","Communication":"📡","Reasoning":"🧩","Data Interpretation":"📊",
+                   "Indian Constitution & Governance":"⚖️","Reading Comprehension":"📖"}
+    for qi, q in enumerate(ai_qs):
+        dc = diff_colors.get(q.get("difficulty",""), "var(--t2)")
+        icon = topic_icons.get(q.get("topic",""), "📌")
+        st.markdown(f"""<div class="card" style="margin-bottom:0.5rem;border-color:rgba(15,184,201,0.2);">
+          <div class="card-meta" style="margin-bottom:0.5rem;">
+            <span class="chip teal">{icon} {q.get('topic','—')}</span>
+            <span class="chip" style="color:{dc};">{q.get('difficulty','—')}</span>
+            
+            <span style="font-size:0.65rem;color:var(--t3);margin-left:auto;">Target: {q.get('year','')} {q.get('season','')}</span>
+          </div>
+          <div style="font-family:'Playfair Display',serif;font-weight:700;color:var(--t1);font-size:0.93rem;line-height:1.7;">{q['question']}</div>
+        </div>""", unsafe_allow_html=True)
+
+
+
+# ═══════════════════════════════════════════════
+# QUIZ ENGINE (shared by all modes)
+# ═══════════════════════════════════════════════
+def _start_quiz(questions, mode, label, total_time_secs):
+    random.shuffle(questions)
+    st.session_state.update({
+        "questions": questions, "q_idx": 0, "answers": {},
+        "quiz_active": True, "quiz_done": False,
+        "quiz_mode": mode, "quiz_label": label,
+        "start_time": time.time(), "q_start": time.time(),
+        "total_time": total_time_secs,
+        "q_times": {},
+        "page": "quiz",
+    })
+
+# ── Timer fragment: reruns every 1s independently, never blocks buttons ──
+@st.fragment(run_every=1)
+def _timer_fragment(remaining, tl, label, idx, total):
+    """Isolated fragment that only updates the header/timer row."""
+    if remaining is None:
+        st.markdown(
+            f'<div style="display:flex;align-items:center;justify-content:space-between;'
+            f'flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;">'
+            f'<div style="font-size:0.8rem;color:var(--t2);font-weight:600;">📝 {label}</div>'
+            f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:1rem;font-weight:700;'
+            f'color:var(--cyan);background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.35);'
+            f'border-radius:8px;padding:0.35rem 0.85rem;">⏱ Free</div>'
+            f'<div style="font-size:0.8rem;color:var(--t2);font-family:\'JetBrains Mono\',monospace;">'
+            f'{idx+1}/{total}</div></div>',
+            unsafe_allow_html=True
+        )
+        return
+
+    # Recalculate from session state so it's always accurate
+    elapsed   = int(time.time() - st.session_state.start_time)
+    remaining = max(0, tl - elapsed)
+    rm, rs    = divmod(remaining, 60)
+    pct       = remaining / tl if tl > 0 else 1.0
+
+    if pct > 0.4:    cls, color = "timer-ok",   "var(--cyan)"
+    elif pct > 0.15: cls, color = "timer-warn",  "var(--gold)"
+    else:            cls, color = "timer-crit",  "var(--red)"
+
+    progress_pct = (st.session_state.q_idx / total * 100) if total > 0 else 0
+
+    st.markdown(
+        f'<div class="progress-track">'
+        f'<div class="progress-fill" style="width:{progress_pct:.1f}%"></div></div>'
+        f'<div style="display:flex;align-items:center;justify-content:space-between;'
+        f'flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">'
+        f'<div style="font-size:0.8rem;color:var(--t2);font-weight:600;">📝 {label}</div>'
+        f'<div class="timer-display {cls}">⏱ {rm:02d}:{rs:02d}</div>'
+        f'<div style="font-size:0.8rem;color:var(--t2);font-family:\'JetBrains Mono\',monospace;">'
+        f'{idx+1}/{total}</div></div>',
+        unsafe_allow_html=True
+    )
+
+    # Auto-submit when time is up
+    if remaining == 0:
+        st.session_state.quiz_done = True
+        st.session_state.score = sum(
+            1 for a in st.session_state.answers.values() if a.get("correct")
+        )
+        st.rerun()
+
+
+def page_quiz():
+    if st.session_state.quiz_done:
+        page_results()
+        return
+    if not st.session_state.quiz_active:
+        page_quiz_config()
+        return
+
+    questions = st.session_state.questions
+    idx       = st.session_state.q_idx
+    total     = len(questions)
+    mode      = st.session_state.quiz_mode
+    label     = st.session_state.quiz_label
+
+    if idx >= total:
+        st.session_state.quiz_done = True
+        st.session_state.score = sum(1 for a in st.session_state.answers.values() if a.get("correct"))
+        st.rerun()
+        return
+
+    q      = questions[idx]
+    tl     = st.session_state.total_time
+    elapsed = int(time.time() - st.session_state.start_time)
+    remaining = max(0, tl - elapsed) if tl > 0 else None
+
+    # Auto-submit on expiry
+    if remaining == 0 and tl > 0:
+        st.session_state.quiz_done = True
+        st.session_state.score = sum(1 for a in st.session_state.answers.values() if a.get("correct"))
+        st.rerun()
+        return
+
+    # For exam_sim we compute rm/rs for the big header
+    rm, rs = divmod(remaining or 0, 60)
+    diff_color = {"Easy":"var(--green)","Medium":"var(--gold)","Hard":"var(--red)"}.get(q.get("difficulty",""),"var(--text2)")
+    yr_tag = f'· {q.get("year","")} {q.get("season","")}' if q.get("year") else ""
+    ai_tag = ""  # AI tag removed from display
+    is_exam_sim = (mode == "exam_sim")
+
+    # Layout
+    if mode in ("exam", "exam_sim"):
+        col_q, col_nav = st.columns([3, 1])
+    else:
+        col_q = col_nav = None
+
+    def _render_body():
+        # ── Header / Timer ──
+        if is_exam_sim:
+            # Big exam-sim header with static timer (fragment handles tick separately)
+            timer_color = "var(--red)" if (remaining is not None and remaining < 600) else \
+                          ("var(--gold)" if (remaining is not None and remaining < 1800) else "var(--cyan)")
+            st.markdown(f"""<div style="background:rgba(10,14,22,0.95);border:1px solid rgba(124,58,237,0.4);
+                border-radius:12px;padding:0.75rem 1.25rem;display:flex;align-items:center;
+                justify-content:space-between;margin-bottom:1rem;gap:1rem;flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span style="font-size:1.1rem;">🎓</span>
+                <span style="font-weight:700;font-size:0.88rem;color:var(--violet2);">{label}</span>
+              </div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:700;
+                  color:{timer_color};letter-spacing:0.05em;">
+                ⏱ {rm:02d}:{rs:02d}
+              </div>
+              <div style="font-size:0.82rem;color:var(--t2);">Q {idx+1} / {total}</div>
+            </div>""", unsafe_allow_html=True)
+            # Fragment handles live tick for exam_sim too
+            _timer_fragment(remaining, tl, label, idx, total)
+        else:
+            # Live-ticking timer fragment (1s updates, non-blocking)
+            _timer_fragment(remaining, tl, label, idx, total)
+
+        # ── Question card ──
+        clean_q = html.unescape(re.sub(r'<[^>]+>', '', q["question"])).strip()
+        st.markdown(f"""<div class="question-wrap">
+          <div class="q-num">QUESTION {idx+1} OF {total}</div>
+          <div class="q-text">{clean_q}</div>
+          <div class="q-tags">
+            <span class="meta-chip" style="color:{diff_color}">{q.get("difficulty","")}</span>
+            <span class="meta-chip violet">{q.get("topic","")}</span>
+            <span class="meta-chip">{yr_tag}</span>
+          </div>
+        </div>""", unsafe_allow_html=True)
+
+        # ── Options ──
+        options = q.get("options", [])
+        correct = q.get("correct_answer", "")
+        already = idx in st.session_state.answers
+        sel_key = f"sel_{idx}"
+        if sel_key not in st.session_state:
+            st.session_state[sel_key] = options[0] if options else ""
+
+        if already:
+            user_ans = st.session_state.answers[idx].get("answer")
+            for opt in options:
+                clean = html.unescape(re.sub(r'<[^>]+>', '', opt)).strip()
+                if opt == correct:
+                    st.markdown(f'<div class="option-btn correct-opt">✅ {clean}</div>', unsafe_allow_html=True)
+                elif opt == user_ans and opt != correct:
+                    st.markdown(f'<div class="option-btn wrong-opt">❌ {clean}</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div class="option-btn neutral-opt">{clean}</div>', unsafe_allow_html=True)
+
+            # ── Answer feedback effects ──────────────────────────────
+            if st.session_state.pop("_show_correct_fx", None) == idx:
+                st.balloons()
                 st.markdown("""
-                <div class="spike-legend">
-                🚀 <b style="color:#10b981">Confirmed Bullish</b> = Call-dominant volume spike AND GEX rising significantly<br>
-                💥 <b style="color:#ef4444">Confirmed Bearish</b> = Put-dominant volume spike AND GEX falling significantly<br>
-                ⚠️ <b style="color:#f59e0b">Divergence</b> = Volume direction conflicts with GEX direction — wait for resolution<br>
-                📊 <b style="color:#8b5cf6">Unconfirmed</b> = Volume spike detected but GEX did not move enough to confirm<br>
-                🔶 <b style="color:#64748b">Extreme 4σ+ / Strong 3σ+</b> = Severity bands in Z-Score panel
+                <div style="text-align:center;padding:0.75rem 0;animation:popIn 0.4s ease;">
+                  <span style="font-size:3.5rem;filter:drop-shadow(0 0 12px #22c55e);">🎉</span>
+                  <div style="font-family:'DM Sans',sans-serif;font-size:1.1rem;font-weight:700;
+                    color:#22c55e;margin-top:0.25rem;letter-spacing:0.03em;">Brilliant! Correct Answer!</div>
+                  <div style="font-size:0.8rem;color:var(--t2);margin-top:0.2rem;">Keep going! 🚀</div>
                 </div>
+                <style>@keyframes popIn{from{transform:scale(0.5);opacity:0}to{transform:scale(1);opacity:1}}</style>
+                """, unsafe_allow_html=True)
+            elif st.session_state.pop("_show_wrong_fx", None) == idx:
+                st.markdown("""
+                <div style="text-align:center;padding:0.75rem 0;animation:shakeIt 0.5s ease;">
+                  <span style="font-size:3.5rem;filter:drop-shadow(0 0 12px #f43f5e);">😢</span>
+                  <div style="font-family:'DM Sans',sans-serif;font-size:1.1rem;font-weight:700;
+                    color:#f43f5e;margin-top:0.25rem;">Oops! That was wrong</div>
+                  <div style="font-size:0.8rem;color:var(--t2);margin-top:0.2rem;">Check the explanation below 👇</div>
+                </div>
+                <style>
+                  @keyframes shakeIt{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}
+                  40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+                </style>
                 """, unsafe_allow_html=True)
 
-            spike_fig, df_spikes = create_intraday_timeline_with_spikes(df, unit_label, z_thresh)
-            st.plotly_chart(spike_fig, use_container_width=True)
-
-            st.markdown("#### 🔍 Detected Spike Events")
-            spike_summary = build_spike_summary(df_spikes, unit_label)
-
-            if spike_summary.empty:
-                st.info(f"No volume spikes detected at {z_thresh}σ threshold. Try lowering the slider.")
-            else:
-                def _row_color(row):
-                    c = {'CONFIRMED_BULLISH':'background-color:rgba(16,185,129,0.12)',
-                         'CONFIRMED_BEARISH':'background-color:rgba(239,68,68,0.12)',
-                         'DIVERGENCE':       'background-color:rgba(245,158,11,0.12)',
-                         'UNCONFIRMED':      'background-color:rgba(139,92,246,0.08)'}.get(row['GEX Signal'],'')
-                    return [c] * len(row)
-
-                st.dataframe(spike_summary.style.apply(_row_color, axis=1),
-                             use_container_width=True, hide_index=True)
-
-                k1,k2,k3,k4,k5 = st.columns(5)
-                k1.metric("Total Spikes",         len(spike_summary))
-                k2.metric("🚀 Confirmed Bullish", (spike_summary['GEX Signal']=='CONFIRMED_BULLISH').sum())
-                k3.metric("💥 Confirmed Bearish", (spike_summary['GEX Signal']=='CONFIRMED_BEARISH').sum())
-                k4.metric("⚠️ Divergence",        (spike_summary['GEX Signal']=='DIVERGENCE').sum())
-                k5.metric("🔥 Extreme (4σ+)",     (spike_summary['Strength']=='EXTREME').sum())
-
-                st.download_button(
-                    "📥 Download Spike Log (CSV)",
-                    data=spike_summary.to_csv(index=False),
-                    file_name=f"nyztrade_spikes_{meta.get('symbol','')}.csv",
-                    mime="text/csv",
+            if q.get("explanation") and mode not in ("exam", "exam_sim"):
+                clean_exp = html.unescape(re.sub(r'<[^>]+>', '', q["explanation"])).strip()
+                st.markdown(
+                    f'<div class="explanation-box"><div class="exp-title">💡 Explanation</div>'
+                    f'<div class="exp-text">{clean_exp}</div></div>',
+                    unsafe_allow_html=True
                 )
 
-        # ── TAB 1: Standard GEX ───────────────────────────────────────────────
-        with tabs[1]:
-            st.markdown("### 🎯 Standard Gamma Exposure (GEX)")
-            st.plotly_chart(create_separate_gex_chart(df_selected, spot_price, unit_label), use_container_width=True)
-            c1,c2,c3 = st.columns(3)
-            c1.metric("Positive GEX", f"{df_selected[df_selected['net_gex']>0]['net_gex'].sum():.4f}{unit_label}")
-            c2.metric("Negative GEX", f"{df_selected[df_selected['net_gex']<0]['net_gex'].sum():.4f}{unit_label}")
-            c3.metric("Total Volume",  f"{df_selected.get('total_volume', pd.Series([0])).sum():,.0f}" if 'total_volume' in df_selected.columns else "N/A")
+            nc1, nc2, nc3 = st.columns([1, 1, 1])
+            with nc1:
+                if idx > 0 and st.button("← Prev", key=f"prev_{idx}", use_container_width=True):
+                    st.session_state.q_idx -= 1; st.rerun()
+            with nc2:
+                bm_id    = q.get("id", idx)
+                bm_label = "🔖 Saved" if bm_id in st.session_state.bookmarks else "🔖 Save"
+                if st.button(bm_label, key=f"bm_{idx}", use_container_width=True):
+                    if bm_id in st.session_state.bookmarks:
+                        st.session_state.bookmarks.discard(bm_id)
+                    else:
+                        st.session_state.bookmarks.add(bm_id)
+                    st.rerun()
+            with nc3:
+                if idx < total - 1:
+                    if st.button("Next →", key=f"next_{idx}", use_container_width=True, type="primary"):
+                        st.session_state.q_idx += 1
+                        st.session_state.q_start = time.time()
+                        st.rerun()
+                else:
+                    if st.button("🏁 Finish", key=f"finish_{idx}", use_container_width=True, type="primary"):
+                        st.session_state.quiz_done = True
+                        st.session_state.score = sum(1 for a in st.session_state.answers.values() if a.get("correct"))
+                        st.rerun()
 
-        # ── TAB 2: Enhanced GEX Overlay ───────────────────────────────────────
-        with tabs[2]:
-            st.markdown("### 🚀 Enhanced GEX Overlay")
-            st.plotly_chart(create_enhanced_gex_overlay_chart(df_selected, spot_price, unit_label), use_container_width=True)
-            c1,c2,c3,c4 = st.columns(4)
-            orig_t = df_selected['net_gex'].sum()
-            c1.metric("Original GEX Total", f"{orig_t:.4f}{unit_label}")
-            c4.metric("Total Volume", f"{df_selected['total_volume'].sum():,.0f}" if 'total_volume' in df_selected.columns else "N/A")
+        else:
+            # Pre-answer: pure buttons — no duplicate HTML
+            clean_opts = [html.unescape(re.sub(r'<[^>]+>', '', o)).strip() for o in options]
+            for i_o, (opt, clean) in enumerate(zip(options, clean_opts)):
+                if st.session_state[sel_key] == opt:
+                    st.markdown(
+                        f'<div class="opt-selected">'
+                        f'<span class="opt-dot-sel">●</span>&nbsp;&nbsp;{clean}'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                else:
+                    if st.button(f"○  {clean}", key=f"opt_{idx}_{i_o}", use_container_width=True):
+                        st.session_state[sel_key] = opt
+                        st.rerun()
 
-        # ── TAB 3: Significant GEX ────────────────────────────────────────────
-        with tabs[3]:
-            st.markdown("### 🎯 Significant GEX: Addition vs Unwind")
-            sig_fig, df_classified = create_significant_gex_chart(df_selected, spot_price, unit_label)
-            st.plotly_chart(sig_fig, use_container_width=True)
+            st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+            # Submit — full width for easy tapping on mobile
+            if st.button("✅  Submit Answer", key=f"sub_{idx}", use_container_width=True, type="primary"):
+                choice       = st.session_state[sel_key]
+                correct_flag = (choice == correct)
+                t_taken      = int(time.time() - (st.session_state.q_start or time.time()))
+                st.session_state.answers[idx] = {"answer": choice, "correct": correct_flag, "time": t_taken}
+                st.session_state.q_times[idx]  = t_taken
+                st.session_state.total_attempted += 1
+                if correct_flag:
+                    st.session_state.total_correct += 1
+                    st.session_state.streak += 1
+                    st.session_state["_show_correct_fx"] = idx
+                else:
+                    st.session_state.streak = 0
+                    st.session_state["_show_wrong_fx"] = idx
+                    if q not in st.session_state.wrong_questions:
+                        st.session_state.wrong_questions.append(q)
+                if mode in ("exam", "exam_sim"):
+                    st.session_state.q_idx += 1
+                    st.session_state.q_start = time.time()
+                st.rerun()
+            # Skip + Bookmark in 2-col row — large tap targets
+            _sb1, _sb2 = st.columns(2)
+            with _sb1:
+                if st.button("⏭  Skip", key=f"skip_{idx}", use_container_width=True):
+                    st.session_state.answers[idx] = {"answer": None, "correct": False, "skipped": True}
+                    st.session_state.q_idx += 1
+                    st.session_state.q_start = time.time()
+                    st.rerun()
+            with _sb2:
+                bm_id2   = q.get("id", idx)
+                bm_lbl2  = "🔖 Saved" if bm_id2 in st.session_state.bookmarks else "🔖 Save"
+                if st.button(bm_lbl2, key=f"bm2_{idx}", use_container_width=True):
+                    if bm_id2 in st.session_state.bookmarks:
+                        st.session_state.bookmarks.discard(bm_id2)
+                    else:
+                        st.session_state.bookmarks.add(bm_id2)
+                    st.rerun()
 
-            st.markdown("#### 📊 High-Significance Strikes")
-            strong_only = df_classified[df_classified['gex_category'].isin(['STRONG_ADD','STRONG_UNWIND'])
-                                       ].sort_values('significance_pct', ascending=False)
-            if not strong_only.empty:
-                disp_cols = [c for c in ['strike','gex_category','significance_pct','net_gex',
-                                         'call_oi_change','put_oi_change','total_volume'] if c in strong_only.columns]
-                def _cat_color(val):
-                    if val == 'STRONG_ADD':    return 'background-color:rgba(16,185,129,0.25)'
-                    if val == 'STRONG_UNWIND': return 'background-color:rgba(239,68,68,0.25)'
-                    return ''
-                st.dataframe(strong_only[disp_cols].style.applymap(_cat_color, subset=['gex_category']),
-                             use_container_width=True, height=300)
-                k1,k2,k3,k4 = st.columns(4)
-                k1.metric("🟢 Strong Additions",  (df_classified['gex_category']=='STRONG_ADD').sum())
-                k2.metric("🔴 Strong Unwinds",    (df_classified['gex_category']=='STRONG_UNWIND').sum())
-                k3.metric("⬜ Noise Strikes",      (df_classified['gex_category']=='NOISE').sum())
-                top_str = strong_only.iloc[0]['strike'] if not strong_only.empty else 'N/A'
-                k4.metric("⭐ Most Significant",  f"₹{top_str:,.0f}" if isinstance(top_str,(int,float)) else top_str)
-            else:
-                st.info("No strongly significant GEX moves at this timestamp. Try a different time point.")
+    # Render in correct container
+    if col_q is not None:
+        with col_q:
+            _render_body()
+    else:
+        _render_body()
 
-        # ── TAB 4: Standard VANNA ─────────────────────────────────────────────
-        with tabs[4]:
-            st.markdown("### 🌊 Standard VANNA Exposure")
-            st.plotly_chart(create_standard_vanna_chart(df_selected, spot_price, unit_label), use_container_width=True)
-            c1,c2,c3 = st.columns(3)
-            c1.metric("Call VANNA", f"{df_selected['call_vanna'].sum():.4f}{unit_label}")
-            c2.metric("Put VANNA",  f"{df_selected['put_vanna'].sum():.4f}{unit_label}")
-            c3.metric("Net VANNA",  f"{df_selected['net_vanna'].sum():.4f}{unit_label}")
+    # ── Exam navigator panel (CLICKABLE) ─────────────────────────────
+    if mode in ("exam", "exam_sim") and col_nav is not None:
+        with col_nav:
+            answered_count = sum(1 for a in st.session_state.answers.values() if not a.get("skipped"))
 
-        # ── TAB 5: Enhanced VANNA Overlay + Flip Breakout ────────────────────
-        with tabs[5]:
-            st.markdown("### 🌊 Enhanced VANNA Overlay + ⚡ VANNA Flip Breakout Probability")
-            st.markdown("""<div class="spike-legend">
-            🔴 <b style="color:#ef4444">Resistance Ceiling</b> = POS→NEG flip above spot — IV↑ forces dealers to SELL delta → breakdown accelerates<br>
-            🚀 <b style="color:#10b981">Vacuum Zone</b> = NEG→POS flip above spot — IV↑ forces dealers to BUY delta → fast squeeze UP<br>
-            ⚠️ <b style="color:#f59e0b">Trap Door</b> = POS→NEG flip below spot — IV↑ below = drop accelerates with no support<br>
-            🛡️ <b style="color:#06b6d4">Support Floor</b> = NEG→POS flip below spot — IV compression = dealers buy delta, price held<br>
-            <b>Probability score</b> = distance × IV regime × VANNA magnitude × TTE × skew. Above 70% = high institutional activity expected.
+            st.markdown('<div class="exam-panel-title">QUESTION NAVIGATOR</div>', unsafe_allow_html=True)
+
+            # Navigator button CSS
+            st.markdown("""<style>
+            .nav-btn-grid {display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:0.5rem;}
+            .nav-btn {border:1px solid rgba(255,255,255,0.15);border-radius:6px;text-align:center;
+                      padding:5px 2px;font-size:0.72rem;font-weight:600;cursor:pointer;
+                      background:rgba(255,255,255,0.05);color:var(--t1);line-height:1;}
+            .nav-btn.current  {background:var(--violet)!important;border-color:var(--violet)!important;
+                               color:#fff!important;box-shadow:0 0 8px rgba(139,92,246,0.6);}
+            .nav-btn.answered {background:var(--green)!important;border-color:var(--green)!important;color:#000!important;}
+            .nav-btn.skipped  {background:var(--gold)!important;border-color:var(--gold)!important;color:#000!important;}
+            </style>""", unsafe_allow_html=True)
+
+            # Render color indicator row (visual only)
+            nav_html = '<div class="nav-btn-grid">'
+            for qi in range(total):
+                if qi == idx:            cls = "nav-btn current"
+                elif qi in st.session_state.answers:
+                    cls = "nav-btn answered" if not st.session_state.answers[qi].get("skipped") else "nav-btn skipped"
+                else:                    cls = "nav-btn"
+                nav_html += f'<div class="{cls}">{qi+1}</div>'
+            nav_html += '</div>'
+            st.markdown(nav_html, unsafe_allow_html=True)
+
+            # Clickable jump buttons — compact rows of 7
+            cols_per_row = 7
+            for row_start in range(0, total, cols_per_row):
+                row_qs = list(range(row_start, min(row_start + cols_per_row, total)))
+                btn_cols = st.columns(len(row_qs))
+                for bi, qi in enumerate(row_qs):
+                    with btn_cols[bi]:
+                        btn_label = str(qi + 1)
+                        if st.button(btn_label, key=f"nav_q_{qi}",
+                                     use_container_width=True,
+                                     help=f"Jump to Question {qi+1}"):
+                            st.session_state.quiz_idx = qi
+                            st.rerun()
+
+            # Legend + stats
+            st.markdown(f"""
+            <div style="margin-top:0.5rem;display:flex;gap:0.75rem;flex-wrap:wrap;font-size:0.7rem;color:var(--t2);">
+              <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;
+                background:var(--violet);margin-right:3px;vertical-align:middle;"></span>Now</span>
+              <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;
+                background:var(--green);margin-right:3px;vertical-align:middle;"></span>Done</span>
+              <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;
+                background:var(--gold);margin-right:3px;vertical-align:middle;"></span>Skip</span>
+            </div>
+            <div style="margin-top:0.35rem;font-size:0.78rem;color:var(--t2);">
+              Answered: <b style="color:var(--green);">{answered_count}</b> / {total}
             </div>""", unsafe_allow_html=True)
 
-            tte_days = 7 if meta.get('expiry_flag','WEEK') == 'WEEK' else 30
-            tte_val  = tte_days / 365
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🏁 Submit Exam", key="exam_submit", use_container_width=True, type="primary"):
+                st.session_state.quiz_done = True
+                st.session_state.score = sum(1 for a in st.session_state.answers.values() if a.get("correct"))
+                st.rerun()
 
-            # ── Step 1: build full-day IV trend, then slice to selected_ts ──
-            # All signals (banner, table, chart title) must reflect the same moment.
-            iv_df_full = compute_iv_trend(df)     # full day — needed for chart sparkline
-            if 'timestamp' in iv_df_full.columns and len(iv_df_full) > 0:
-                iv_at_ts = iv_df_full[iv_df_full['timestamp'] <= selected_ts]
-                if iv_at_ts.empty:
-                    iv_at_ts = iv_df_full.iloc[:1]
-            else:
-                iv_at_ts = iv_df_full
 
-            # ── Step 2: flip zones & bias — all use iv_at_ts ─────────────
-            vf_zones  = identify_vanna_flip_zones(df_selected, spot_price)
-            bias_data = compute_session_bias(vf_zones, iv_at_ts, df_selected, spot_price)
-            prob_df   = compute_breakout_probability(vf_zones, iv_at_ts, spot_price, tte_val, df_selected)
+def page_quiz_config():
+    qb = QuestionBank()
+    st.markdown('<h2 style="font-family:Syne,sans-serif;font-size:1.5rem;font-weight:800;margin-bottom:1rem;">📝 Configure Practice Session</h2>', unsafe_allow_html=True)
 
-            # ── Step 3: extract iv scalars for this timestamp ─────────────
-            _raw_iv = iv_at_ts.iloc[-1]
-            latest_iv = {
-                'iv_regime': str(_raw_iv['iv_regime'])  if 'iv_regime' in _raw_iv.index else 'N/A',
-                'iv_skew'  : float(_raw_iv['iv_skew'])  if 'iv_skew'   in _raw_iv.index else 0.0,
-                'call_iv'  : float(_raw_iv['call_iv'])  if 'call_iv'   in _raw_iv.index else 0.0,
-                'put_iv'   : float(_raw_iv['put_iv'])   if 'put_iv'    in _raw_iv.index else 0.0,
-            }
+    cc1, cc2 = st.columns([2,1])
+    with cc1:
+        st.markdown("**📚 Select Topics**")
+        selected = []
+        tc = st.columns(2)
+        for i, topic in enumerate(qb.get_topics()):
+            with tc[i%2]:
+                if st.checkbox(topic, value=True, key=f"cfg_{topic}"): selected.append(topic)
 
-            # ── Step 4: render chart — pass iv_at_ts so title also reflects ts ─
-            enh_fig, _, _ = create_enhanced_vanna_overlay_chart(
-                df_selected, spot_price, unit_label,
-                df_full=df, tte=tte_val, iv_df_override=iv_at_ts
-            )
-            st.plotly_chart(enh_fig, use_container_width=True)
+    with cc2:
+        diff   = st.radio("Difficulty", ["Mixed","Easy","Medium","Hard"], horizontal=True)
+        n      = st.select_slider("Questions", [10,15,20,25,30,50], value=15)
+        pm     = st.radio("Mode", ["Practice","Exam"], captions=["Show answers after each Q","Full simulation"])
+        timed  = st.toggle("Timer", value=True)
+        t_secs = n * 120 if timed else 0
+        # Year/season filter
+        sy = st.multiselect("Year(s)", qb.get_years(), default=[], placeholder="All", key="cfg_yr")
+        ss = st.multiselect("Season(s)", qb.get_seasons(), default=[], placeholder="All", key="cfg_ss")
 
-            # ── Volume Spike × VANNA Coincidence panel ────────────────────
-            with st.expander("⚡ Volume Spike × VANNA Coincidence", expanded=True):
-                _spike_z = st.slider(
-                    "Spike sensitivity (Z-threshold)", 1.5, 4.0, 2.0, 0.1,
-                    key="vanna_spike_z",
-                    help="Lower = more spikes. 2.0σ = moderate, 3.0σ = strong only.",
-                )
-                _sp_fig, _sp_df = create_vanna_spike_panel(df, unit_label, z_threshold=_spike_z)
-                st.plotly_chart(_sp_fig, use_container_width=True)
-                _sp_events = _sp_df[_sp_df['vol_spike']][
-                    ['timestamp','spike_type','spike_strength','gex_confirmation','vol_z_score']
-                ].rename(columns={
-                    'timestamp'      : 'Time',
-                    'spike_type'     : 'Type',
-                    'spike_strength' : 'Strength',
-                    'gex_confirmation': 'GEX Confirmation',
-                    'vol_z_score'    : 'Z-Score',
-                })
-                if not _sp_events.empty:
-                    _sp_events['Time'] = _sp_events['Time'].dt.strftime('%H:%M')
-                    _sp_events['Z-Score'] = _sp_events['Z-Score'].round(2)
-                    st.dataframe(_sp_events, use_container_width=True, hide_index=True)
+    prev = qb.get_filtered(topics=selected or None, difficulty=diff, years=sy or None, seasons=ss or None, n=9999, shuffle=False)
+    st.markdown(f'<p style="color:var(--violet2);font-weight:700;font-size:0.85rem;">✅ {len(prev)} match · {min(n,len(prev))} will be used</p>', unsafe_allow_html=True)
 
-            bull_pct   = bias_data['bull_pct']
-            bear_pct   = bias_data['bear_pct']
-            bias       = bias_data['bias']
-            confidence = bias_data['confidence']
-            iv_regime  = bias_data['iv_regime']
-            iv_skew    = bias_data['iv_skew']
+    if st.button("🚀 Start Session", use_container_width=True, type="primary"):
+        if not selected: st.error("Select at least one topic."); return
+        qs = qb.get_filtered(topics=selected, difficulty=diff, years=sy or None, seasons=ss or None, n=n)
+        _start_quiz(qs, pm.lower(), f"Practice ({diff})", t_secs)
+        st.rerun()
 
-            # ── Session bias banner ───────────────────────────────────────
-            bias_cfg = {
-                'BULLISH'   : ('#10b981', '🟢 BULLISH BIAS'),
-                'BEARISH'   : ('#ef4444', '🔴 BEARISH BIAS'),
-                'CONFLICTED': ('#f59e0b', '⚡ CONFLICTED'),
-            }
-            bc, bl = bias_cfg.get(bias, ('#64748b','⬜ NEUTRAL'))
-            conf_color = {'HIGH':'#10b981','MODERATE':'#f59e0b','LOW':'#64748b'}[confidence]
-            rc = {'EXPANDING':'#ef4444','COMPRESSING':'#10b981','FLAT':'#94a3b8'}.get(iv_regime,'#94a3b8')
 
-            st.markdown(f"""
-            <div style="display:flex;gap:10px;align-items:stretch;margin:8px 0 16px 0;flex-wrap:wrap;">
-              <!-- Bullish gauge -->
-              <div style="flex:1;min-width:160px;padding:14px 18px;
-                   background:rgba(16,185,129,0.10);border:1.5px solid rgba(16,185,129,0.45);
-                   border-radius:12px;text-align:center;">
-                <div style="font-size:2rem;font-weight:800;color:#10b981;
-                     font-family:'JetBrains Mono',monospace;">{bull_pct:.0f}%</div>
-                <div style="font-size:0.85rem;color:#10b981;margin-top:2px;">🟢 BULLISH PROBABILITY</div>
-                <div style="background:rgba(16,185,129,0.2);border-radius:6px;height:6px;margin-top:8px;">
-                  <div style="background:#10b981;width:{bull_pct}%;height:6px;border-radius:6px;"></div>
-                </div>
-              </div>
-              <!-- Direction verdict -->
-              <div style="flex:1;min-width:180px;padding:14px 18px;
-                   background:{bc}18;border:2px solid {bc}55;
-                   border-radius:12px;text-align:center;">
-                <div style="font-size:1.3rem;font-weight:800;color:{bc};
-                     font-family:'JetBrains Mono',monospace;">{bl}</div>
-                <div style="font-size:0.78rem;color:{conf_color};margin-top:6px;">
-                  Confidence: <b>{confidence}</b></div>
-                <div style="font-size:0.75rem;color:#94a3b8;margin-top:4px;">
-                  IV: <span style="color:{rc}"><b>{iv_regime}</b></span> |
-                  Skew: <span style="color:{'#10b981' if iv_skew>0 else '#ef4444'}">{iv_skew:+.1f}%</span>
-                </div>
-              </div>
-              <!-- Bearish gauge -->
-              <div style="flex:1;min-width:160px;padding:14px 18px;
-                   background:rgba(239,68,68,0.10);border:1.5px solid rgba(239,68,68,0.45);
-                   border-radius:12px;text-align:center;">
-                <div style="font-size:2rem;font-weight:800;color:#ef4444;
-                     font-family:'JetBrains Mono',monospace;">{bear_pct:.0f}%</div>
-                <div style="font-size:0.85rem;color:#ef4444;margin-top:2px;">🔴 BEARISH PROBABILITY</div>
-                <div style="background:rgba(239,68,68,0.2);border-radius:6px;height:6px;margin-top:8px;">
-                  <div style="background:#ef4444;width:{bear_pct}%;height:6px;border-radius:6px;"></div>
-                </div>
-              </div>
-            </div>
-            """, unsafe_allow_html=True)
+# ═══════════════════════════════════════════════
+# RESULTS
+# ═══════════════════════════════════════════════
+def get_grade(pct):
+    if pct >= 90: return "A+", "var(--emerald)", "Outstanding! 🏆"
+    if pct >= 75: return "A",  "var(--emerald)", "Excellent! 🎉"
+    if pct >= 60: return "B+", "var(--teal2)",   "Good work! 👍"
+    if pct >= 50: return "B",  "var(--amber)",   "Keep practicing 💪"
+    if pct >= 35: return "C",  "var(--amber)",   "Need more revision 📖"
+    return "D", "var(--rose)", "Don't give up! 🔥"
 
-            # ── Bias Transition Chart ─────────────────────────────────────
-            st.markdown("#### 📊 Bull vs Bear Probability Transition")
-            transition_fig = create_bias_transition_chart(df, spot_price, selected_ts, tte_val)
-            st.plotly_chart(transition_fig, use_container_width=True)
+def page_results():
+    score   = st.session_state.get("score", 0)
+    total   = len(st.session_state.questions)
+    pct     = round(score/total*100) if total else 0
+    elapsed = int(time.time() - (st.session_state.start_time or time.time()))
+    em, es  = divmod(elapsed, 60)
+    grade, gc, gm = get_grade(pct)
+    label   = st.session_state.quiz_label
+    mode    = st.session_state.quiz_mode
+    t_secs  = st.session_state.get("total_time", total * 120)
 
-            # ── Signal breakdown ──────────────────────────────────────────
-            with st.expander("📡 Signal Breakdown (4 independent signals)"):
-                for line in bias_data['lines']:
-                    st.markdown(f"• {line}")
-                st.markdown(f"""
-                **VANNA Balance:** {bias_data['vanna_balance_pct']:.1f}% of flip magnitude above spot
-                (>50% = IV expansion pushes price UP more than DOWN)
+    user = st.session_state.user
+    if user and mode in ("exam", "exam_sim", "practice"):
+        save_score(st.session_state.username, user["name"], score, total, pct, mode, elapsed)
 
-                **Net VANNA above spot:** `{bias_data['net_vanna_above']:.4f}` |
-                **below spot:** `{bias_data['net_vanna_below']:.4f}`
-                """)
+    wrong   = sum(1 for a in st.session_state.answers.values() if not a.get("correct") and not a.get("skipped"))
+    skipped = sum(1 for a in st.session_state.answers.values() if a.get("skipped"))
+    avg_t   = round(sum(st.session_state.q_times.values())/len(st.session_state.q_times)) if st.session_state.q_times else 0
 
-            # ── KPI strip ─────────────────────────────────────────────────
-            k1,k2,k3,k4,k5,k6 = st.columns(6)
-            k1.metric("Flip Zones",    len(vf_zones))
-            k2.metric("🚀 Vacuum",    sum(1 for z in vf_zones if z['role']=='VACUUM_ZONE'))
-            k3.metric("🔴 Resistance",sum(1 for z in vf_zones if z['role']=='RESISTANCE_CEILING'))
-            k4.metric("⚠️ Trap Doors",sum(1 for z in vf_zones if z['role']=='TRAP_DOOR'))
-            k5.metric("IV Regime",     latest_iv.get('iv_regime', 'N/A'))
-            k6.metric("IV Skew",       f"{latest_iv.get('iv_skew', 0.0):+.1f}%")
-
-            # ── Directional probability table ──────────────────────────────
-            if not prob_df.empty:
-                st.markdown("#### 🎯 Flip Zone Directional Probability")
-
-                def _prob_bg(row):
-                    d = row.get('Direction','')
-                    if 'BULLISH'    in str(d): return ['background-color:rgba(16,185,129,0.15)']*len(row)
-                    if 'BEARISH'    in str(d): return ['background-color:rgba(239,68,68,0.15)']*len(row)
-                    if 'CONFLICTED' in str(d): return ['background-color:rgba(245,158,11,0.12)']*len(row)
-                    return ['']*len(row)
-
-                # Build display table — no empty-string column names
-                dp = prob_df[[
-                    'strike','role','distance_pct',
-                    'bull_score','bear_score','final_score',
-                    'direction','dir_icon','signal','iv_regime'
-                ]].copy()
-                # Combine icon into Direction string before renaming
-                dp['direction'] = prob_df['dir_icon'] + ' ' + prob_df['direction']
-                dp.columns = [
-                    'Strike','Role','Dist%',
-                    '🟢 Bull%','🔴 Bear%','Best%',
-                    'Direction','_drop','Signal','IV'
-                ]
-                dp.drop(columns=['_drop'], inplace=True)
-                dp['Strike'] = dp['Strike'].apply(lambda x: f"₹{x:,.0f}")
-                dp['Dist%']  = dp['Dist%'].apply(lambda x: f"{x:.2f}%")
-                for c in ['🟢 Bull%','🔴 Bear%','Best%']:
-                    dp[c] = dp[c].apply(lambda x: f"{x:.1f}%")
-
-                st.dataframe(dp.style.apply(_prob_bg, axis=1),
-                             use_container_width=True, hide_index=True,
-                             height=min(420, 44 + len(dp)*40))
-
-                # ── Top zone trade guidance card ──────────────────────────
-                top = prob_df.iloc[0]
-                is_bull = top['direction'] == 'BULLISH'
-                is_bear = top['direction'] == 'BEARISH'
-
-                guidance = {
-                    ('VACUUM_ZONE',     True ): ("🚀 SQUEEZE SETUP",
-                        f"₹{top['strike']:,.0f} Vacuum zone. IV expanding → dealers BUY delta above. "
-                        f"Bull score {top['bull_score']:.0f}% vs Bear {top['bear_score']:.0f}%. "
-                        f"Enter: break+close above ₹{top['strike']:,.0f}. "
-                        f"Target: next VANNA flip zone above. Stop: below entry 0.5%."),
-                    ('VACUUM_ZONE',     False): ("📉 VACUUM FADE",
-                        f"₹{top['strike']:,.0f} Vacuum zone but IV compressing. "
-                        f"Dealers selling delta. Bear score {top['bear_score']:.0f}%. "
-                        f"Expect price to fall away from this zone rather than squeeze through it."),
-                    ('RESISTANCE_CEILING', False): ("🔴 BREAKDOWN WATCH",
-                        f"₹{top['strike']:,.0f} Resistance ceiling. IV expanding → dealers SELL delta. "
-                        f"Bear score {top['bear_score']:.0f}% vs Bull {top['bull_score']:.0f}%. "
-                        f"Enter: break+close below ceiling with IV rising. "
-                        f"Target: next VANNA flip support below. Stop: reclaim ceiling."),
-                    ('RESISTANCE_CEILING', True ): ("🟢 CEILING ABSORBED",
-                        f"₹{top['strike']:,.0f} Resistance ceiling but IV compressing. "
-                        f"Dealers absorbing. Bull score {top['bull_score']:.0f}%. "
-                        f"Slow grind up likely if IV stays flat. Not a momentum trade."),
-                    ('TRAP_DOOR',       False): ("⚠️ TRAP DOOR ARMED",
-                        f"₹{top['strike']:,.0f} trap door below spot. IV expanding → drop accelerates below. "
-                        f"Bear score {top['bear_score']:.0f}%. "
-                        f"High-vol candle below this level = acceleration. "
-                        f"No natural support until next VANNA flip below."),
-                    ('TRAP_DOOR',       True ): ("🛡️ TRAP DOOR HEALING",
-                        f"₹{top['strike']:,.0f} below spot. IV compressing → dealers buying. "
-                        f"Bull score {top['bull_score']:.0f}%. Bounce likely from this zone."),
-                    ('SUPPORT_FLOOR',   True ): ("🛡️ SUPPORT ACTIVE",
-                        f"₹{top['strike']:,.0f} VANNA support floor. IV compressing → dealers buy delta. "
-                        f"Bull score {top['bull_score']:.0f}%. "
-                        f"Hold long while IV stays flat/falling near this level. "
-                        f"Invalidated if IV starts expanding."),
-                    ('SUPPORT_FLOOR',   False): ("💥 FLOOR BREAKING",
-                        f"₹{top['strike']:,.0f} VANNA floor but IV EXPANDING. "
-                        f"Bear score {top['bear_score']:.0f}%. "
-                        f"Floor breaks under vol expansion — dealers forced to SELL delta. "
-                        f"Short signal if price closes below ₹{top['strike']:,.0f}."),
-                }
-                key  = (top['role'], is_bull)
-                lbl, desc = guidance.get(key, ("📊 MONITOR","Watch this level closely."))
-                card_col = '#10b981' if is_bull else ('#ef4444' if is_bear else '#f59e0b')
-
-                st.markdown(f"""
-                <div style="margin-top:14px;padding:14px 20px;
-                     background:{card_col}12;border:1.5px solid {card_col}45;
-                     border-radius:12px;font-family:'JetBrains Mono',monospace;">
-                  <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <b style="color:{card_col};font-size:1rem;">{lbl}</b>
-                    <span style="font-size:0.78rem;color:#94a3b8;">
-                      {top['dir_icon']} {top['direction']} | {top['signal']}
-                    </span>
-                  </div>
-                  <div style="font-size:0.81rem;color:#cbd5e1;line-height:1.75;margin-top:8px;">
-                    {desc}
-                  </div>
-                  <div style="display:flex;gap:20px;margin-top:10px;font-size:0.75rem;color:#64748b;">
-                    <span>🟢 Bull: <b style="color:#10b981">{top['bull_score']:.0f}%</b></span>
-                    <span>🔴 Bear: <b style="color:#ef4444">{top['bear_score']:.0f}%</b></span>
-                    <span>IV: <b style="color:{rc}">{iv_regime}</b></span>
-                    <span>Skew: {iv_skew:+.1f}%</span>
-                    <span>Dist: {top['distance_pct']:.2f}%</span>
-                  </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-                st.download_button("📥 Download Directional Analysis CSV",
-                    data=prob_df.to_csv(index=False),
-                    file_name=f"vanna_directional_{meta.get('symbol','')}.csv",
-                    mime="text/csv")
-            else:
-                st.info("No VANNA flip zones found. Select wider strikes (ATM±5 or more).")
-
-        # ── TAB 6: DEX ────────────────────────────────────────────────────────
-        with tabs[6]:
-            st.markdown("### 📊 Delta Exposure (DEX)")
-            st.plotly_chart(create_dex_chart(df_selected, spot_price, unit_label), use_container_width=True)
-            c1,c2,c3 = st.columns(3)
-            c1.metric("Call DEX", f"{df_selected['call_dex'].sum():.4f}{unit_label}")
-            c2.metric("Put DEX",  f"{df_selected['put_dex'].sum():.4f}{unit_label}")
-            c3.metric("Net DEX",  f"{df_selected['net_dex'].sum():.4f}{unit_label}")
-
-        # ── TAB 7: OI Distribution ────────────────────────────────────────────
-        with tabs[7]:
-            st.markdown("### 📋 Open Interest Distribution")
-            st.plotly_chart(create_oi_distribution_chart(df_selected, spot_price), use_container_width=True)
-
-        # ── TAB 8: Data Table ─────────────────────────────────────────────────
-        with tabs[8]:
-            st.markdown("### 📁 Data Summary")
-            st.markdown(f"""
-            **Symbol**: {meta.get('symbol',symbol)} ({meta.get('instrument_type','INDEX')})
-            | **Fetch Mode**: {fetch_mode.upper()}
-            | **Last Fetch**: {meta.get('fetch_time','N/A')}
-            | **Total Records**: {meta.get('total_records',0)}
-            | **Time Range**: {meta.get('time_range','N/A')}
-            | **Contract Size**: {meta.get('contract_size','N/A')}
-            | **Unit**: ₹ {unit_label}
-            """)
-            disp = ['strike','net_gex','net_dex','net_vanna','total_volume','call_volume','put_volume',
-                    'call_oi','put_oi','call_iv','put_iv']
-            avail = [c for c in disp if c in df_selected.columns]
-            st.dataframe(df_selected[avail], use_container_width=True, height=400)
-            st.download_button("📥 Download Data (CSV)", data=df_selected.to_csv(index=False),
-                               file_name=f"nyztrade_{meta.get('symbol',symbol)}_{target_date}.csv", mime="text/csv",
-                               use_container_width=True)
-
+    # ── Motivational banner ──────────────────────────────────────────
+    if pct >= 75:
+        banner_bg = "linear-gradient(135deg,rgba(16,185,129,0.18),rgba(5,150,105,0.08))"
+        banner_border = "rgba(16,185,129,0.4)"
+        banner_icon = "🎉"
+        banner_msg = "Excellent performance! Keep it up!"
+    elif pct >= 50:
+        banner_bg = "linear-gradient(135deg,rgba(232,160,32,0.15),rgba(180,120,0,0.05))"
+        banner_border = "rgba(232,160,32,0.4)"
+        banner_icon = "💪"
+        banner_msg = "Good effort! A bit more revision will get you there."
     else:
-        st.info("""
-        👋 **Welcome to NYZTrade UNIFIED Dashboard!**
+        banner_bg = "linear-gradient(135deg,rgba(244,63,94,0.15),rgba(200,30,60,0.05))"
+        banner_border = "rgba(244,63,94,0.4)"
+        banner_icon = "📖"
+        banner_msg = "Don't give up — review the explanations and try again!"
 
-        **New in this version — Volume Spike Detection (Tab 0):**
-        - 🚀 Confirmed Bullish = Call-dominant spike + GEX rising
-        - 💥 Confirmed Bearish = Put-dominant spike + GEX falling
-        - ⚠️ Divergence = Volume & GEX conflict — wait for resolution
-        - 📊 Unconfirmed = Volume spike but GEX flat
-        - Adjustable σ threshold slider for sensitivity control
-        - Downloadable spike log CSV
+    st.markdown(f"""<div style="background:{banner_bg};border:1px solid {banner_border};
+        border-radius:16px;padding:2rem 1.5rem;text-align:center;margin-bottom:1.5rem;">
+      <div style="font-size:0.75rem;color:var(--t2);margin-bottom:0.5rem;font-weight:600;
+          letter-spacing:0.08em;text-transform:uppercase;">📝 {label}</div>
+      <div style="font-size:clamp(3rem,10vw,5rem);font-weight:900;font-family:'Playfair Display',serif;
+          color:{gc};line-height:1;">{grade}</div>
+      <div style="font-size:clamp(1.4rem,4vw,2.2rem);font-weight:800;color:var(--t1);margin:0.25rem 0;">
+          {score} / {total}</div>
+      <div style="font-size:1.1rem;font-weight:700;color:{gc};">{pct}% Accuracy</div>
+      <div style="margin-top:0.75rem;font-size:1rem;color:var(--t2);">{banner_icon} {banner_msg}</div>
+    </div>""", unsafe_allow_html=True)
 
-        **New — Significant GEX Tab (Tab 3):**
-        - Separates Strong Additions from Strong Unwinds
-        - Classifies noise/residual OI automatically
-        - Significance score overlay line
+    # ── Stats strip ──────────────────────────────────────────────────
+    stat_cols = st.columns(5)
+    for col, val, lbl, c in [
+        (stat_cols[0], score,         "✅ Correct",  "var(--emerald)"),
+        (stat_cols[1], wrong,         "❌ Wrong",    "var(--rose)"),
+        (stat_cols[2], skipped,       "⏭️ Skipped", "var(--amber)"),
+        (stat_cols[3], f"{em}m {es}s","⏱️ Time",    "var(--indigo2)"),
+        (stat_cols[4], f"{avg_t}s",   "⚡ Avg/Q",   "var(--teal2)"),
+    ]:
+        with col:
+            st.markdown(f"""<div class="stat-card-mini" style="border-top-color:{c};">
+              <span class="val" style="color:{c};">{val}</span>
+              <span class="lbl">{lbl}</span>
+            </div>""", unsafe_allow_html=True)
 
-        **Select your instrument and click 🚀 Fetch Data to begin!**
-        """)
+    # ── Leaderboard rank ─────────────────────────────────────────────
+    if user:
+        lb = get_leaderboard(mode=mode)
+        my_rank = next((i+1 for i,r in enumerate(lb) if r["username"]==st.session_state.username), None)
+        if my_rank:
+            st.markdown(f"""<div style="text-align:center;margin:1.25rem 0;padding:0.85rem;
+                background:var(--amber-glow);border:1px solid rgba(232,160,32,0.3);border-radius:var(--r-md);">
+              <span style="font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:800;color:var(--amber);">
+                🏆 Your Rank: #{my_rank} out of {len(lb)}</span>
+            </div>""", unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.markdown(f"""
-    <div style="text-align:center;padding:20px;color:#64748b;">
-        <p style="font-family:'JetBrains Mono',monospace;font-size:0.85rem;">
-            NYZTrade Unified GEX/DEX Dashboard | INDEX + STOCK Options<br>
-            Smart Caching | VANNA/CHARM | Gamma Flip Zones | Volume Spike Detection | Significant GEX | Drawing Tools
-        </p>
-        <p style="font-size:0.75rem;margin-top:8px;">
-            ⚠️ For educational and research purposes only. Not financial advice.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    # ── Wrong answers quick review ───────────────────────────────────
+    wrong_qs = [(i, st.session_state.questions[i], st.session_state.answers[i])
+                for i in range(total)
+                if i in st.session_state.answers and not st.session_state.answers[i].get("correct")
+                and not st.session_state.answers[i].get("skipped")]
+    if wrong_qs:
+        with st.expander(f"📋 Review {len(wrong_qs)} Wrong Answers", expanded=False):
+            for qi, q, ans in wrong_qs:
+                st.markdown(f"""<div style="border-left:3px solid var(--rose);padding:0.6rem 0.8rem;
+                    margin-bottom:0.75rem;border-radius:0 8px 8px 0;background:rgba(244,63,94,0.06);">
+                  <div style="font-size:0.78rem;color:var(--t2);margin-bottom:0.3rem;">Q{qi+1} · {q.get('topic','')} · {q.get('difficulty','')}</div>
+                  <div style="font-weight:600;color:var(--t1);margin-bottom:0.4rem;">{q.get('question','')[:160]}</div>
+                  <div style="font-size:0.82rem;">
+                    <span style="color:var(--rose);">✗ Your answer: {ans.get('answer','—')}</span><br>
+                    <span style="color:var(--emerald);">✓ Correct: {q.get('correct_answer','')}</span>
+                  </div>
+                  <div style="font-size:0.78rem;color:var(--t2);margin-top:0.3rem;font-style:italic;">
+                    💡 {q.get('explanation','')[:200]}</div>
+                </div>""", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Action buttons — PRIMARY: New Test / Retry ───────────────────
+    st.markdown("""<div style="font-size:0.75rem;color:var(--t2);text-align:center;
+        margin-bottom:0.6rem;letter-spacing:0.05em;text-transform:uppercase;font-weight:600;">
+        What's next?</div>""", unsafe_allow_html=True)
+
+    btn1, btn2, btn3, btn4 = st.columns(4)
+
+    with btn1:
+        # NEW TEST — same type, fresh shuffle
+        if st.button("🚀 New Test", use_container_width=True, type="primary",
+                     help="Start a fresh test of the same type immediately"):
+            qb = QuestionBank()
+            fresh_qs = qb.get_filtered(n=total, shuffle=True)
+            if fresh_qs:
+                _start_quiz(fresh_qs, mode, label + " (New)", t_secs)
+                st.rerun()
+
+    with btn2:
+        if st.button("🔄 Retry Same", use_container_width=True,
+                     help="Restart with the exact same questions"):
+            st.session_state.quiz_active = False
+            st.session_state.quiz_done   = False
+            st.rerun()
+
+    with btn3:
+        if st.button("📊 Analytics", use_container_width=True):
+            st.session_state.page = "analytics"
+            st.session_state.quiz_active = False
+            st.session_state.quiz_done   = False
+            st.rerun()
+
+    with btn4:
+        if st.button("🏛️ Home", use_container_width=True):
+            st.session_state.page = "home"
+            st.session_state.quiz_active = False
+            st.session_state.quiz_done   = False
+            st.rerun()
+
+    # Secondary row
+    s1, s2 = st.columns(2)
+    with s1:
+        if st.button("🏆 Leaderboard", use_container_width=True):
+            st.session_state.page = "leaderboard"
+            st.session_state.quiz_active = False
+            st.session_state.quiz_done   = False
+            st.rerun()
+    with s2:
+        if st.button("🔖 Practice Weak Topics", use_container_width=True,
+                     help="Start a practice session focused on topics you got wrong"):
+            qb = QuestionBank()
+            # collect wrong topics
+            wrong_topics = list({st.session_state.questions[i].get("topic")
+                                  for i in range(total)
+                                  if i in st.session_state.answers
+                                  and not st.session_state.answers[i].get("correct")
+                                  and not st.session_state.answers[i].get("skipped")})
+            if not wrong_topics:
+                wrong_topics = None  # no wrong answers → use all
+            focus_qs = qb.get_filtered(topics=wrong_topics, n=15, shuffle=True)
+            if focus_qs:
+                topic_str = ", ".join(wrong_topics[:3]) if wrong_topics else "All"
+                _start_quiz(focus_qs, "practice", f"Weak Topic Practice ({topic_str[:30]})", 15*120)
+                st.rerun()
+
+
+# ═══════════════════════════════════════════════
+# LEADERBOARD
+# ═══════════════════════════════════════════════
+def page_leaderboard():
+    st.markdown('<h2 style="font-family:Syne,sans-serif;font-size:1.5rem;font-weight:800;margin-bottom:0.5rem;">🏆 Leaderboard</h2>', unsafe_allow_html=True)
+
+    lc1, lc2, lc3 = st.columns([2,1,1])
+    with lc1:
+        mode_filter = st.selectbox("Filter by mode", ["All","exam_sim","exam","practice"], key="lb_mode",
+                                   format_func=lambda x: {"All":"All Modes","exam_sim":"🎓 Exam Simulation","exam":"🧪 Mock Test","practice":"📝 Practice"}.get(x,x))
+    with lc2:
+        n_show = st.select_slider("Show", [10,20,50], value=20, key="lb_n")
+    with lc3:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔄 Refresh", use_container_width=True):
+            st.rerun()
+
+    lb = get_leaderboard(mode=mode_filter if mode_filter != "All" else None, limit=n_show)
+
+    # Show current user's rank
+    if st.session_state.username:
+        lb_all = get_leaderboard(mode=mode_filter if mode_filter != "All" else None, limit=200)
+        my_rank = next((i+1 for i,r in enumerate(lb_all) if r["username"]==st.session_state.username), None)
+        total_students = len(lb_all)
+        if my_rank:
+            pct_rank = round((total_students - my_rank + 1)/total_students*100) if total_students else 0
+            st.markdown(f"""<div style="background:var(--indigo-glow);border:1px solid rgba(99,102,241,0.35);border-radius:var(--r-md);
+                padding:0.85rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+              <span style="font-size:0.9rem;color:var(--t2);">📍 Your Standing</span>
+              <span style="font-family:'Fira Code',monospace;font-weight:800;font-size:1.05rem;color:var(--indigo2);">
+                Rank #{my_rank} of {total_students} students · Top {pct_rank}%
+              </span>
+            </div>""", unsafe_allow_html=True)
+
+    medals = ["🥇","🥈","🥉"]
+    rank_colors = ["gold","silver","bronze"]
+
+    if not lb:
+        st.markdown('<div style="text-align:center;padding:3rem;color:var(--text3);">No scores recorded yet. Complete a quiz to appear here!</div>', unsafe_allow_html=True)
+        return
+
+    # Top 3 podium
+    if len(lb) >= 3:
+        p2, p1, p3 = st.columns([1,1.2,1])
+        for col, row, i, height in [(p2,lb[1],1,"7rem"),(p1,lb[0],0,"9rem"),(p3,lb[2],2,"6rem")]:
+            with col:
+                initials = "".join(w[0].upper() for w in row["name"].split()[:2])
+                is_me = row["username"] == st.session_state.username
+                st.markdown(f"""<div style="text-align:center;background:var(--card);border:1px solid var(--border2);
+                  border-radius:var(--rl);padding:1.2rem 0.75rem;margin-bottom:0.5rem;">
+                  <div style="font-size:1.6rem;">{medals[i]}</div>
+                  <div style="width:2.8rem;height:2.8rem;border-radius:50%;background:linear-gradient(135deg,var(--violet),var(--cyan));
+                    display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;margin:0.4rem auto;">
+                    {initials}</div>
+                  <div style="font-weight:700;font-size:0.85rem;color:var(--text);">{row["name"]} {"⭐" if is_me else ""}</div>
+                  <div style="font-family:JetBrains Mono,monospace;font-weight:800;font-size:1.1rem;color:var(--gold);">{row["pct"]}%</div>
+                  <div style="font-size:0.7rem;color:var(--text3);">{row["score"]}/{row["total"]}</div>
+                </div>""", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    for i, row in enumerate(lb):
+        is_me = row["username"] == st.session_state.username
+        me_cls = "lb-row me" if is_me else "lb-row"
+        rank_cls = rank_colors[i] if i < 3 else "rest"
+        medal = medals[i] if i < 3 else str(i+1)
+        initials = "".join(w[0].upper() for w in row["name"].split()[:2])
+        ts = datetime.fromisoformat(row["ts"]).strftime("%d %b %Y") if row.get("ts") else ""
+        st.markdown(f"""<div class="{me_cls}">
+          <div class="lb-rank {rank_cls}">{medal}</div>
+          <div class="lb-avatar">{initials}</div>
+          <div style="flex:1">
+            <div class="lb-name">{row["name"]} {"⭐ You" if is_me else ""}</div>
+            <div class="lb-detail">{row.get("mode","—")} · {ts}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="lb-score">{row["pct"]}%</div>
+            <div style="font-size:0.7rem;color:var(--text3);">{row["score"]}/{row["total"]}</div>
+          </div>
+        </div>""", unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════
+# ANALYTICS
+# ═══════════════════════════════════════════════
+def page_analytics():
+    st.markdown('<h2 style="font-family:Syne,sans-serif;font-size:1.5rem;font-weight:800;margin-bottom:1rem;">📊 Your Analytics</h2>', unsafe_allow_html=True)
+
+    attempted = st.session_state.total_attempted
+    correct   = st.session_state.total_correct
+    accuracy  = round(correct/attempted*100) if attempted else 0
+    streak    = st.session_state.streak
+    bookmarks = len(st.session_state.bookmarks)
+    wrong_cnt = len(st.session_state.wrong_questions)
+
+    c1,c2,c3,c4,c5,c6 = st.columns(6)
+    for col,val,lbl,c in [
+        (c1,attempted,"Attempted","#7c5cfc"),(c2,correct,"Correct","#00e5a0"),
+        (c3,f"{accuracy}%","Accuracy","#00d4ff"),(c4,streak,"Streak 🔥","#f5a623"),
+        (c5,bookmarks,"Bookmarks","#a78bfa"),(c6,wrong_cnt,"For Review","#ff4d6d"),
+    ]:
+        with col:
+            st.markdown(f'<div class="card" style="text-align:center;padding:1rem;border-top:3px solid {c}"><div style="font-family:JetBrains Mono,monospace;font-size:1.6rem;font-weight:800;color:{c};">{val}</div><div style="font-size:0.68rem;color:var(--text3);text-transform:uppercase;margin-top:0.2rem;">{lbl}</div></div>', unsafe_allow_html=True)
+
+    # Topic performance
+    answers   = st.session_state.answers
+    questions = st.session_state.questions
+    if answers and questions:
+        st.markdown('<div class="section-label">Topic Performance</div>', unsafe_allow_html=True)
+        topic_stats = {}
+        for qi, ans in answers.items():
+            if qi < len(questions):
+                t = questions[qi].get("topic","General")
+                if t not in topic_stats: topic_stats[t] = {"correct":0,"total":0}
+                topic_stats[t]["total"] += 1
+                if ans.get("correct"): topic_stats[t]["correct"] += 1
+        for topic, stats in sorted(topic_stats.items()):
+            pct = round(stats["correct"]/stats["total"]*100) if stats["total"] else 0
+            bar_c = "#00e5a0" if pct>=70 else ("#f5a623" if pct>=50 else "#ff4d6d")
+            st.markdown(f"""<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:0.75rem 1rem;margin-bottom:0.4rem;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem;">
+                <span style="font-weight:600;font-size:0.85rem;">{topic}</span>
+                <span style="font-family:JetBrains Mono,monospace;font-size:0.85rem;color:{bar_c};">{pct}% ({stats["correct"]}/{stats["total"]})</span>
+              </div>
+              <div style="background:var(--border);height:5px;border-radius:3px;">
+                <div style="background:{bar_c};height:100%;width:{pct}%;border-radius:3px;transition:width 0.5s;"></div>
+              </div>
+            </div>""", unsafe_allow_html=True)
+
+    # Wrong questions for review
+    if st.session_state.wrong_questions:
+        st.markdown('<div class="section-label">❌ Questions for Review</div>', unsafe_allow_html=True)
+        if st.button("🔄 Practice Wrong Questions", use_container_width=True, type="primary"):
+            qs = st.session_state.wrong_questions[:20]
+            _start_quiz(qs, "practice", "Wrong Q Review", len(qs)*90)
+            st.rerun()
+
+
+# ═══════════════════════════════════════════════
+# BOOKMARKS
+# ═══════════════════════════════════════════════
+def page_bookmarks():
+    st.markdown('<h2 style="font-family:Syne,sans-serif;font-size:1.5rem;font-weight:800;margin-bottom:0.5rem;">🔖 Bookmarks</h2>', unsafe_allow_html=True)
+    bms = st.session_state.bookmarks
+    if not bms:
+        st.markdown('<div style="text-align:center;padding:3rem;color:var(--text3);">No bookmarks yet. Click 🔖 during a quiz to save questions.</div>', unsafe_allow_html=True)
+        return
+    qb = QuestionBank()
+    all_q = {q.get("id"): q for q in qb.get_all()}
+    bm_questions = [all_q[bid] for bid in bms if bid in all_q]
+    st.markdown(f'<p style="color:var(--text2);font-size:0.85rem;margin-bottom:1rem;">{len(bm_questions)} saved questions</p>', unsafe_allow_html=True)
+    if bm_questions and st.button("🚀 Practice Bookmarks", use_container_width=True, type="primary"):
+        _start_quiz(bm_questions, "practice", "Bookmarked Questions", len(bm_questions)*90)
+        st.rerun()
+    for q in bm_questions:
+        st.markdown(f"""<div class="card" style="margin-bottom:0.5rem;">
+          <div class="card-meta"><span class="meta-chip violet">{q.get("topic","")}</span>
+          <span class="meta-chip">{q.get("difficulty","")}</span>
+          <span class="meta-chip">{q.get("year","")} {q.get("season","")}</span></div>
+          <div style="font-weight:600;font-size:0.88rem;margin-top:0.5rem;color:var(--text);line-height:1.6;">{q["question"][:200]}</div>
+          <div style="font-size:0.8rem;color:var(--green);margin-top:0.3rem;">✅ {q.get("correct_answer","")}</div>
+        </div>""", unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════
+# LOGIN / REGISTER
+# ═══════════════════════════════════════════════
+def page_login():
+    user = st.session_state.user
+    uname = st.session_state.username or ""
+
+    # ── If already logged in, show profile card ──
+    if user:
+        scores = load_scores()
+        my_scores = [s for s in scores if s.get("username")==uname]
+        attempts  = len(my_scores)
+        best_pct  = max((s["pct"] for s in my_scores), default=0)
+        avg_pct   = round(sum(s["pct"] for s in my_scores)/attempts) if attempts else 0
+        lb_all    = get_leaderboard(limit=200)
+        my_rank   = next((i+1 for i,r in enumerate(lb_all) if r["username"]==uname), None)
+        initials  = "".join(w[0].upper() for w in user["name"].split()[:2])
+
+        st.markdown(f"""<div class="page-header">
+          <h1>👤 My Profile</h1>
+        </div>""", unsafe_allow_html=True)
+
+        st.markdown(f"""<div class="card" style="border-color:rgba(99,102,241,0.4);margin-bottom:1.5rem;">
+          <div class="card-accent-top" style="background:linear-gradient(90deg,var(--indigo),var(--teal));"></div>
+          <div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;">
+            <div style="width:4rem;height:4rem;border-radius:50%;background:linear-gradient(135deg,var(--indigo),var(--teal));
+              display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.4rem;color:#fff;flex-shrink:0;">
+              {initials}
+            </div>
+            <div style="flex:1;">
+              <div style="font-family:'Playfair Display',serif;font-weight:800;font-size:1.2rem;color:var(--t1);">{user["name"]}</div>
+              <div style="color:var(--t3);font-size:0.8rem;">@{uname} · Joined {user.get("joined","—")}</div>
+            </div>
+            {f'<div style="font-family:Fira Code,monospace;font-size:1.5rem;font-weight:800;color:var(--amber);">🏆 #{my_rank}</div>' if my_rank else ""}
+          </div>
+        </div>""", unsafe_allow_html=True)
+
+        sc = st.columns(4)
+        for col, val, lbl, c in [
+            (sc[0], attempts,  "Attempts",   "var(--indigo2)"),
+            (sc[1], f"{best_pct}%", "Best Score", "var(--emerald)"),
+            (sc[2], f"{avg_pct}%",  "Avg Score",  "var(--amber)"),
+            (sc[3], f"#{my_rank}" if my_rank else "—", "Rank", "var(--teal2)"),
+        ]:
+            with col:
+                st.markdown(f"""<div class="card" style="text-align:center;padding:1rem;border-top:3px solid {c};">
+                  <div style="font-family:'Fira Code',monospace;font-size:1.5rem;font-weight:800;color:{c};">{val}</div>
+                  <div style="font-size:0.68rem;color:var(--t3);text-transform:uppercase;margin-top:0.2rem;">{lbl}</div>
+                </div>""", unsafe_allow_html=True)
+
+        if my_scores:
+            st.markdown('<div class="section-label">Recent Attempts</div>', unsafe_allow_html=True)
+            for s in sorted(my_scores, key=lambda x: x.get("ts",""), reverse=True)[:5]:
+                ts = datetime.fromisoformat(s["ts"]).strftime("%d %b %Y %H:%M") if s.get("ts") else "—"
+                mode_badge = {"exam_sim":"🎓 Exam Sim","exam":"🧪 Mock","practice":"📝 Practice"}.get(s.get("mode",""), s.get("mode","—"))
+                c = "var(--emerald)" if s["pct"]>=60 else ("var(--amber)" if s["pct"]>=40 else "var(--rose)")
+                st.markdown(f"""<div class="card" style="padding:0.75rem 1rem;margin-bottom:0.4rem;display:flex;align-items:center;
+                    justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                  <span style="font-size:0.82rem;color:var(--t2);">{mode_badge}</span>
+                  <span style="font-size:0.75rem;color:var(--t3);">{ts}</span>
+                  <span style="font-family:'Fira Code',monospace;font-weight:700;color:{c};">{s["pct"]}% ({s["score"]}/{s["total"]})</span>
+                </div>""", unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🏆 View Leaderboard", use_container_width=True, type="primary"):
+                st.session_state.page = "leaderboard"; st.rerun()
+        with col2:
+            if st.button("🚪 Logout", use_container_width=True):
+                st.session_state.user = None; st.session_state.username = None
+                st.session_state.page = "home"; st.rerun()
+        return
+
+    # ── Login / Register form ────────────────────
+    st.markdown('<div class="login-wrap">', unsafe_allow_html=True)
+    st.markdown('<span class="login-logo">🏛️</span>', unsafe_allow_html=True)
+    st.markdown('<div class="login-title">NET Guru</div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-sub">Sign in to track progress, earn ranks, and join the student leaderboard</div>', unsafe_allow_html=True)
+
+    tab1, tab2 = st.tabs(["🔑 Login", "📝 Register"])
+
+    with tab1:
+        un = st.text_input("Username", key="login_un", placeholder="your_username")
+        pw = st.text_input("Password", type="password", key="login_pw", placeholder="••••••••")
+        st.markdown('<div style="font-size:0.75rem;color:var(--t3);margin-top:-0.5rem;margin-bottom:0.5rem;">Default demo: username <b>demo</b> · password <b>demo123</b></div>', unsafe_allow_html=True)
+        if st.button("Login →", use_container_width=True, type="primary", key="do_login"):
+            ok, user_data = verify_user(un, pw)
+            if ok:
+                st.session_state.user = user_data
+                st.session_state.username = un
+                st.session_state.page = "home"
+                st.success(f"Welcome back, {user_data['name']}! 🎉")
+                st.rerun()
+            else:
+                st.error("Invalid username or password.")
+
+    with tab2:
+        rname = st.text_input("Full Name",   key="reg_name", placeholder="Your Full Name")
+        run   = st.text_input("Username",    key="reg_un",   placeholder="choose_a_username")
+        rpw   = st.text_input("Password",    type="password", key="reg_pw", placeholder="minimum 6 characters")
+        rpw2  = st.text_input("Confirm Password", type="password", key="reg_pw2", placeholder="repeat password")
+        if st.button("Create Account →", use_container_width=True, type="primary", key="do_reg"):
+            if not rname or not run or not rpw: st.error("Please fill all fields.")
+            elif rpw != rpw2: st.error("Passwords don't match.")
+            elif len(rpw) < 6: st.error("Password must be at least 6 characters.")
+            else:
+                ok, msg = register_user(run, rpw, rname)
+                if ok:
+                    ok2, udata = verify_user(run, rpw)
+                    st.session_state.user = udata
+                    st.session_state.username = run
+                    st.session_state.page = "home"
+                    st.success(f"Account created! Welcome, {rname} 🎉")
+                    st.rerun()
+                else: st.error(msg)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Auto-create demo accounts for leaderboard demo
+    try:
+        users = load_users()
+        demo_accounts = [
+            ("demo",    "demo123",  "Demo Student"),
+            ("arjun",   "test123",  "Arjun Kumar"),
+            ("priya",   "test123",  "Priya Nair"),
+            ("rahul",   "test123",  "Rahul Sharma"),
+            ("anjali",  "test123",  "Anjali Menon"),
+        ]
+        scores = load_scores()
+        existing_score_users = {s.get("username") for s in scores}
+        for un_, pw_, nm_ in demo_accounts:
+            if un_ not in users:
+                register_user(un_, pw_, nm_)
+            # Seed demo scores for leaderboard
+            if un_ != "demo" and un_ not in existing_score_users:
+                import random as _r
+                sc_ = _r.randint(8, 14)
+                save_score(un_, nm_, sc_, 15,
+                           round(sc_/15*100), "exam", 900)
+    except: pass
+
+
+# ═══════════════════════════════════════════════
+# PDF UPLOAD (dev only)
+# ═══════════════════════════════════════════════
+def page_pdf_upload():
+    if not st.session_state.dev_mode:
+        st.error("Developer access required."); return
+    st.markdown('<h2 style="font-family:Syne,sans-serif;font-weight:800;">📄 PDF Upload (Developer)</h2>', unsafe_allow_html=True)
+    st.info("Upload PDF question papers. Questions will be extracted and added to the bank with year/season metadata.")
+    yr_in = st.selectbox("Year", PYQ_YEARS, key="pdf_yr")
+    ss_in = st.selectbox("Season", SEASONS, key="pdf_ss")
+    uploaded = st.file_uploader("Upload PDF", type="pdf", key="pdf_file")
+    if uploaded:
+        st.success(f"Uploaded: {uploaded.name} — {yr_in} {ss_in}")
+        st.info("PDF extraction requires PyMuPDF/pdfplumber. Questions auto-tagged with selected year and season.")
+
+
+# ═══════════════════════════════════════════════
+# MAIN ROUTER
+# ═══════════════════════════════════════════════
+def main():
+    inject_styles()
+    render_sidebar()
+
+    # Dev mode unlock via URL param
+    if not st.session_state.dev_mode:
+        params = st.query_params
+        if params.get("dev") == DEVELOPER_PIN:
+            st.session_state.dev_mode = True
+
+    page = st.session_state.page
+
+    # Guard developer-only pages
+    if page == "pdf_upload" and not st.session_state.get("dev_mode", False):
+        page = "home"
+        st.session_state.page = "home"
+
+    if   page == "home":        page_home()
+    elif page == "pyq":         page_pyq()
+    elif page == "quiz":
+        if st.session_state.quiz_active or st.session_state.quiz_done:
+            page_quiz()
+        else:
+            page_quiz_config()
+    elif page == "mock":        page_mock()
+    elif page == "ai":          page_ai()
+    elif page == "analytics":   page_analytics()
+    elif page == "bookmarks":   page_bookmarks()
+    elif page == "leaderboard": page_leaderboard()
+    elif page == "login":       page_login()
+    elif page == "pdf_upload":  page_pdf_upload()
+    else:                       page_home()
 
 if __name__ == "__main__":
     main()
