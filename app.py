@@ -1632,13 +1632,9 @@ def page_quiz():
                     else: st.session_state.bookmarks.add(bm_id)
                     st.rerun()
 
-        # Throttled auto-rerun for live timer (every 5s)
+        # Smooth 1-second timer: JS meta-refresh (non-blocking, no sleep)
         if remaining is not None and remaining > 0:
-            last_r = st.session_state.get("_timer_tick", 0)
-            if time.time() - last_r >= 5:
-                st.session_state["_timer_tick"] = time.time()
-                time.sleep(0.05)
-                st.rerun()
+            st.markdown('<meta http-equiv="refresh" content="1">', unsafe_allow_html=True)
 
     # Render body in correct container
     if col_q is not None:
